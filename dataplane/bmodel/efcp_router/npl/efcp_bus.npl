@@ -1,0 +1,80 @@
+
+#define PORT_NUM_WIDTH    7
+#define MGID_WIDTH        11
+#define PORT_BITMAP_WIDTH 32
+
+#define MEMBERSHIP_SPG_FAILED 0:0
+#define UNKNOWN_PKT           1:1
+#define CHECKSUM_FAILURE      2:2
+#define L3_LOOKUP_DISCARD     3:3
+#define MAC_ADDR_BCAST        0xffffffffffff 
+
+struct local_t {
+    fields {
+        bit[128] in_port_bitmap;
+        bit[128] temp_port_bitmap;
+    }
+}
+
+struct control_id_t {
+    fields {
+        bit[4]  otpid_enable;
+        bit     ts_enable;
+    }
+}
+
+struct obj_bus_t {
+    fields {
+        bit[2]                  port_type_cfg;
+        bit[PORT_NUM_WIDTH]     port_num;
+        bit[8]                  dst_modid;
+        bit[PORT_NUM_WIDTH]     dst_port;
+        bit[8]                  src_modid;
+        bit[12]                 port_vid;
+        bit[12]                 vid;
+    }
+}
+
+struct aux_bus_t {
+    fields {
+        bit [16]     drop_vector;
+    }
+}
+
+struct egr_obj_bus_t {
+    fields {
+        bit[8]              dst_modid;
+        bit[PORT_NUM_WIDTH] dst_port;
+        bit[PORT_NUM_WIDTH] ing_port;
+        bit[16]             ingress_timestamp;
+    }
+}
+
+struct time_bus_t {
+    fields {
+        bit[16] currenttime;
+    }
+}
+
+struct ccbi_t {
+    fields {
+        bit[128] l2_pbm;
+        bit[128] l3_pbm;
+    }
+}
+
+struct ccbe_t {
+    fields {
+        bit[PORT_NUM_WIDTH] dst_port;
+    }
+}
+
+bus local_t               local;
+bus control_id_t          control_id;
+bus obj_bus_t             obj_bus;
+bus aux_bus_t             aux_bus;
+bus aux_bus_t             egr_aux_bus;
+bus egr_obj_bus_t         egr_obj_bus;
+bus time_bus_t            time_bus;
+bus ccbi_t                ccbi;
+bus ccbe_t                ccbe;
