@@ -16,8 +16,8 @@ source ./bin/setup.sh
 Once the environment is ready, follow the below steps to **build and run** the NPL project:
 
 ```bash
-export NPL_EXAMPLES=/home/npl/nplRINA
-cd $NPL_EXAMPLES/efcp_switch
+export NPL_EXAMPLES=/home/npl/rina_router/dataplane/bmodel
+cd $NPL_EXAMPLES/efcp_router
 make fe_nplsim
 make nplsim_comp
 make nplsim_run
@@ -29,7 +29,7 @@ Before you inject packets you need populate Logical tables using pre-defined tab
 Command to use is as below:
 
 ```
-rcload /home/npl/nplRINA/efcp_switch/bm_tests/tests/tbl_cfg.txt
+rcload /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/tbl_cfg.txt
 ```
 
 Now is possible to inject packet using below command from **original console window** where you compiled the NPL code. If you run the test in another terminal instance, make sure you have the enviroment ready.
