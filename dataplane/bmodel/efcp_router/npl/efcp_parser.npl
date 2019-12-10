@@ -24,7 +24,7 @@ struct group1_t {
     fields {
         l2_t         l2;
         vlan_t       vlan;
-        }
+    }
 }
 
 /*
@@ -36,7 +36,7 @@ struct ing_pkt_t {
     fields {
         group1_t group1;
         efcp_group efcp_hdr;
-        }
+    }
 }
 
 struct egr_pkt_t {
@@ -71,13 +71,13 @@ parser_node ethernet {
         if (control_id.otpid_enable[3:3] && latest.ethertype == VLAN) {
             /*0x8100 VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging
             IEEE 802.1aq with NNI compatibility[10]*/
-            print("He entrat en latest.ethertype = 0x8100\n");
+            print("Inside latest.ethertype = 0x8100\n");
             next_node vlan;
         } 
         
         if (latest.ethertype == EFCP) {
             //0xD1F0
-            print("He entrat en latest.ethertype = D1F\n");
+            print("Inside latest.ethertype = D1F\n");
             next_node efcp;
         }                         
         
@@ -93,13 +93,13 @@ parser_node ethernet {
 
 
 parser_node vlan {
-    print("He entrado en el parser_node vlan\n");
+    print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.group1.vlan);
     next_node efcp;
 }
 
 parser_node efcp {
-    print("He entrado en el parser_node efcp\n");
+    print("Inside parser_node efcp\n");
     extract_fields(ingress_pkt.efcp_hdr.efcp);
     next_node ingress;
 }
