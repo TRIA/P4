@@ -1,2 +1,2 @@
 *.log
-/efcp_switch/fe_output/*
+/efcp_router/fe_output/*
