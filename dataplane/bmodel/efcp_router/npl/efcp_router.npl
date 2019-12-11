@@ -125,6 +125,30 @@ function do_packet_modif() { //to be implemented on flex editor
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
 }
 
+function handle_vlan(){
+    print("obj_bus.vid is 0X%x\n", obj_bus.vid);
+    
+    if(egress_pkt.group1.vlan._PRESENT){
+        //Mira a ver si asigna correctamente el vid en el paquete
+        /*if(egress_pkt.group1.vlan.vid == 33){
+        print("vid == 33!!\n");
+        }*/
+        if(ingress_pkt.group1.vlan.vid == 0){
+            print("He entrado en el if de vlan = 0 habiendo vlan header\n");
+            delete_header(egress_pkt.group1.vlan);
+        } else {                                    
+            replace_header_field(egress_pkt.group1.vlan.vid, obj_bus.vid);
+        }
+    } else {
+        if(ingress_pkt.group1.vlan.vid == 0){
+            delete_header(egress_pkt.group1.vlan);
+        } else {
+            print("Supuestamente, added header\n");
+            add_header(egress_pkt.group1.vlan);
+        }
+    }
+}
+
 function update_efcp_checksum() {
     create_checksum(egress_pkt.efcp_hdr.efcp.hdrChecksum,
         {
