@@ -132,7 +132,9 @@ function handle_vlan(){
     if(ingress_pkt.group1.vlan._PRESENT){        
         if(obj_bus.vid == 0){
             print("VLAN header present with vid = 0\n");
-            delete_header(egress_pkt.group1.vlan);
+            delete_header(ingress_pkt.group1.vlan);
+            obj_bus.eth_etype = EFCP;        
+            replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
         }
         else {
             print("VLAN header present, but not 0. vid = 0X%x\n", obj_bus.vid);
@@ -140,6 +142,7 @@ function handle_vlan(){
         }
     }
     else {
+        if(obj_bus.vid != 0){
         print("Added VLAN header\n");        
         add_header(ingress_pkt.group1.vlan);
         replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
@@ -147,6 +150,7 @@ function handle_vlan(){
         obj_bus.vlan_etype = EFCP;        
         replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
         replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
+        }
     }
 }
 
@@ -171,24 +175,29 @@ DEBUG
 *************************************/
 //Print egress packet
 function print_packet() {
+    print("\n### Ethernet ###\n");
+    print("\nMAC destiation = 0X%x\n", egress_pkt.group1.l2.macda);
+    print("MAC source = 0X%x\n", egress_pkt.group1.l2.macsa);
+    print("Ethertype = 0X%x\n", egress_pkt.group1.l2.ethertype);
+
     if(egress_pkt.group1.vlan._PRESENT){
-        print("\n### VLAN ###\n");
-        print("\nPriority Code Point = X%x\n", egress_pkt.group1.vlan.pcp);
-        print("Drop Eligible Indicator = X%x\n", egress_pkt.group1.vlan.cfi);
-        print("VLAN id = X%x\n", egress_pkt.group1.vlan.vid);
-        print("Ethertype = X%x\n", egress_pkt.group1.vlan.ethertype);        
+        print("\n\t### VLAN ###\n");
+        print("\n\tPriority Code Point = X%x\n", egress_pkt.group1.vlan.pcp);
+        print("\tDrop Eligible Indicator = X%x\n", egress_pkt.group1.vlan.cfi);
+        print("\tVLAN id = X%x\n", egress_pkt.group1.vlan.vid);
+        print("\tEthertype = X%x\n", egress_pkt.group1.vlan.ethertype);        
     }    
-    print("\n\t### EFCP ###\n");
-    print("\n\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
-    print("\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
-    print("\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
-    print("\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
-    print("\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
-    print("\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
-    print("\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
-    print("\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
-    print("\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
-    print("\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
+    print("\n\t\t### EFCP ###\n");
+    print("\n\t\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
+    print("\t\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
+    print("\t\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
+    print("\t\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
+    print("\t\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
+    print("\t\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
+    print("\t\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
+    print("\t\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
+    print("\t\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
+    print("\t\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
 }
  
 
