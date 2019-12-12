@@ -22,7 +22,7 @@ struct efcp_t {
     	bit[16]     srcAddr;
     	bit[8]      qosID;
     	bit[16]     dstCEPID;
-   	bit[16]     srcCEPID;
+   	    bit[16]     srcCEPID;
     	bit[8]      pduType;
     	bit[8]      flags;
     	bit[16]     length;

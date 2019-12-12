@@ -60,8 +60,9 @@ logical_table efcp_forward_table {
         bit[16] dest_addr;     
     }
 
-    fields {          
-        bit[48]             macda;        
+    fields {  
+        bit[12]             vid;
+        bit[48]             macda; 
         bit[PORT_NUM_WIDTH] dst_port; 
         bit[8]              dst_modid;
     }
@@ -76,7 +77,8 @@ logical_table efcp_forward_table {
         if(_LOOKUP0 == 1) {
             /* Mas tarde en la funcion do_packet_modif() se asigna egress_pkt =
             ingress_pkt, por eso se guarda la mac en ingress.*/ 
-            ingress_pkt.group1.l2.macda = macda;
+            ingress_pkt.group1.l2.macda = macda;            
+            obj_bus.vid = vid;            
             obj_bus.dst_modid = dst_modid;
             obj_bus.dst_port = dst_port;
         }
@@ -120,32 +122,31 @@ function assign_ing_to_egr_bus() {
 /*************************************
 PACKET MODIFICATION
 *************************************/
-function do_packet_modif() { //to be implemented on flex editor
+function do_packet_modif() { //to be implemented on flex editor    
     egress_pkt.group1.l2 = ingress_pkt.group1.l2;
+    egress_pkt.group1.vlan = ingress_pkt.group1.vlan;
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
 }
 
-function handle_vlan(){
-    print("obj_bus.vid is 0X%x\n", obj_bus.vid);
-    
-    if(egress_pkt.group1.vlan._PRESENT){
-        //Mira a ver si asigna correctamente el vid en el paquete
-        /*if(egress_pkt.group1.vlan.vid == 33){
-        print("vid == 33!!\n");
-        }*/
-        if(ingress_pkt.group1.vlan.vid == 0){
-            print("He entrado en el if de vlan = 0 habiendo vlan header\n");
+function handle_vlan(){            
+    if(ingress_pkt.group1.vlan._PRESENT){        
+        if(obj_bus.vid == 0){
+            print("VLAN header present with vid = 0\n");
             delete_header(egress_pkt.group1.vlan);
-        } else {                                    
-            replace_header_field(egress_pkt.group1.vlan.vid, obj_bus.vid);
         }
-    } else {
-        if(ingress_pkt.group1.vlan.vid == 0){
-            delete_header(egress_pkt.group1.vlan);
-        } else {
-            print("Supuestamente, added header\n");
-            add_header(egress_pkt.group1.vlan);
+        else {
+            print("VLAN header present, but not 0. vid = 0X%x\n", obj_bus.vid);
+            replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
         }
+    }
+    else {
+        print("Added VLAN header\n");        
+        add_header(ingress_pkt.group1.vlan);
+        replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
+        obj_bus.eth_etype = VLAN;
+        obj_bus.vlan_etype = EFCP;        
+        replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
+        replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
     }
 }
 
@@ -168,20 +169,28 @@ function memory_init() {
 /*************************************
 DEBUG
 *************************************/
-//Print egress EFCP layer
-function print_efcp_packet() {
-    print("\n### EFCP ###\n");
-    print("\nVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
-    print("Destination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
-    print("Source address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
-    print("QoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
-    print("Source CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
-    print("PDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
-    print("Flags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
-    print("Length = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
-    print("Sequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
-    print("Checksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
+//Print egress packet
+function print_packet() {
+    if(egress_pkt.group1.vlan._PRESENT){
+        print("\n### VLAN ###\n");
+        print("\nPriority Code Point = X%x\n", egress_pkt.group1.vlan.pcp);
+        print("Drop Eligible Indicator = X%x\n", egress_pkt.group1.vlan.cfi);
+        print("VLAN id = X%x\n", egress_pkt.group1.vlan.vid);
+        print("Ethertype = X%x\n", egress_pkt.group1.vlan.ethertype);        
+    }    
+    print("\n\t### EFCP ###\n");
+    print("\n\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
+    print("\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
+    print("\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
+    print("\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
+    print("\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
+    print("\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
+    print("\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
+    print("\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
+    print("\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
+    print("\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
 }
+ 
 
 /*************************************
 PROGRAM
@@ -217,9 +226,11 @@ program efcp_switch {
     //-----Egress---------//
     assign_ing_to_egr_bus();
 
-    do_packet_modif();  
+    handle_vlan();
+    do_packet_modif();      
     update_efcp_checksum();    
-    print_efcp_packet();    
+    print_packet();    
+    
 
     //In VI Component - Implement drop functionality in End of the Pipe 
     edb.usage_mode_create( 0,
