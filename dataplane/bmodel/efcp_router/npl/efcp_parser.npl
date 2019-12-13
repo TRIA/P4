@@ -25,6 +25,7 @@ struct l3_group_t {
     fields {
         ipv4_t         ipv4;
     }
+}
 
 
 /*Level 2 group level struct*/
@@ -108,7 +109,6 @@ parser_node ethernet {
     }
 }
 
-
 parser_node vlan {
     print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.group1.vlan);
@@ -121,7 +121,7 @@ parser_node efcp {
     next_node ingress;
 }
 
-parser_node efcp {
+parser_node ipv4 {
     print("Inside parser_node ipv4\n");
     extract_fields(ingress_pkt.l3_hdr.ipv4);
     next_node ingress;
