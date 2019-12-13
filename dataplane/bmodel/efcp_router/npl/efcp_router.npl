@@ -193,16 +193,30 @@ function handle_vlan(){
     }
 }
 
-function update_efcp_checksum() {
-    create_checksum(egress_pkt.efcp_hdr.efcp.hdrChecksum,
-        {
-            egress_pkt.efcp_hdr.efcp.vers, egress_pkt.efcp_hdr.efcp.dstAddr,
-            egress_pkt.efcp_hdr.efcp.srcAddr, egress_pkt.efcp_hdr.efcp.qosID,
-            egress_pkt.efcp_hdr.efcp.dstCEPID, egress_pkt.efcp_hdr.efcp.pduType,
-            egress_pkt.efcp_hdr.efcp.srcCEPID, egress_pkt.efcp_hdr.efcp.flags,
-            egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seqnum
-        });
+function update_checksum() {
+    if(egress_pkt.efcp_hdr.efcp._PRESENT){        
+        create_checksum(egress_pkt.efcp_hdr.efcp.hdrChecksum,
+            {
+                egress_pkt.efcp_hdr.efcp.vers, egress_pkt.efcp_hdr.efcp.dstAddr,
+                egress_pkt.efcp_hdr.efcp.srcAddr, egress_pkt.efcp_hdr.efcp.qosID,
+                egress_pkt.efcp_hdr.efcp.dstCEPID, egress_pkt.efcp_hdr.efcp.pduType,
+                egress_pkt.efcp_hdr.efcp.srcCEPID, egress_pkt.efcp_hdr.efcp.flags,
+                egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seqnum
+            });
+    }
+    else if(egress_pkt.l3_hdr.ipv4._PRESENT){
+        create_checksum(egress_pkt.l3_hdr.ipv4.checksum,
+            {
+                egress_pkt.l3_hdr.ipv4.version, egress_pkt.l3_hdr.ipv4.ihl,
+                egress_pkt.l3_hdr.ipv4.diffserv, egress_pkt.l3_hdr.ipv4.totalLen,
+                egress_pkt.l3_hdr.ipv4.identification, 
+                egress_pkt.l3_hdr.ipv4.flags, egress_pkt.l3_hdr.ipv4.fragOffset,
+                egress_pkt.l3_hdr.ipv4.ttl, egress_pkt.l3_hdr.ipv4.protocol,
+                egress_pkt.l3_hdr.ipv4.srcAddr, egress_pkt.l3_hdr.ipv4.dstAddr
+            });
+    }    
 }
+
 
 function memory_init() {
     ccbe.dst_port = 0;
@@ -225,20 +239,36 @@ function print_packet() {
         print("\tDrop Eligible Indicator = X%x\n", egress_pkt.group1.vlan.cfi);
         print("\tVLAN id = X%x\n", egress_pkt.group1.vlan.vid);
         print("\tEthertype = X%x\n", egress_pkt.group1.vlan.ethertype);        
-    }    
-    print("\n\t\t### EFCP ###\n");
-    print("\n\t\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
-    print("\t\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
-    print("\t\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
-    print("\t\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
-    print("\t\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
-    print("\t\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
-    print("\t\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
-    print("\t\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
-    print("\t\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
-    print("\t\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
+    }
+
+    if(egress_pkt.efcp_hdr.efcp._PRESENT) {
+        print("\n\t\t### EFCP ###\n");
+        print("\n\t\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
+        print("\t\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
+        print("\t\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
+        print("\t\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
+        print("\t\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
+        print("\t\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
+        print("\t\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
+        print("\t\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
+        print("\t\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
+        print("\t\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
+    }
+
+    if(egress_pkt.l3_hdr.ipv4._PRESENT) {
+        print("\n\t\t### IP ###\n");
+        print("\n\t\tVersion = 0X%x\n", egress_pkt.l3_hdr.ipv4.version);        
+        print("\t\tIHL = 0X%x\n", egress_pkt.l3_hdr.ipv4.ihl);                
+        print("\t\tdiffserv = 0X%x\n", egress_pkt.l3_hdr.ipv4.diffserv);                
+        print("\t\tIdentification = 0X%x\n", egress_pkt.l3_hdr.ipv4.identification);                
+        print("\t\tFragmentation Offset = 0X%x\n", egress_pkt.l3_hdr.ipv4.fragOffset);                
+        print("\t\tTTL = 0X%x\n", egress_pkt.l3_hdr.ipv4.ttl);                
+        print("\t\tProtocol = 0X%x\n", egress_pkt.l3_hdr.ipv4.protocol);                
+        print("\t\tChecksum = 0X%x\n", egress_pkt.l3_hdr.ipv4.checksum);        
+        print("\t\tSource Address = 0X%x\n", egress_pkt.l3_hdr.ipv4.srcAddr);                
+        print("\t\tDestination Address = 0X%x\n\n", egress_pkt.l3_hdr.ipv4.dstAddr);                
+    }
 }
- 
 
 /*************************************
 PROGRAM
@@ -275,10 +305,10 @@ program efcp_switch {
     //-----Egress---------//
     assign_ing_to_egr_bus();
 
-//    handle_vlan();
+//  handle_vlan();
     do_packet_modif();      
-//    update_efcp_checksum();    
-//    print_packet();    
+    update_checksum();    
+    print_packet();    
     
 
     //In VI Component - Implement drop functionality in End of the Pipe 
