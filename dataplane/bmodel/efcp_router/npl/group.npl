@@ -1,12 +1,11 @@
 #include "header.npl"
 
-/*
-* A struct is also used to package the headers into a header group level struct.
-* Header groups are required to define a packet in the NPL.
-* Header group level structs are packed to specify a packet.
-* A header group level struct must only instantiate structs used to declare header types.
-* bit/bit[] are not allowed. Arrays of header groups are not allowed.
-*/
+// A group level struct is used to aggregate multiple headers into a header group
+// - The header groups must follow the order in which the groups appear across all packets
+// - Header groups are required to define a packet in the NPL
+// - Header group level structs are packed to specify a packet
+// - A header group level struct must only instantiate structs used to declare header types
+// - bit/bit[] are not allowed. Arrays of header groups are not allowed
 
 // EFCP group level struct
 struct efcp_group {

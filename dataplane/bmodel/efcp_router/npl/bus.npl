@@ -70,6 +70,7 @@ struct ccbe_t {
     }
 }
 
+// Bus instances
 bus local_t               local;
 bus control_id_t          control_id;
 bus obj_bus_t             obj_bus;

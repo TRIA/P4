@@ -1,10 +1,8 @@
 #include "group.npl"
 
-/*
-* A packet level struct is used to aggregate multiple headers or header
-* groups into a packet. The header groups must follow the order in which
-* the groups appear across all packets.
-*/
+// A packet level struct is used to aggregate multiple headers or header groups into a packet
+// The header groups must follow the order in which the groups appear across all packets
+
 struct ing_pkt_t {
     fields {
         layer2_group l2_hdr;
@@ -19,8 +17,6 @@ struct egr_pkt_t {
     }
 }
 
-/*
-* Packet instances are declared using the keyword packet
-*/
+// Packet instances
 packet ing_pkt_t ingress_pkt;
 packet egr_pkt_t egress_pkt;

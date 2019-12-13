@@ -54,16 +54,14 @@ function handle_vlan() {
             print("VLAN header present, but not 0. vid = 0X%x\n", obj_bus.vid);
             replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
         }
-    } else {
-        if (obj_bus.vid != 0) {
-            print("Added VLAN header\n");        
-            add_header(ingress_pkt.l2_hdr.vlan);
-            replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
-            obj_bus.eth_etype = VLAN;
-            obj_bus.vlan_etype = EFCP;        
-            replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
-            replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
-        }
+    } else if (obj_bus.vid != 0) {
+        print("Added VLAN header\n");        
+        add_header(ingress_pkt.l2_hdr.vlan);
+        replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
+        obj_bus.eth_etype = VLAN;
+        obj_bus.vlan_etype = EFCP;        
+        replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
+        replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
     }
 }
 
