@@ -2,7 +2,8 @@
 
 // Use defines until registers are implemented
 #define VLAN 0x8100
-#define EFCP 0xD1F
+#define EFCP 0x0D1F
+#define IPv4 0x0800
 
 /*
 * A struct is also used to package the headers into a header group level struct.
@@ -18,6 +19,13 @@ struct efcp_group {
         efcp_t         efcp;
     }
 }
+
+/*Level 3 group level struct*/
+struct l3_group_t {
+    fields {
+        ipv4_t         ipv4;
+    }
+
 
 /*Level 2 group level struct*/
 struct group1_t {
@@ -36,6 +44,7 @@ struct ing_pkt_t {
     fields {
         group1_t group1;
         efcp_group efcp_hdr;
+        l3_group_t l3_hdr;
     }
 }
 
@@ -43,6 +52,7 @@ struct egr_pkt_t {
     fields {
         group1_t group1;
         efcp_group efcp_hdr;
+        l3_group_t l3_hdr;
     }
 }
 
@@ -75,13 +85,20 @@ parser_node ethernet {
             next_node vlan;
         } 
         
-        if (latest.ethertype == EFCP) {
+        else if (latest.ethertype == EFCP) {
             //0xD1F0
             print("Inside latest.ethertype = D1F\n");
             next_node efcp;
-        }                         
+        }
+
+        else if (latest.ethertype == IPv4) {
+            //0x0800
+            print("Inside latest.ethertype = 0x0800\n");
+            next_node ipv4;
+        }                                 
         
         switch(latest.ethertype) {
+            0x0800            : next_node ipv4;
             0xD1F0            : next_node efcp;
             default           : next_node ingress;
         }        
@@ -101,6 +118,12 @@ parser_node vlan {
 parser_node efcp {
     print("Inside parser_node efcp\n");
     extract_fields(ingress_pkt.efcp_hdr.efcp);
+    next_node ingress;
+}
+
+parser_node efcp {
+    print("Inside parser_node ipv4\n");
+    extract_fields(ingress_pkt.l3_hdr.ipv4);
     next_node ingress;
 }
 
