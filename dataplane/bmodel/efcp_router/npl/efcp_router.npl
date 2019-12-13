@@ -172,23 +172,37 @@ function handle_vlan(){
         if(obj_bus.vid == 0){
             print("VLAN header present with vid = 0\n");
             delete_header(ingress_pkt.group1.vlan);
-            obj_bus.eth_etype = EFCP;        
+
+            if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
+                obj_bus.eth_etype = EFCP;        
+            }
+            else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
+                obj_bus.eth_etype = IPv4;        
+            } 
+
             replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
         }
         else {
-            print("VLAN header present, but not 0. vid = 0X%x\n", obj_bus.vid);
+            print("VLAN header present, but vid not 0. vid = 0X%x\n", obj_bus.vid);
             replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
         }
     }
     else {
         if(obj_bus.vid != 0){
-        print("Added VLAN header\n");        
-        add_header(ingress_pkt.group1.vlan);
-        replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
-        obj_bus.eth_etype = VLAN;
-        obj_bus.vlan_etype = EFCP;        
-        replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
-        replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
+            print("Added VLAN header\n");        
+            add_header(ingress_pkt.group1.vlan);
+            replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
+            obj_bus.eth_etype = VLAN;
+
+            if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
+                obj_bus.vlan_etype = EFCP;        
+            }
+            else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
+                obj_bus.vlan_etype = IPv4;        
+            }                        
+
+            replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
+            replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
         }
     }
 }
@@ -291,8 +305,13 @@ program efcp_switch {
     parse_begin(start);
     port_table.lookup(0);
     
-    efcp_forward_table.lookup(0);    
-    ipv4_forward_table.lookup(0);    
+    if(ingress_pkt.efcp_hdr.efcp._PRESENT){
+        efcp_forward_table.lookup(0);    
+    }    
+    if(ingress_pkt.l3_hdr.ipv4._PRESENT){
+        ipv4_forward_table.lookup(0);         
+    }        
+
     resolve_destination();
 
     mmu.usage_mode_create( 0,
@@ -305,7 +324,7 @@ program efcp_switch {
     //-----Egress---------//
     assign_ing_to_egr_bus();
 
-//  handle_vlan();
+    handle_vlan();
     do_packet_modif();      
     update_checksum();    
     print_packet();    

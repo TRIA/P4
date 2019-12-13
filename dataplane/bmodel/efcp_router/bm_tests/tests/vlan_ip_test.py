@@ -2,8 +2,7 @@
 nplsim test script
 """
 
-from scapy.all import Ether, Dot1Q, IP, TCP, Raw, hexdump
-
+from scapy.all import *
 import os
 import sys
 
@@ -13,15 +12,20 @@ from batch_test_base import BatchTestBase, socket_port_get, reg_file_get
 
 CFG_FILE = 'bm_tests/l2_test/tbl_cfg.txt'
 
-
 #Pkt config
-dst_mac = "00:00:05:00:00:01"
-src_mac = "00:00:05:00:00:00"
+dst_mac = "00:00:05:00:00:02"
+src_mac = "00:00:05:00:00:01"
 dip = "10.0.0.2"
 sip = "10.0.0.1"
 
+class VLAN(Packet):
+    name = "VLAN"
+    fields_desc = [ShortField("pcp_dei_id", 0x00), ShortField("etherType", 0x0000)]
+
+bind_layers(Ether, VLAN)
+
 def get_tx_packet(test_num):
-    pkt = Ether()/IP()/Raw()
+    pkt = Ether(type=0x8100)/VLAN(etherType=0x0800)/IP()/Raw()
     pkt[Ether].dst = dst_mac
     pkt[Ether].src = src_mac
     pkt[IP].dst = dip
@@ -45,7 +49,7 @@ class Test(object):
         self.connected = self.bt_if.connect(host, sport, reg_file)
 
         if self.batch_mode:
-            # if batch_mode then then load config file
+            # if batch_mode then load config file
             stat = self.bt_if.configure(cfg_file)
 
             (stat, data) = self.bt_if.process_txt_cmd('debug_level 4')
@@ -65,7 +69,9 @@ class Test(object):
             for i in port:
 
                 # get packet
+                
                 pkt = get_tx_packet(i+1)
+
 
                 print "##################################"
                 print "TX PKT num {} on port {}:".format(count, i)
@@ -96,7 +102,6 @@ class Test(object):
             # if batch_mode then close nplsim,
             self.bt_if.exit()
 
-
 if __name__ == '__main__':
     """ test.py -port <socket port num> -fe <output dir>
         if -fe is specified then running in batch_mode:
@@ -119,5 +124,4 @@ if __name__ == '__main__':
     test_if.run()
 
     # close nplsim
-    test_if.exit()
-
+    test_if.exit()            

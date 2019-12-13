@@ -112,7 +112,12 @@ parser_node ethernet {
 parser_node vlan {
     print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.group1.vlan);
-    next_node efcp;
+
+    switch(latest.ethertype) {
+    0x0800            : next_node ipv4;
+    0xD1F0            : next_node efcp;
+    default           : next_node ingress;
+} 
 }
 
 parser_node efcp {

@@ -44,7 +44,6 @@ bind_layers(Ether, VLAN)
 bind_layers(VLAN, EFCP, type=0x8100)
 
 def get_tx_packet(test_num):
-    pkt = Ether() / EFCP(dst_addr=2, pdu_type=0x80)
     pkt = Ether(type=0x8100) / VLAN(etherType=0xD1F) / EFCP(dst_addr=2, pdu_type=0x80)
     pkt[Ether].dst = dst_mac
     pkt[Ether].src = src_mac
