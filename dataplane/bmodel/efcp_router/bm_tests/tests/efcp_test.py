@@ -29,16 +29,16 @@ class EFCP(Packet):
                     XByteField("qos_id", 0x00),
                     ShortField("dst_cepid", 0),
                     ShortField("src_cepid", 0),
-                    XByteField("pdu_type", 0x00),
+                    XByteField("pdutype", 0x00),
                     XByteField("flags", 0x00),
                     ShortField("length", 1),
-                    IntField("seqnum", 0),
+                    IntField("seq_num", 0),
                     XShortField("chksum", 0x00)]
 
 bind_layers(Ether, EFCP, type=0xD1F)
 
 def get_tx_packet(test_num):
-    pkt = Ether() / EFCP(dst_addr=2, pdu_type=0x80)
+    pkt = Ether() / EFCP(dst_addr=2, pdutype=0x80)
     pkt[Ether].dst = dst_mac
     pkt[Ether].src = src_mac
     pkt = pkt/"This EFCP packet #{} from CLI to BM :)".format(test_num)

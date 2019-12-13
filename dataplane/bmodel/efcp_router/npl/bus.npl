@@ -1,4 +1,3 @@
-
 #define PORT_NUM_WIDTH    7
 #define MGID_WIDTH        11
 #define PORT_BITMAP_WIDTH 32

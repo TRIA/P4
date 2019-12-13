@@ -3,11 +3,11 @@ lt port_table insert port_num=1 default_vid=0 src_modid=0x9
 lt port_table insert port_num=2 default_vid=0 src_modid=0x9
 
 # efcp_forward_table: hash; keys: dest_addr
-lt efcp_forward_table insert dest_addr=0x0001 dst_modid=0x9 dst_port=0x1 macda=0x000005000001
+lt efcp_forward_table insert dest_addr=0x0001 dst_modid=0x9 dst_port=0x1 mac_dst_addr=0x000005000001
 # With VLAN:
-lt efcp_forward_table insert dest_addr=0x0002 dst_modid=0x9 dst_port=0x2 macda=0x000005000002 vid=33
+lt efcp_forward_table insert dest_addr=0x0002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002 vid=33
 # Without VLAN: 
-#lt efcp_forward_table insert dest_addr=0x0002 dst_modid=0x9 dst_port=0x2 macda=0x000005000002 
+#lt efcp_forward_table insert dest_addr=0x0002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002 
 
 # indicate ingress packets don't have crc
 pkt_has_crc 0

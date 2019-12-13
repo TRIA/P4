@@ -1,38 +1,24 @@
 # NPL simple implementation for a RINA interior router
 
-Simple NPL implementation that only forward EFCP packets (without VLAN)
+Simple NPL implementation that forward EFCP packets (including VLAN header)
 
 ## Building and running project
 
-Is necessary to first **build the environment**
+Is necessary to first **build the environment**, then **build and run** the NPL project. That is done via a single script:
 
 ```bash
-sudo bash
-  # Password is “npl”
-cd ~/ncsc-1.3.3rc4
-source ./bin/setup.sh
-```
-
-Once the environment is ready, follow the below steps to **build and run** the NPL project:
-
-```bash
-export NPL_EXAMPLES=/home/npl/rina_router/dataplane/bmodel
-cd $NPL_EXAMPLES/efcp_router
-make fe_nplsim
-make nplsim_comp
-make nplsim_run
+sudo ./build_run.sh
 ```
 
 Now you will see two xterm windows one with name `BMODEL` and another with `BMCLI`.
 
-Before you inject packets you need populate Logical tables using pre-defined table configurations **through `BMCLI` window**.  
-Command to use is as below:
+Before you inject packets you need to populate logical tables using pre-defined table configurations **through the `BMCLI` window**:
 
 ```
 rcload /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/tbl_cfg.txt
 ```
 
-Now is possible to inject packet using below command from **original console window** where you compiled the NPL code. If you run the test in another terminal instance, make sure you have the enviroment ready.
+Now it is possible to inject a packet using the command below from the **original console window** where you compiled the NPL code. If you run the test in another terminal instance, make sure you have the enviroment ready.
 
 ```bash
 python bm_tests/tests/efcp_test.py
@@ -44,7 +30,8 @@ The above `efcp_test.py` sends an ingress packet to port 1 through the `loopback
 ## Useful stuff
 
 ### Print
-NPL uses print construct to print value of any variable in the program. print command is translated to the
+
+NPL uses the print construct to print the value of any variable in the program. The print command is translated to the
 Behavioral C Model. It does not have significance from compilation point of view. print invocation is called in
 the C model in the same sequence as in an NPL program. Only fields can be printed, no structs. Internally,
 print command works in a similar way as the C printf command.
@@ -57,6 +44,7 @@ print("Value of the SVP is %d, VFI is %d\n", obj_bus.svp, obj_bus.vfi);
 ```
 
 ### Create Checksum
+
 The Create Checksum construct can only be used in function constructs. The create checksum supports TCP/UDP checksum calculations.
 
 **Example:**
@@ -130,5 +118,3 @@ Receiving packet from BM
 Dst Port = 2
 Dst Modid = 9
 ```
-
-

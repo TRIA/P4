@@ -1,0 +1,25 @@
+#include "header.npl"
+
+/*
+* A struct is also used to package the headers into a header group level struct.
+* Header groups are required to define a packet in the NPL.
+* Header group level structs are packed to specify a packet.
+* A header group level struct must only instantiate structs used to declare header types.
+* bit/bit[] are not allowed. Arrays of header groups are not allowed.
+*/
+
+// EFCP group level struct
+struct efcp_group {
+    fields {
+        efcp_t         efcp;
+    }
+}
+
+// Level 2 group level struct
+struct layer2_group {
+    fields {
+        l2_t         l2;
+        vlan_t       vlan;
+    }
+}
+
