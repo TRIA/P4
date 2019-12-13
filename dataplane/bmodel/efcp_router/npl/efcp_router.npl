@@ -85,6 +85,45 @@ logical_table efcp_forward_table {
     }
 }
 
+/********************
+IPv4 LOGICAL TABLE
+********************/
+logical_table ipv4_forward_table {
+
+    table_type : hash;
+
+    minsize    : 8192;
+    maxsize    : 16384;
+
+    keys{
+        bit[32] dest_addr;     
+    }
+
+    fields {  
+        //bit[12]             vid;
+        bit[48]             macda; 
+        bit[PORT_NUM_WIDTH] dst_port; 
+        bit[8]              dst_modid;
+    }
+
+    key_construct() {
+        if(_LOOKUP0 == 1) {           
+            dest_addr = ingress_pkt.l3_hdr.ipv4.dstAddr;
+        }
+    }
+
+    fields_assign() {
+        if(_LOOKUP0 == 1) {
+            /* Mas tarde en la funcion do_packet_modif() se asigna egress_pkt =
+            ingress_pkt, por eso se guarda la mac en ingress.*/ 
+            ingress_pkt.group1.l2.macda = macda;            
+            //obj_bus.vid = vid;            
+            obj_bus.dst_modid = dst_modid;
+            obj_bus.dst_port = dst_port;
+        }
+    }
+}
+
 
 /***********************
 EGRESS TABLES
@@ -99,7 +138,6 @@ Resolve Destination
  - Pick destination results from one of the table lookups
 *************************************/
 function resolve_destination() { 
-
     /*By default on obj_bus dst_modid and dst_port are from the L2 table.
     However if L3 lookup was successful then pick it from nhi table.*/
         ccbi.l2_pbm = 1 << obj_bus.dst_port;
@@ -122,10 +160,11 @@ function assign_ing_to_egr_bus() {
 /*************************************
 PACKET MODIFICATION
 *************************************/
-function do_packet_modif() { //to be implemented on flex editor    
+function do_packet_modif() { //to be implemented on flex editor        
     egress_pkt.group1.l2 = ingress_pkt.group1.l2;
     egress_pkt.group1.vlan = ingress_pkt.group1.vlan;
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
+    egress_pkt.l3_hdr.ipv4 = ingress_pkt.l3_hdr.ipv4;
 }
 
 function handle_vlan(){            
@@ -223,6 +262,7 @@ program efcp_switch {
     port_table.lookup(0);
     
     efcp_forward_table.lookup(0);    
+    ipv4_forward_table.lookup(0);    
     resolve_destination();
 
     mmu.usage_mode_create( 0,
@@ -235,10 +275,10 @@ program efcp_switch {
     //-----Egress---------//
     assign_ing_to_egr_bus();
 
-    handle_vlan();
+//    handle_vlan();
     do_packet_modif();      
-    update_efcp_checksum();    
-    print_packet();    
+//    update_efcp_checksum();    
+//    print_packet();    
     
 
     //In VI Component - Implement drop functionality in End of the Pipe 
