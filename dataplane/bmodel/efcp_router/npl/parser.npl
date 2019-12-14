@@ -1,0 +1,61 @@
+#include "packet.npl"
+
+// Use defines until registers are implemented
+#define VLAN 0x8100
+#define EFCP 0xD1F
+
+parser_node start {
+    root_node : 1; 
+    switch (obj_bus.port_type_cfg) {
+        0x3     :   next_node ethernet;
+        default :   next_node ingress;
+    }
+}
+
+parser_node ethernet {
+    // Specify which header instance to extract here
+    // - All fields of a specified header instance are extracted here
+    // - Packet parsing pointer also moves extract_fields
+    extract_fields(ingress_pkt.l2_hdr.l2); 
+
+    if (control_id.ts_enable == 0) { 
+        if (control_id.otpid_enable[3:3] && latest.ethertype == VLAN) {
+            // 0x8100 VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging
+            // IEEE 802.1aq with NNI compatibility[10]
+            print("Inside latest.ethertype = 0x8100\n");
+            next_node vlan;
+        } 
+        
+        if (latest.ethertype == EFCP) {
+            // 0xD1F0
+            print("Inside latest.ethertype = D1F\n");
+            next_node efcp;
+        }                         
+        
+        switch (latest.ethertype) {
+            0xD1F0            : next_node efcp;
+            default           : next_node ingress;
+        }        
+    }
+    else {
+        next_node ingress;
+    }
+}
+
+
+parser_node vlan {
+    print("Inside parser_node vlan\n");
+    extract_fields(ingress_pkt.l2_hdr.vlan);
+    next_node efcp;
+}
+
+parser_node efcp {
+    print("Inside parser_node efcp\n");
+    extract_fields(ingress_pkt.efcp_hdr.efcp);
+    next_node ingress;
+}
+
+parser_node ingress {
+    // Specify that this is the last node of this tree
+    end_node : 1; 
+}

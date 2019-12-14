@@ -1,0 +1,33 @@
+struct vlan_t {
+    fields {
+        bit[3]      pcp;
+        bit[1]      cfi;
+        bit[12]     vid;
+        bit[16]     ethertype;
+    }
+}
+
+struct l2_t {
+    fields {
+        bit[48]     mac_dst_addr;
+        bit[48]     mac_src_addr;
+        bit[16]     ethertype;
+    }
+}
+
+struct efcp_t {
+    fields {
+    	bit[8]      version;
+    	bit[16]     ipc_dst_addr;
+    	bit[16]     ipc_src_addr;
+    	bit[8]      qos_id;
+        // Connection Endpoint IDs
+    	bit[16]     cep_dst_id;
+        bit[16]     cep_src_id;
+    	bit[8]      pdutype;
+    	bit[8]      flags;
+    	bit[16]     length;
+    	bit[32]     seq_num;
+    	bit[16]     hdr_checksum;
+    }
+}

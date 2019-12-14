@@ -1,115 +1,27 @@
-//This Program lists Simple L2 Switch Functionality
-#include "efcp_bus.npl"
-#include "efcp_parser.npl"
-#include "efcp_sf_defines.npl"
+// This program implements the Error And Flow Control Protocol (EFCP), as well as legacy protocols
 
-/********************
-TABLE SPECIFICATION
-********************/
-/********************
-PORT TABLE
-********************/
-logical_table port_table {
-
-    table_type : index;
-    minsize    : 128;
-    maxsize    : 128;
-
-    keys {
-        bit[PORT_NUM_WIDTH] port_num;
-    }
-
-    fields {
-        bit[8]  src_modid;
-        bit[12] default_vid;
-    }
-
-    key_construct() {
-        if (_LOOKUP0 == 1) {
-            port_num = obj_bus.port_num;
-        }
-    }
-
-    fields_assign() {
-        if (_LOOKUP0 == 1) {
-            obj_bus.src_modid = src_modid;
-            obj_bus.port_vid = default_vid;
-        }
-    }
-}
-
-/********************
-EFCP LOGICAL TABLE
-********************/
-logical_table efcp_forward_table {
-
-    table_type : hash;
-    /*Minimum guaranteed size. Physical table must have this
-    number of entries.*/
-    minsize    : 8192;
-
-    /*Maximum allowed size. This is mainly for SDK populate
-    purposes, in case maxsize and minsize have different
-    values.
-    If minsize and maxsize are the same, then it is treated
-    as constant "size" for that table. The compiler must find
-    a physical table of the specified size.*/
-    maxsize    : 16384;
-
-    keys{
-        bit[16] dest_addr;     
-    }
-
-    fields {  
-        bit[12]             vid;
-        bit[48]             macda; 
-        bit[PORT_NUM_WIDTH] dst_port; 
-        bit[8]              dst_modid;
-    }
-
-    key_construct() {
-        if(_LOOKUP0 == 1) {           
-            dest_addr = ingress_pkt.efcp_hdr.efcp.dstAddr;
-        }
-    }
-
-    fields_assign() {
-        if(_LOOKUP0 == 1) {
-            /* Mas tarde en la funcion do_packet_modif() se asigna egress_pkt =
-            ingress_pkt, por eso se guarda la mac en ingress.*/ 
-            ingress_pkt.group1.l2.macda = macda;            
-            obj_bus.vid = vid;            
-            obj_bus.dst_modid = dst_modid;
-            obj_bus.dst_port = dst_port;
-        }
-    }
-}
-
-
-/***********************
-EGRESS TABLES
-***********************/
+#include "bus.npl"
+#include "parser.npl"
+#include "special_function.npl"
+#include "table.npl"
+#include "debug.npl"
 
 /*************************************
 FUNCTION DECLARATION
 *************************************/
 
-/*************************************
-Resolve Destination 
- - Pick destination results from one of the table lookups
-*************************************/
-function resolve_destination() { 
-
-    /*By default on obj_bus dst_modid and dst_port are from the L2 table.
-    However if L3 lookup was successful then pick it from nhi table.*/
-        ccbi.l2_pbm = 1 << obj_bus.dst_port;
+// Resolve Destination
+// - Pick destination results from one of the table lookups
+function resolve_destination() {
+    // By default on obj_bus dst_modid and dst_port are from the L2 table.
+    // However if L3 lookup was successful then pick it from nhi table.
+    ccbi.l2_pbm = 1 << obj_bus.dst_port;
 }
 
-
-/*************************************
-ASSIGN to EGR BUS 
- - Notional Only for clarity of understanding. Need not do this.
-*************************************/
+// Assign data from the ingress bus (used in the ingress pipeline) to
+// data in the egress bus (used in the egress pipeline)
+// - Not needed by the logic (a single bus could be used for the whole program),
+// - but nevertheless provided for architectural and educational reasons
 function assign_ing_to_egr_bus() {
     egr_obj_bus.dst_modid       = obj_bus.dst_modid;
     egr_obj_bus.dst_port        = ccbe.dst_port;
@@ -122,46 +34,46 @@ function assign_ing_to_egr_bus() {
 /*************************************
 PACKET MODIFICATION
 *************************************/
-function do_packet_modif() { //to be implemented on flex editor    
-    egress_pkt.group1.l2 = ingress_pkt.group1.l2;
-    egress_pkt.group1.vlan = ingress_pkt.group1.vlan;
+// - To be implemented on Flex editor
+function do_modify_packet () { //to be implemented on flex editor    
+    egress_pkt.l2_hdr.l2 = ingress_pkt.l2_hdr.l2;
+    egress_pkt.l2_hdr.vlan = ingress_pkt.l2_hdr.vlan;
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
 }
 
-function handle_vlan(){            
-    if(ingress_pkt.group1.vlan._PRESENT){        
-        if(obj_bus.vid == 0){
+// TODO: document better
+// Manage the VLAN header in the ingress packet
+function handle_vlan() {            
+    if (ingress_pkt.l2_hdr.vlan._PRESENT) {        
+        if (obj_bus.vid == 0) {
             print("VLAN header present with vid = 0\n");
-            delete_header(ingress_pkt.group1.vlan);
+            delete_header(ingress_pkt.l2_hdr.vlan);
             obj_bus.eth_etype = EFCP;        
-            replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
-        }
-        else {
+            replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
+        } else {
             print("VLAN header present, but not 0. vid = 0X%x\n", obj_bus.vid);
-            replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
         }
-    }
-    else {
-        if(obj_bus.vid != 0){
+    } else if (obj_bus.vid != 0) {
         print("Added VLAN header\n");        
-        add_header(ingress_pkt.group1.vlan);
-        replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
+        add_header(ingress_pkt.l2_hdr.vlan);
+        replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
         obj_bus.eth_etype = VLAN;
         obj_bus.vlan_etype = EFCP;        
-        replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
-        replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
-        }
+        replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
+        replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
     }
 }
 
 function update_efcp_checksum() {
-    create_checksum(egress_pkt.efcp_hdr.efcp.hdrChecksum,
+    create_checksum(
+        egress_pkt.efcp_hdr.efcp.hdr_checksum,
         {
-            egress_pkt.efcp_hdr.efcp.vers, egress_pkt.efcp_hdr.efcp.dstAddr,
-            egress_pkt.efcp_hdr.efcp.srcAddr, egress_pkt.efcp_hdr.efcp.qosID,
-            egress_pkt.efcp_hdr.efcp.dstCEPID, egress_pkt.efcp_hdr.efcp.pduType,
-            egress_pkt.efcp_hdr.efcp.srcCEPID, egress_pkt.efcp_hdr.efcp.flags,
-            egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seqnum
+            egress_pkt.efcp_hdr.efcp.version, egress_pkt.efcp_hdr.efcp.ipc_dst_addr,
+            egress_pkt.efcp_hdr.efcp.ipc_src_addr, egress_pkt.efcp_hdr.efcp.qos_id,
+            egress_pkt.efcp_hdr.efcp.cep_dst_id, egress_pkt.efcp_hdr.efcp.pdutype,
+            egress_pkt.efcp_hdr.efcp.cep_src_id, egress_pkt.efcp_hdr.efcp.flags,
+            egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seq_num
         });
 }
 
@@ -170,46 +82,16 @@ function memory_init() {
     ccbi.l3_pbm = 0;
 }
 
-/*************************************
-DEBUG
-*************************************/
-//Print egress packet
-function print_packet() {
-    print("\n### Ethernet ###\n");
-    print("\nMAC destiation = 0X%x\n", egress_pkt.group1.l2.macda);
-    print("MAC source = 0X%x\n", egress_pkt.group1.l2.macsa);
-    print("Ethertype = 0X%x\n", egress_pkt.group1.l2.ethertype);
-
-    if(egress_pkt.group1.vlan._PRESENT){
-        print("\n\t### VLAN ###\n");
-        print("\n\tPriority Code Point = X%x\n", egress_pkt.group1.vlan.pcp);
-        print("\tDrop Eligible Indicator = X%x\n", egress_pkt.group1.vlan.cfi);
-        print("\tVLAN id = X%x\n", egress_pkt.group1.vlan.vid);
-        print("\tEthertype = X%x\n", egress_pkt.group1.vlan.ethertype);        
-    }    
-    print("\n\t\t### EFCP ###\n");
-    print("\n\t\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.vers);
-    print("\t\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.dstAddr);
-    print("\t\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcAddr);
-    print("\t\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qosID);
-    print("\t\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.srcCEPID);
-    print("\t\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pduType);
-    print("\t\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
-    print("\t\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
-    print("\t\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seqnum);
-    print("\t\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdrChecksum);
-}
- 
 
 /*************************************
 PROGRAM
 *************************************/
 program efcp_switch {
 
+    // NLP setup
     memory_init();
-
-    //In VI Component - Implement Iarb and drive these signals
-    iarb.usage_mode_create( 0,
+    // - In VI Component - implement Iarb and drive these signals
+    iarb.usage_mode_create(0,
             control_id.otpid_enable,
             control_id.ts_enable,
             obj_bus.port_num,
@@ -218,31 +100,37 @@ program efcp_switch {
             );
     iarb.execute();
 
-    //-----Ingress---------//
+    // Ingress pipeline
+    // - Start parsing the different types of packet
     parse_begin(start);
+    // - Invoke port table
     port_table.lookup(0);
-    
-    efcp_forward_table.lookup(0);    
+    // - Invoke EFCP table
+    efcp_forward_table.lookup(0);
+    // - Check specific tables to know where to forward the packet to (depends on the layer in use)
     resolve_destination();
 
-    mmu.usage_mode_create( 0,
+    // NLP setup
+    mmu.usage_mode_create(0,
             ccbi.l2_pbm,
             ccbi.l3_pbm,
             ccbe.dst_port
             );
     mmu.execute();
 
-    //-----Egress---------//
+    // Egress pipeline
+    // - Copies content of one bus into another. Optional
     assign_ing_to_egr_bus();
-
+    // - Manage the existence of the VLAN header
     handle_vlan();
-    do_packet_modif();      
-    update_efcp_checksum();    
-    print_packet();    
-    
+    // - Copy some headers of the ingress packet into the egress packet (currently, L2-related data)
+    do_modify_packet();
+    update_efcp_checksum();
+    print_egress_packet();
 
-    //In VI Component - Implement drop functionality in End of the Pipe 
-    edb.usage_mode_create( 0,
+    // NLP setup
+    // - In VI Component - implement drop functionality in End of the Pipe
+    edb.usage_mode_create(0,
             egr_aux_bus.drop_vector,
             egr_obj_bus.dst_modid,
             egr_obj_bus.dst_port
