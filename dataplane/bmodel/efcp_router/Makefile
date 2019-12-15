@@ -8,7 +8,7 @@ NPL_BMI_CORP_NET = 1
 NPL_BMI_MININET  =
 
 NPL_DIR          = npl
-NPL_PROGRAM_NAME = efcp_router.npl
+NPL_PROGRAM_NAME = router.npl
 NLC_CONFIG       = ${NPL_DIR}/config.ini
 FE_OUTPUT_DIR    = fe_output
 APP_TARGET       = 

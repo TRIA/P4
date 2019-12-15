@@ -1,10 +1,10 @@
 # port_table: index; keys: port_num
-lt port_table insert port_num=1 default_vid=0 src_modid=0x9
-lt port_table insert port_num=2 default_vid=0 src_modid=0x9
+lt port_table insert port_num=1 default_vlan_id=0 src_modid=0x9
+lt port_table insert port_num=2 default_vlan_id=0 src_modid=0x9
 
 # efcp_forward_table: hash; keys: ipc_dst_addr
-lt efcp_forward_table insert dest_addr=0x0001 dst_modid=0x9 dst_port=0x1 mac_dst_addr=0x000005000001
-lt efcp_forward_table insert dest_addr=0x0002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002
+lt efcp_forward_table insert ipc_dst_addr=0x0001 dst_modid=0x9 dst_port=0x1 mac_dst_addr=0x000005000001
+lt efcp_forward_table insert ipc_dst_addr=0x0002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002
 
 # indicate ingress packets don't have crc
 pkt_has_crc 0
