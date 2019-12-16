@@ -1,0 +1,25 @@
+function print_egress_packet() {
+    print("\n### Ethernet ###\n");
+    print("\nMAC destiation = 0X%x\n", egress_pkt.l2_hdr.l2.mac_dst_addr);
+    print("MAC source = 0X%x\n", egress_pkt.l2_hdr.l2.mac_src_addr);
+    print("Ethertype = 0X%x\n", egress_pkt.l2_hdr.l2.ethertype);
+
+    if (egress_pkt.l2_hdr.vlan._PRESENT) {
+        print("\n\t### VLAN ###\n");
+        print("\n\tPriority Code Point = X%x\n", egress_pkt.l2_hdr.vlan.pcp);
+        print("\tDrop Eligible Indicator = X%x\n", egress_pkt.l2_hdr.vlan.cfi);
+        print("\tVLAN id = X%x\n", egress_pkt.l2_hdr.vlan.vid);
+        print("\tEthertype = X%x\n", egress_pkt.l2_hdr.vlan.ethertype);
+    }
+    print("\n\t\t### EFCP ###\n");
+    print("\n\t\tVersion = 0X%x\n", egress_pkt.efcp_hdr.efcp.version);
+    print("\t\tDestination address = 0X%x\n", egress_pkt.efcp_hdr.efcp.ipc_dst_addr);
+    print("\t\tSource address = 0X%x\n", egress_pkt.efcp_hdr.efcp.ipc_src_addr);
+    print("\t\tQoS ID = 0X%x\n", egress_pkt.efcp_hdr.efcp.qos_id);
+    print("\t\tSource CEPID = 0X%x\n", egress_pkt.efcp_hdr.efcp.cep_src_id);
+    print("\t\tPDU Type = 0X%x\n", egress_pkt.efcp_hdr.efcp.pdutype);
+    print("\t\tFlags = 0X%x\n", egress_pkt.efcp_hdr.efcp.flags);
+    print("\t\tLength = 0X%x\n", egress_pkt.efcp_hdr.efcp.length);
+    print("\t\tSequence number = 0X%x\n", egress_pkt.efcp_hdr.efcp.seq_num);
+    print("\t\tChecksum = 0X%x\n\n", egress_pkt.efcp_hdr.efcp.hdr_checksum);
+}

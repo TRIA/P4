@@ -1,0 +1,114 @@
+// INGRESS TABLES
+
+// Port table
+logical_table port_table {
+
+    table_type : index;
+    minsize    : 128;
+    maxsize    : 128;
+
+    keys {
+        bit[PORT_NUM_WIDTH] port_num;
+    }
+
+    fields {
+        bit[8]  src_modid;
+        bit[12] default_vid;
+    }
+
+    key_construct() {
+        if (_LOOKUP0 == 1) {
+            port_num = obj_bus.port_num;
+        }
+    }
+
+    fields_assign() {
+        if (_LOOKUP0 == 1) {
+            obj_bus.src_modid = src_modid;
+            obj_bus.port_vid = default_vid;
+        }
+    }
+}
+
+// EFCP logical table
+logical_table efcp_forward_table {
+
+    table_type : hash;
+    // Minimum guaranteed size. Physical table must have this number of entries
+    minsize    : 8192;
+
+    // Maximum allowed size. This is mainly for SDK populating purposes, in case
+    // maxsize and minsize have different values.
+    // If minsize and maxsize are the same, then it is treated as constant "size" for
+    // that table. The compiler must find a physical table of the specified size
+    maxsize    : 16384;
+
+    keys{
+        bit[16] dest_addr;
+    }
+
+    fields {
+        bit[12]             vid;
+        bit[48]             mac_dst_addr;
+        bit[PORT_NUM_WIDTH] dst_port;
+        bit[8]              dst_modid;
+    }
+
+    key_construct() {
+        if (_LOOKUP0 == 1) {
+            dest_addr = ingress_pkt.efcp_hdr.efcp.ipc_dst_addr;
+        }
+    }
+
+    fields_assign() {
+        if (_LOOKUP0 == 1) {
+            // Later "egress_pkt = ingress_pkt" is executed inside the "do_modify_packet" method
+            // This is why the MAC address is saved in the ingress_pkt
+            ingress_pkt.l2_hdr.l2.mac_dst_addr = mac_dst_addr;
+            obj_bus.vid = vid;
+            obj_bus.dst_modid = dst_modid;
+            obj_bus.dst_port = dst_port;
+        }
+    }
+}
+
+//IPv4 LOGICAL TABLE
+
+logical_table ipv4_forward_table {
+
+    table_type : hash;
+
+    minsize    : 8192;
+    maxsize    : 16384;
+
+    keys{
+        bit[32] dest_addr;     
+    }
+
+    fields {  
+        bit[12]             vid;
+        bit[48]             macda; 
+        bit[PORT_NUM_WIDTH] dst_port; 
+        bit[8]              dst_modid;
+    }
+
+    key_construct() {
+        if(_LOOKUP0 == 1) {           
+            dest_addr = ingress_pkt.l3_hdr.ipv4.dstAddr;
+        }
+    }
+
+    fields_assign() {
+        if(_LOOKUP0 == 1) {
+            /* Mas tarde en la funcion do_packet_modif() se asigna egress_pkt =
+            ingress_pkt, por eso se guarda la mac en ingress.*/ 
+            ingress_pkt.group1.l2.macda = macda;            
+            obj_bus.vid = vid;            
+            obj_bus.dst_modid = dst_modid;
+            obj_bus.dst_port = dst_port;
+        }
+    }
+}
+
+
+// EGRESS TABLES
