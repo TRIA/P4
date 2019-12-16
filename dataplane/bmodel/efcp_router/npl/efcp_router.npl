@@ -174,10 +174,10 @@ function handle_vlan(){
             delete_header(ingress_pkt.group1.vlan);
 
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
-                obj_bus.eth_etype = EFCP;        
+                obj_bus.eth_etype = EFCP_ETYPE;        
             }
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
-                obj_bus.eth_etype = IPv4;        
+                obj_bus.eth_etype = IPv4_ETYPE;        
             } 
 
             replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
@@ -195,10 +195,10 @@ function handle_vlan(){
             obj_bus.eth_etype = VLAN;
 
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
-                obj_bus.vlan_etype = EFCP;        
+                obj_bus.vlan_etype = EFCP_ETYPE;        
             }
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
-                obj_bus.vlan_etype = IPv4;        
+                obj_bus.vlan_etype = IPv4_ETYPE;        
             }                        
 
             replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
