@@ -1,4 +1,3 @@
-
 #define PORT_NUM_WIDTH    7
 #define MGID_WIDTH        11
 #define PORT_BITMAP_WIDTH 32
@@ -71,6 +70,7 @@ struct ccbe_t {
     }
 }
 
+// Bus instances
 bus local_t               local;
 bus control_id_t          control_id;
 bus obj_bus_t             obj_bus;
