@@ -48,62 +48,62 @@ function handle_vlan() {
     if (ingress_pkt.l2_hdr.vlan._PRESENT) {        
         if (obj_bus.vid == 0) {
             print("VLAN header present with vid = 0\n");
-            delete_header(ingress_pkt.group1.vlan);
+            delete_header(ingress_pkt.l2_hdr.vlan);
 
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
-                obj_bus.eth_etype = EFCP;        
+                obj_bus.eth_etype = EFCP_ETYPE;        
             }
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
-                obj_bus.eth_etype = IPv4;        
+                obj_bus.eth_etype = IPv4_ETYPE;        
             } 
 
-            replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
+            replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
         }
         else {
             print("VLAN header present, but vid not 0. vid = 0X%x\n", obj_bus.vid);
-            replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
         }
     }
     else {
         if(obj_bus.vid != 0){
             print("Added VLAN header\n");        
-            add_header(ingress_pkt.group1.vlan);
-            replace_header_field(ingress_pkt.group1.vlan.vid, obj_bus.vid);
-            obj_bus.eth_etype = VLAN;
+            add_header(ingress_pkt.l2_hdr.vlan);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
+            obj_bus.eth_etype = VLAN_ETYPE;
 
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
-                obj_bus.vlan_etype = EFCP;        
+                obj_bus.vlan_etype = EFCP_ETYPE;        
             }
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
-                obj_bus.vlan_etype = IPv4;        
+                obj_bus.vlan_etype = IPv4_ETYPE;        
             }                        
 
-            replace_header_field(ingress_pkt.group1.vlan.ethertype, obj_bus.vlan_etype);
-            replace_header_field(ingress_pkt.group1.l2.ethertype, obj_bus.eth_etype);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
+            replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
         }
     }
 }
 
 function update_checksum() {
     if(egress_pkt.efcp_hdr.efcp._PRESENT){        
-        create_checksum(egress_pkt.efcp_hdr.efcp.hdrChecksum,
+        create_checksum(egress_pkt.efcp_hdr.efcp.hdr_checksum,
             {
-                egress_pkt.efcp_hdr.efcp.vers, egress_pkt.efcp_hdr.efcp.dstAddr,
-                egress_pkt.efcp_hdr.efcp.srcAddr, egress_pkt.efcp_hdr.efcp.qosID,
-                egress_pkt.efcp_hdr.efcp.dstCEPID, egress_pkt.efcp_hdr.efcp.pduType,
-                egress_pkt.efcp_hdr.efcp.srcCEPID, egress_pkt.efcp_hdr.efcp.flags,
-                egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seqnum
+                egress_pkt.efcp_hdr.efcp.version, egress_pkt.efcp_hdr.efcp.ipc_dst_addr,
+                egress_pkt.efcp_hdr.efcp.ipc_src_addr, egress_pkt.efcp_hdr.efcp.qos_id,
+                egress_pkt.efcp_hdr.efcp.cep_dst_id, egress_pkt.efcp_hdr.efcp.pdutype,
+                egress_pkt.efcp_hdr.efcp.cep_src_id, egress_pkt.efcp_hdr.efcp.flags,
+                egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seq_num
             });
     }
     else if(egress_pkt.l3_hdr.ipv4._PRESENT){
         create_checksum(egress_pkt.l3_hdr.ipv4.checksum,
             {
                 egress_pkt.l3_hdr.ipv4.version, egress_pkt.l3_hdr.ipv4.ihl,
-                egress_pkt.l3_hdr.ipv4.diffserv, egress_pkt.l3_hdr.ipv4.totalLen,
+                egress_pkt.l3_hdr.ipv4.diffserv, egress_pkt.l3_hdr.ipv4.total_len,
                 egress_pkt.l3_hdr.ipv4.identification, 
-                egress_pkt.l3_hdr.ipv4.flags, egress_pkt.l3_hdr.ipv4.fragOffset,
+                egress_pkt.l3_hdr.ipv4.flags, egress_pkt.l3_hdr.ipv4.frag_offset,
                 egress_pkt.l3_hdr.ipv4.ttl, egress_pkt.l3_hdr.ipv4.protocol,
-                egress_pkt.l3_hdr.ipv4.srcAddr, egress_pkt.l3_hdr.ipv4.dstAddr
+                egress_pkt.l3_hdr.ipv4.src_addr, egress_pkt.l3_hdr.ipv4.dst_addr
             });
     }    
 }
@@ -118,7 +118,7 @@ function memory_init() {
 /*************************************
 PROGRAM
 *************************************/
-program efcp_switch {
+program efcp_router {
 
     // NLP setup
     memory_init();

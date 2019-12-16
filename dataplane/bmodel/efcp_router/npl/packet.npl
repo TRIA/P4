@@ -7,6 +7,7 @@ struct ing_pkt_t {
     fields {
         layer2_group l2_hdr;
         efcp_group efcp_hdr;
+        layer3_group l3_hdr;        
     }
 }
 
@@ -14,6 +15,7 @@ struct egr_pkt_t {
     fields {
         layer2_group l2_hdr;
         efcp_group efcp_hdr;
+        layer3_group l3_hdr;
     }
 }
 

@@ -22,3 +22,11 @@ struct layer2_group {
     }
 }
 
+/*Level 3 group level struct*/
+struct layer3_group {
+    fields {
+        ipv4_t         ipv4;
+    }
+}
+
+
