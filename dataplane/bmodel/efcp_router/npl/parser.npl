@@ -1,9 +1,6 @@
 #include "packet.npl"
+#include "constants.npl"
 
-// Use defines until registers are implemented
-#define VLAN_ETYPE 0x8100
-#define EFCP_ETYPE 0xD1F
-#define IPv4_ETYPE 0x0800
 
 
 parser_node start {

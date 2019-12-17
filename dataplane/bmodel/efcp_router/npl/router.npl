@@ -5,6 +5,7 @@
 #include "special_function.npl"
 #include "table.npl"
 #include "debug.npl"
+#include "constants.npl"
 
 /*************************************
 FUNCTION DECLARATION
