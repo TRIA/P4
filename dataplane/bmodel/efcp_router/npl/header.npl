@@ -2,7 +2,7 @@ struct vlan_t {
     fields {
         bit[3]      pcp;
         bit[1]      cfi;
-        bit[12]     vid;
+        bit[12]     vlan_id;
         bit[16]     ethertype;
     }
 }

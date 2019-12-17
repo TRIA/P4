@@ -88,7 +88,7 @@ logical_table ipv4_forward_table {
     }
 
     fields {  
-        bit[12]             vid;
+        bit[12]             vlan_id;
         bit[48]             mac_dst_addr;
         bit[PORT_NUM_WIDTH] dst_port; 
         bit[8]              dst_modid;
@@ -105,7 +105,7 @@ logical_table ipv4_forward_table {
             // Later "egress_pkt = ingress_pkt" is executed inside the "do_modify_packet" method
             // This is why the MAC address is saved in the ingress_pkt
             ingress_pkt.l2_hdr.l2.mac_dst_addr = mac_dst_addr;            
-            obj_bus.vid = vid;            
+            obj_bus.vlan_id = vlan_id;            
             obj_bus.dst_modid = dst_modid;
             obj_bus.dst_port = dst_port;
         }

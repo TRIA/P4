@@ -4,7 +4,7 @@ lt port_table insert port_num=2 default_vlan_id=0 src_modid=0x9
 
 # ipv4_forward_table: hash; keys: dest_addr
 lt ipv4_forward_table insert dst_addr=0x0a000001 dst_modid=0x9 dst_port=0x1 mac_dst_addr=0x000005000001
-lt ipv4_forward_table insert dst_addr=0x0a000002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002 vid=33
+lt ipv4_forward_table insert dst_addr=0x0a000002 dst_modid=0x9 dst_port=0x2 mac_dst_addr=0x000005000002 vlan_id=33
 
 # efcp_forward_table: hash; keys: ipc_dst_addr
 lt efcp_forward_table insert ipc_dst_addr=0x0001 dst_modid=0x9 dst_port=0x1 mac_dst_addr=0x000005000001

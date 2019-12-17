@@ -8,7 +8,7 @@ function print_egress_packet() {
         print("\n\t### VLAN ###\n");
         print("\n\tPriority Code Point = X%x\n", egress_pkt.l2_hdr.vlan.pcp);
         print("\tDrop Eligible Indicator = X%x\n", egress_pkt.l2_hdr.vlan.cfi);
-        print("\tVLAN id = X%x\n", egress_pkt.l2_hdr.vlan.vid);
+        print("\tVLAN id = X%x\n", egress_pkt.l2_hdr.vlan.vlan_id);
         print("\tEthertype = X%x\n", egress_pkt.l2_hdr.vlan.ethertype);
     }
     print("\n\t\t### EFCP ###\n");
