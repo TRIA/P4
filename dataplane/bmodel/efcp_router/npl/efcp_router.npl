@@ -42,33 +42,47 @@ function do_modify_packet () { //to be implemented on flex editor
     egress_pkt.l3_hdr.ipv4 = ingress_pkt.l3_hdr.ipv4;
 }
 
-// TODO: document better
+
 // Manage the VLAN header in the ingress packet
-function handle_vlan() {            
-    if (ingress_pkt.l2_hdr.vlan._PRESENT) {        
+function handle_vlan() {     
+    // Check if VLAN header is present in ingress packet regardless of whether
+    // is an EFCP or an IP packet
+    if (ingress_pkt.l2_hdr.vlan._PRESENT) { 
+        // Ingress packet has VLAN header, but egress packets must be without.
+        // This is specified in the table configuration.
         if (obj_bus.vid == 0) {
             print("VLAN header present with vid = 0\n");
             delete_header(ingress_pkt.l2_hdr.vlan);
 
+            // Check whether is an EFCP or IP packet in order to set the 
+            // ethertype field in Ethernet layer.
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
                 obj_bus.eth_etype = EFCP_ETYPE;        
             }
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
                 obj_bus.eth_etype = IPv4_ETYPE;        
-            } 
-
+            }             
             replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
         }
+        // Ingress packet has a VLAN and egress packet must have as well. So 
+        // only the vid field is changed
         else {
             print("VLAN header present, but vid not 0. vid = 0X%x\n", obj_bus.vid);
             replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
         }
     }
+    // VLAN header is not present in ingress packet.
     else {
+
+        // VLAN header is not present and egress packet must have it. So VLAN
+        // header is added by the router.
         if(obj_bus.vid != 0){
             print("Added VLAN header\n");        
             add_header(ingress_pkt.l2_hdr.vlan);
             replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vid);
+
+            // Replace ethertypes: Ethernet ethertype will be 0x8100 and VLAN
+            // ethertype will be 0xD1F or 0x800.
             obj_bus.eth_etype = VLAN_ETYPE;
 
             if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
@@ -77,7 +91,6 @@ function handle_vlan() {
             else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
                 obj_bus.vlan_etype = IPv4_ETYPE;        
             }                        
-
             replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
             replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
         }
