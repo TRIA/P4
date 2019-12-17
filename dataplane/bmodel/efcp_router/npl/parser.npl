@@ -45,7 +45,6 @@ parser_node ethernet {
     }
 }
 
-
 parser_node vlan {
     print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.l2_hdr.vlan);

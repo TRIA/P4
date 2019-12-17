@@ -31,8 +31,8 @@ struct obj_bus_t {
         bit[8]                  dst_modid;
         bit[PORT_NUM_WIDTH]     dst_port;
         bit[8]                  src_modid;
-        bit[12]                 port_vid;
-        bit[12]                 vid;
+        bit[12]                 port_vlan_id;
+        bit[12]                 vlan_id;
     }
 }
 

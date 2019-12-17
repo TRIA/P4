@@ -35,7 +35,7 @@ function assign_ing_to_egr_bus() {
 PACKET MODIFICATION
 *************************************/
 // - To be implemented on Flex editor
-function do_modify_packet () { //to be implemented on flex editor    
+function do_modify_packet () {
     egress_pkt.l2_hdr.l2 = ingress_pkt.l2_hdr.l2;
     egress_pkt.l2_hdr.vlan = ingress_pkt.l2_hdr.vlan;
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
@@ -122,6 +122,9 @@ function update_checksum() {
 }
 
 
+/*************************************
+SETUP FOR NPL ENVIRONMENT
+*************************************/
 function memory_init() {
     ccbe.dst_port = 0;
     ccbi.l3_pbm = 0;

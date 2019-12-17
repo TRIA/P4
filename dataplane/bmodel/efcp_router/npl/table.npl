@@ -12,8 +12,9 @@ logical_table port_table {
     }
 
     fields {
+        // TODO: refactor
         bit[8]  src_modid;
-        bit[12] default_vid;
+        bit[12] default_vlan_id;
     }
 
     key_construct() {
@@ -25,7 +26,7 @@ logical_table port_table {
     fields_assign() {
         if (_LOOKUP0 == 1) {
             obj_bus.src_modid = src_modid;
-            obj_bus.port_vid = default_vid;
+            obj_bus.port_vlan_id = default_vlan_id;
         }
     }
 }
@@ -48,9 +49,10 @@ logical_table efcp_forward_table {
     }
 
     fields {
-        bit[12]             vid;
+        bit[12]             vlan_id;
         bit[48]             mac_dst_addr;
         bit[PORT_NUM_WIDTH] dst_port;
+        // TODO: refactor
         bit[8]              dst_modid;
     }
 
@@ -65,7 +67,7 @@ logical_table efcp_forward_table {
             // Later "egress_pkt = ingress_pkt" is executed inside the "do_modify_packet" method
             // This is why the MAC address is saved in the ingress_pkt
             ingress_pkt.l2_hdr.l2.mac_dst_addr = mac_dst_addr;
-            obj_bus.vid = vid;
+            obj_bus.vlan_id = vlan_id;
             obj_bus.dst_modid = dst_modid;
             obj_bus.dst_port = dst_port;
         }
