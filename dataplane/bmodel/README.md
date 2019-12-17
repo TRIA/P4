@@ -18,7 +18,19 @@ Before you inject packets you need to populate logical tables using pre-defined 
 rcload /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/tbl_cfg.txt
 ```
 
-Now it is possible to inject a packet using the command below from the **original console window** where you compiled the NPL code. If you run the test in another terminal instance, make sure you have the enviroment ready.
+Now it is possible to inject a packet using the command below from the **original console window** where you compiled the NPL code. If you run the test in another terminal instance,
+
+
+Before running tests, make sure you have the enviroment ready. If not, activate it by running: 
+
+```bash
+sudo bash
+  # Password is “npl”
+cd ~/ncsc-1.3.3rc4
+source ./bin/setup.sh
+```
+
+Then run the test:
 
 ```bash
 python bm_tests/tests/efcp_test.py
