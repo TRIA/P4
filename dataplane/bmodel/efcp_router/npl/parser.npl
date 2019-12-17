@@ -1,8 +1,8 @@
 #include "packet.npl"
 
 // Use defines until registers are implemented
+#define EFCP 0x0D1F
 #define VLAN 0x8100
-#define EFCP 0xD1F
 
 parser_node start {
     root_node : 1; 
@@ -27,21 +27,26 @@ parser_node ethernet {
         } 
         
         if (latest.ethertype == EFCP) {
+            // TODO: check for consistency (EFCP is defined to be "0x0D1F") at the beginning
+            // of the file, yet later this value changes. If it is a different value, add
+            // a specific constant/define
+
             // 0xD1F0
             print("Inside latest.ethertype = D1F\n");
             next_node efcp;
         }                         
         
         switch (latest.ethertype) {
+            // TODO: check for consistency (EFCP is defined to be "0x0D1F") at the beginning
+            // of the file, yet later this value changes. If it is a different value, add
+            // a specific constant/define
             0xD1F0            : next_node efcp;
             default           : next_node ingress;
         }        
-    }
-    else {
+    } else {
         next_node ingress;
     }
 }
-
 
 parser_node vlan {
     print("Inside parser_node vlan\n");
