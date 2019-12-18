@@ -76,13 +76,23 @@ class Test(NPLBaseTest):
                     print("RX PKT in port {}:".format(rx_pkt["PORT"]))
                     hexdump(rx_pkt["PACKET"])
 
+#                    # Verify that the payload of each sent packet is present at each received packet
+#                    # - Note: not use of equals but a substring in the emitted packet due to the presence of multiple
+#                    # - non-ASCII symbols in the received payload and because this may be incomplete as well
+#                    efcp_payload_excerpt = str(tx_pkt.getlayer("EFCP").payload)[:20]
+#                    self.assertTrue(efcp_payload_excerpt in str(rx_pkt["PACKET"]))
+#                    # Verify that the port where the packet was submitted to is correct
+#                    self.assertTrue(ipc_dst_addr == tx_pkt.getlayer("EFCP").fields["ipc_dst_addr"])
+
                     # Verify that the payload of each sent packet is present at each received packet
                     # - Note: not use of equals but a substring in the emitted packet due to the presence of multiple
                     # - non-ASCII symbols in the received payload and because this may be incomplete as well
                     efcp_payload_excerpt = str(tx_pkt.getlayer("EFCP").payload)[:20]
-                    self.assertTrue(efcp_payload_excerpt in str(rx_pkt["PACKET"]))
+                    self.assert_contained_in(str(rx_pkt["PACKET"]), efcp_payload_excerpt)
                     # Verify that the port where the packet was submitted to is correct
-                    self.assertTrue(ipc_dst_addr == tx_pkt.getlayer("EFCP").fields["ipc_dst_addr"])
+                    self.assert_equal(ipc_dst_addr, tx_pkt.getlayer("EFCP").fields["ipc_dst_addr"])
+                    # Verify that the port where the packet was received from is correct
+                    self.assert_equal(ipc_dst_addr, rx_pkt["PORT"])
 
 
 if __name__ == "__main__":

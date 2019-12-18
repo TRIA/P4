@@ -2,42 +2,76 @@
 
 Simple NPL implementation that forward EFCP packets (including VLAN header)
 
-## Building and running project
+## Building and running
 
-Is necessary to first **build the environment**, then **build and run** the NPL project. That is done via a single script:
+Before building and running, NPL programs need to have its environment loaded.
+These steps are typically done manually, but are provided as part of our "build", "run" and "build-run" commands.
 
 ```bash
-sudo ./build_run.sh
+make build
+make run
+
+# Run the following for a combined build and run
+make build-run
 ```
 
-Now you will see two xterm windows one with name `BMODEL` and another with `BMCLI`.
+At the end of the "run" stage, two Xterm windows will open: one with name `BMODEL`, another with name `BMCLI`. It is now possible to inject packets.
 
-Before you inject packets you need to populate logical tables using pre-defined table configurations **through the `BMCLI` window**:
+### Configuring the tables
 
+If injecting packets but not using the "make" commands, you need to populate the logical tables using pre-defined or modified table configurations in the **`BMCLI` program**.
+
+From an Xterm window:
 ```
 rcload /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/tbl_cfg.txt
 ```
 
-Now it is possible to inject a packet using the command below from the **original console window** where you compiled the NPL code. If you run the test in another terminal instance,
-
-
-Before running tests, make sure you have the enviroment ready. If not, activate it by running: 
-
-```bash
-sudo bash
-  # Password is “npl”
-cd ~/ncsc-1.3.3rc4
-source ./bin/setup.sh
+Using a normal console:
+```
+python /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/cli/bmif_cli.py --port 9090 \
+        --regfile /home/npl/rina_router/dataplane/bmodel/efcp_router/fe_output/bmodel/dfiles/bm_all.yml \
+        --rcfile /home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/tbl_cfg.txt"
 ```
 
-Then run the test:
+In any other case, this is run inside the `make` commands here provided.
+
+## Testing
+
+Tests can be run specifying a single class or as a suite.
+Also, the tests can run in background or with Xterm (in a more interactive fashion).
+
+### Single class
 
 ```bash
-python bm_tests/tests/efcp_test.py
+cd efcp_router
+
+# Background mode
+make test class=/home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/efcp_test.py
+make test class=efcp_test.py
+make test class=efcp.py
+make test class=efcp
+
+# Xterm mode
+make test-graphical class=/home/npl/rina_router/dataplane/bmodel/efcp_router/bm_tests/tests/efcp_test.py
+make test-graphical class=efcp_test.py
+make test-graphical class=efcp_test
+make test-graphical class=efcp
 ```
 
-The above `efcp_test.py` sends an ingress packet to port 1 through the `loopback` interface. And you can see packet being switched to Port 2 based on NPL switching program in `BMODEL` xterm window.  
+For instance, the `efcp_test.py` tests sends an ingress packet to port 1 through the `loopback` interface. Upon running the test you should see a packet being switched to Port 2.
+The behaviour of the test is based on the NPL switching program in `BMODEL` xterm window and in the configuration of the tables.
 
+### Suite
+
+```bash
+cd efcp_router
+
+# Background mode
+make test
+
+# Xterm mode
+make test-graphical
+```
 
 ## Useful stuff
 

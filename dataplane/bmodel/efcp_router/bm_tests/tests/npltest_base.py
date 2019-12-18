@@ -1,14 +1,15 @@
+from cli.bti import batch_test_base
 from scapy.all import *
 import importlib
 import os
 import unittest
 import sys
 
-BATCH_TEST_DIR = os.path.join(os.path.dirname(__file__), os.environ["NCS_ROOT"] + "/bmi/cli/bti")
-sys.path.append(BATCH_TEST_DIR)
-from batch_test_base import BatchTestBase, socket_port_get, reg_file_get
+sys.path.append(os.path.dirname(__file__))
+from cli.bti.batch_test_base import BatchTestBase, socket_port_get, reg_file_get
 
-CFG_FILE = "bm_tests/l2_test/tbl_cfg.txt"
+# Table configuration file located at the root
+CFG_FILE = os.path.join(os.path.dirname(__file__), "tbl_cfg.txt")
 
 
 class NPLBaseTest(unittest.TestCase):
@@ -24,7 +25,8 @@ class NPLBaseTest(unittest.TestCase):
         self.batch_mode = batch_mode
         self.bt_if = BatchTestBase()
 
-        self.connected = self.bt_if.connect(host, sport, reg_file)
+        #self.connected = self.bt_if.connect(host, sport, reg_file)
+        self.connected = self.bt_if.connect_with_cfg(host, sport, reg_file, cfg_file)
 
         if self.batch_mode:
             # if batch_mode then load config file
@@ -33,6 +35,20 @@ class NPLBaseTest(unittest.TestCase):
 
     def __get_tx_packet(self, test_num):
         raise NotImplementedError("Must be implemented in test class")
+
+    def assert_equal(self, expected, provided):
+        try:
+            self.assertTrue(expected == provided)
+        except Exception as e:
+            print("Error: data should be {}, instead found {}".format(expected, provided))
+            raise e
+
+    def assert_contained_in(self, whole, part):
+        try:
+            self.assertTrue(part in whole)
+        except Exception as e:
+            print("Error: data {} should be contained in {}, but it is not".format(part, whole))
+            raise e
 
     def run(self):
         """
@@ -68,6 +84,9 @@ def npl_test_init():
     batch_mode = True
     if reg_file == None:
         batch_mode = False
+
+    # NEW ONE. REMOVE LATER
+    batch_mode = True
 
     return socket_port, reg_file, batch_mode, CFG_FILE
 
