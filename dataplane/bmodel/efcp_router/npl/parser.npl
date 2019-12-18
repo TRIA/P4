@@ -1,8 +1,6 @@
 #include "packet.npl"
 #include "constants.npl"
 
-
-
 parser_node start {
     root_node : 1; 
     switch (obj_bus.port_type_cfg) {
@@ -32,12 +30,11 @@ parser_node ethernet {
         }
 
         if (latest.ethertype == IPv4_ETYPE) {
-            //0x0800
+            // 0x0800
             print("Inside latest.ethertype = 0x0800\n");
             next_node ipv4;
         }                    
-    }
-    else {
+    } else {
         next_node ingress;
     }
 }
@@ -46,11 +43,9 @@ parser_node vlan {
     print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.l2_hdr.vlan);
 
-    if(latest.ethertype ==  IPv4_ETYPE){
+    if (latest.ethertype == IPv4_ETYPE) {
         next_node ipv4;
-    }
-
-    else if(latest.ethertype == EFCP_ETYPE) {
+    } else if (latest.ethertype == EFCP_ETYPE) {
         next_node efcp;
     }    
 }
@@ -66,7 +61,6 @@ parser_node ipv4 {
     extract_fields(ingress_pkt.l3_hdr.ipv4);
     next_node ingress;
 }
-
 
 parser_node ingress {
     // Specify that this is the last node of this tree

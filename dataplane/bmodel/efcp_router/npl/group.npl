@@ -10,7 +10,7 @@
 // EFCP group level struct
 struct efcp_group {
     fields {
-        efcp_t         efcp;
+        efcp_t       efcp;
     }
 }
 
@@ -22,11 +22,9 @@ struct layer2_group {
     }
 }
 
-/*Level 3 group level struct*/
+// Level 3 group level struct
 struct layer3_group {
     fields {
-        ipv4_t         ipv4;
+        ipv4_t       ipv4;
     }
 }
-
-
