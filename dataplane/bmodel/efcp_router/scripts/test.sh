@@ -65,6 +65,9 @@ function clear_sim {
     if [ "${test_with_xterm}" = true ]; then
         killall xterm
     fi
+    # Clean up any possible zombie process on the background
+    pkill -f bmodel
+    pkill -f bmcli
 }
 
 function load_sim {
