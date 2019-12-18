@@ -10,7 +10,7 @@ class EFCP(Packet):
 
     fields_desc = [ XByteField("version", 0x01),
                     ShortField("ipc_dst_addr", 0x00),
-                    ShortField("ipc_scr_addr", 1),
+                    ShortField("ipc_src_addr", 1),
                     XByteField("qos_id", 0x00),
                     ShortField("cep_dst_id", 0),
                     ShortField("cep_src_id", 0),

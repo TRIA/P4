@@ -5,6 +5,7 @@
 #include "special_function.npl"
 #include "table.npl"
 #include "debug.npl"
+#include "constants.npl"
 
 /*************************************
 FUNCTION DECLARATION
@@ -39,42 +40,86 @@ function do_modify_packet () {
     egress_pkt.l2_hdr.l2 = ingress_pkt.l2_hdr.l2;
     egress_pkt.l2_hdr.vlan = ingress_pkt.l2_hdr.vlan;
     egress_pkt.efcp_hdr.efcp = ingress_pkt.efcp_hdr.efcp;
+    egress_pkt.l3_hdr.ipv4 = ingress_pkt.l3_hdr.ipv4;
 }
 
-// TODO: document better
+
 // Manage the VLAN header in the ingress packet
-function handle_vlan() {            
-    if (ingress_pkt.l2_hdr.vlan._PRESENT) {        
+function handle_vlan() {     
+    // Check if VLAN header is present in ingress packet regardless of whether
+    // is an EFCP or an IP packet
+    if (ingress_pkt.l2_hdr.vlan._PRESENT) { 
+        // Ingress packet has VLAN header, but egress packets must be without.
+        // This is specified in the table configuration.
         if (obj_bus.vlan_id == 0) {
             print("VLAN header present with vlan_id = 0\n");
             delete_header(ingress_pkt.l2_hdr.vlan);
-            obj_bus.eth_etype = EFCP;        
+
+            // Check whether is an EFCP or IP packet in order to set the 
+            // ethertype field in Ethernet layer.
+            if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
+                obj_bus.eth_etype = EFCP_ETYPE;        
+            }
+            else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
+                obj_bus.eth_etype = IPv4_ETYPE;        
+            }             
             replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
-        } else {
-            print("VLAN header present, but not 0. vlan_id = 0X%x\n", obj_bus.vlan_id);
-            replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vlan_id);
         }
-    } else if (obj_bus.vlan_id != 0) {
-        print("Added VLAN header\n");        
-        add_header(ingress_pkt.l2_hdr.vlan);
-        replace_header_field(ingress_pkt.l2_hdr.vlan.vid, obj_bus.vlan_id);
-        obj_bus.eth_etype = VLAN;
-        obj_bus.vlan_etype = EFCP;        
-        replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
-        replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
+        // Ingress packet has a VLAN and egress packet must have as well. So 
+        // only the vlan_id field is changed
+        else {
+            print("VLAN header present, but vlan_id not 0. vlan_id = 0X%x\n", obj_bus.vlan_id);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.vlan_id, obj_bus.vlan_id);
+        }
+    }
+    // VLAN header is not present in ingress packet.
+    else {
+
+        // VLAN header is not present and egress packet must have it. So VLAN
+        // header is added by the router.
+        if(obj_bus.vlan_id != 0){
+            print("Added VLAN header\n");        
+            add_header(ingress_pkt.l2_hdr.vlan);
+            replace_header_field(ingress_pkt.l2_hdr.vlan.vlan_id, obj_bus.vlan_id);
+
+            // Replace ethertypes: Ethernet ethertype will be 0x8100 and VLAN
+            // ethertype will be 0xD1F or 0x800.
+            obj_bus.eth_etype = VLAN_ETYPE;
+
+            if(ingress_pkt.efcp_hdr.efcp._PRESENT) {
+                obj_bus.vlan_etype = EFCP_ETYPE;        
+            }
+            else if(ingress_pkt.l3_hdr.ipv4._PRESENT) {
+                obj_bus.vlan_etype = IPv4_ETYPE;        
+            }                        
+            replace_header_field(ingress_pkt.l2_hdr.vlan.ethertype, obj_bus.vlan_etype);
+            replace_header_field(ingress_pkt.l2_hdr.l2.ethertype, obj_bus.eth_etype);
+        }
     }
 }
 
-function update_efcp_checksum() {
-    create_checksum(
-        egress_pkt.efcp_hdr.efcp.hdr_checksum,
-        {
-            egress_pkt.efcp_hdr.efcp.version, egress_pkt.efcp_hdr.efcp.ipc_dst_addr,
-            egress_pkt.efcp_hdr.efcp.ipc_src_addr, egress_pkt.efcp_hdr.efcp.qos_id,
-            egress_pkt.efcp_hdr.efcp.cep_dst_id, egress_pkt.efcp_hdr.efcp.pdutype,
-            egress_pkt.efcp_hdr.efcp.cep_src_id, egress_pkt.efcp_hdr.efcp.flags,
-            egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seq_num
-        });
+function update_checksum() {
+    if(egress_pkt.efcp_hdr.efcp._PRESENT){        
+        create_checksum(egress_pkt.efcp_hdr.efcp.hdr_checksum,
+            {
+                egress_pkt.efcp_hdr.efcp.version, egress_pkt.efcp_hdr.efcp.ipc_dst_addr,
+                egress_pkt.efcp_hdr.efcp.ipc_src_addr, egress_pkt.efcp_hdr.efcp.qos_id,
+                egress_pkt.efcp_hdr.efcp.cep_dst_id, egress_pkt.efcp_hdr.efcp.pdutype,
+                egress_pkt.efcp_hdr.efcp.cep_src_id, egress_pkt.efcp_hdr.efcp.flags,
+                egress_pkt.efcp_hdr.efcp.length, egress_pkt.efcp_hdr.efcp.seq_num
+            });
+    }
+    else if(egress_pkt.l3_hdr.ipv4._PRESENT){
+        create_checksum(egress_pkt.l3_hdr.ipv4.checksum,
+            {
+                egress_pkt.l3_hdr.ipv4.version, egress_pkt.l3_hdr.ipv4.ihl,
+                egress_pkt.l3_hdr.ipv4.diffserv, egress_pkt.l3_hdr.ipv4.total_len,
+                egress_pkt.l3_hdr.ipv4.identification, 
+                egress_pkt.l3_hdr.ipv4.flags, egress_pkt.l3_hdr.ipv4.frag_offset,
+                egress_pkt.l3_hdr.ipv4.ttl, egress_pkt.l3_hdr.ipv4.protocol,
+                egress_pkt.l3_hdr.ipv4.src_addr, egress_pkt.l3_hdr.ipv4.dst_addr
+            });
+    }    
 }
 
 
@@ -90,7 +135,7 @@ function memory_init() {
 /*************************************
 PROGRAM
 *************************************/
-program efcp_switch {
+program efcp_router {
 
     // NLP setup
     memory_init();
@@ -109,8 +154,15 @@ program efcp_switch {
     parse_begin(start);
     // - Invoke port table
     port_table.lookup(0);
-    // - Invoke EFCP table
-    efcp_forward_table.lookup(0);
+    
+    if(ingress_pkt.efcp_hdr.efcp._PRESENT){
+        // - Invoke EFCP table
+        efcp_forward_table.lookup(0);    
+    }    
+    if(ingress_pkt.l3_hdr.ipv4._PRESENT){
+        // - Invoke IPv4 table          
+        ipv4_forward_table.lookup(0);         
+    }        
     // - Check specific tables to know where to forward the packet to (depends on the layer in use)
     resolve_destination();
 
@@ -127,14 +179,13 @@ program efcp_switch {
     assign_ing_to_egr_bus();
     // - Manage the existence of the VLAN header
     handle_vlan();
-    // - Copy some headers of the ingress packet into the egress packet (currently, L2-related data)
     do_modify_packet();
-    update_efcp_checksum();
-    print_egress_packet();
-
+    update_checksum();    
+    print_egress_packet();    
+    
     // NLP setup
-    // - In VI Component - implement drop functionality in End of the Pipe
-    edb.usage_mode_create(0,
+    //In VI Component - Implement drop functionality in End of the Pipe 
+    edb.usage_mode_create( 0,
             egr_aux_bus.drop_vector,
             egr_obj_bus.dst_modid,
             egr_obj_bus.dst_port

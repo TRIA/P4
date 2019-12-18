@@ -22,8 +22,8 @@ class Test(NPLBaseTest):
         connect to nplsim, run test, disconnect from nplsim
     """
 
-    def __get_tx_packet(self, test_num, ipc_dst_addr):
-        pkt = Ether() / EFCP(ipc_dst_addr=ipc_dst_addr, pdutype=0x80)
+    def __get_tx_packet(self, test_num, ipc_dst_addr, ipc_src_addr):
+        pkt = Ether() / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdutype=0x80)
         pkt[Ether].dst = mac_dst_addr
         pkt[Ether].src = mac_src_addr
         pkt = pkt/"EFCP packet #{} sent from CLI to BM :)".format(test_num)
@@ -40,13 +40,16 @@ class Test(NPLBaseTest):
         # destination IPC address
         ipc_dst_addr = 2
 
+        # source IPC address
+        ipc_src_addr = 1        
+
         # number of packets to be sent
         numpkts = 1
 
         for count in range(numpkts):
             for port in ports:
                 # get packet
-                tx_pkt = self.__get_tx_packet(port+1, ipc_dst_addr)
+                tx_pkt = self.__get_tx_packet(port+1, ipc_dst_addr, ipc_src_addr)
 
                 print("--- Submitting packet(s)")
                 print("TX PKT num #{} to port {}:".format(count, port))

@@ -1,8 +1,7 @@
 #include "packet.npl"
+#include "constants.npl"
 
-// Use defines until registers are implemented
-#define EFCP 0x0D1F
-#define VLAN 0x8100
+
 
 parser_node start {
     root_node : 1; 
@@ -19,31 +18,26 @@ parser_node ethernet {
     extract_fields(ingress_pkt.l2_hdr.l2); 
 
     if (control_id.ts_enable == 0) { 
-        if (control_id.otpid_enable[3:3] && latest.ethertype == VLAN) {
+        if (control_id.otpid_enable[3:3] && latest.ethertype == VLAN_ETYPE) {
             // 0x8100 VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging
             // IEEE 802.1aq with NNI compatibility[10]
             print("Inside latest.ethertype = 0x8100\n");
             next_node vlan;
         } 
         
-        if (latest.ethertype == EFCP) {
-            // TODO: check for consistency (EFCP is defined to be "0x0D1F") at the beginning
-            // of the file, yet later this value changes. If it is a different value, add
-            // a specific constant/define
-
-            // 0xD1F0
-            print("Inside latest.ethertype = D1F\n");
+        if (latest.ethertype == EFCP_ETYPE) {
+            // 0x0D1F
+            print("Inside latest.ethertype = 0xD1F\n");
             next_node efcp;
-        }                         
-        
-        switch (latest.ethertype) {
-            // TODO: check for consistency (EFCP is defined to be "0x0D1F") at the beginning
-            // of the file, yet later this value changes. If it is a different value, add
-            // a specific constant/define
-            0xD1F0            : next_node efcp;
-            default           : next_node ingress;
-        }        
-    } else {
+        }
+
+        if (latest.ethertype == IPv4_ETYPE) {
+            //0x0800
+            print("Inside latest.ethertype = 0x0800\n");
+            next_node ipv4;
+        }                    
+    }
+    else {
         next_node ingress;
     }
 }
@@ -51,7 +45,14 @@ parser_node ethernet {
 parser_node vlan {
     print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.l2_hdr.vlan);
-    next_node efcp;
+
+    if(latest.ethertype ==  IPv4_ETYPE){
+        next_node ipv4;
+    }
+
+    else if(latest.ethertype == EFCP_ETYPE) {
+        next_node efcp;
+    }    
 }
 
 parser_node efcp {
@@ -59,6 +60,13 @@ parser_node efcp {
     extract_fields(ingress_pkt.efcp_hdr.efcp);
     next_node ingress;
 }
+
+parser_node ipv4 {
+    print("Inside parser_node ipv4\n");
+    extract_fields(ingress_pkt.l3_hdr.ipv4);
+    next_node ingress;
+}
+
 
 parser_node ingress {
     // Specify that this is the last node of this tree

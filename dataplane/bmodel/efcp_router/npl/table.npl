@@ -74,4 +74,43 @@ logical_table efcp_forward_table {
     }
 }
 
+//IPv4 LOGICAL TABLE
+
+logical_table ipv4_forward_table {
+
+    table_type : hash;
+
+    minsize    : 8192;
+    maxsize    : 16384;
+
+    keys{
+        bit[32] dst_addr;     
+    }
+
+    fields {  
+        bit[12]             vlan_id;
+        bit[48]             mac_dst_addr;
+        bit[PORT_NUM_WIDTH] dst_port; 
+        bit[8]              dst_modid;
+    }
+
+    key_construct() {
+        if(_LOOKUP0 == 1) {           
+            dst_addr = ingress_pkt.l3_hdr.ipv4.dst_addr;
+        }
+    }
+
+    fields_assign() {
+        if(_LOOKUP0 == 1) {
+            // Later "egress_pkt = ingress_pkt" is executed inside the "do_modify_packet" method
+            // This is why the MAC address is saved in the ingress_pkt
+            ingress_pkt.l2_hdr.l2.mac_dst_addr = mac_dst_addr;            
+            obj_bus.vlan_id = vlan_id;            
+            obj_bus.dst_modid = dst_modid;
+            obj_bus.dst_port = dst_port;
+        }
+    }
+}
+
+
 // EGRESS TABLES
