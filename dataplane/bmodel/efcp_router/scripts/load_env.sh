@@ -1,10 +1,9 @@
 #!/bin/bash
 
+base_path=$(realpath $(realpath $(dirname "$0")/..))
+
 #sudo bash
 cd /home/npl/ncsc-1.3.3rc4
 source ./bin/setup.sh
-export NPL_EXAMPLES=/home/npl/rina_router/dataplane/bmodel
-cd $NPL_EXAMPLES/efcp_router
-#make fe_nplsim
-#make nplsim_comp
-#make nplsim_run
+export NPL_EXAMPLES=$base_path
+cd $NPL_EXAMPLES
