@@ -24,7 +24,22 @@ help ::
 	# NPL_PROGRAM_NAME=$(NPL_PROGRAM_NAME)
 	#
 
-clean::
+clean ::
 	@rm -f *_classes.cpp *_classes.h
 	@rm -f mhc.cpp mhc.h header.yml
 	@rm -f *~
+
+build ::
+	@./scripts/build.sh
+
+run ::
+	@./scripts/run.sh
+
+build-run ::  build run
+
+test ::
+	@./scripts/test.sh -c ${class}
+
+test-graphical ::
+	@./scripts/test.sh -g -c ${class}
+
