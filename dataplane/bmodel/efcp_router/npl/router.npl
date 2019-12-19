@@ -117,6 +117,36 @@ function update_checksum() {
 }
 
 
+// Egress pdu type check 
+function egress_pdu_check() {
+    // Check that injected packet is EFCP
+    if (ingress_pkt.efcp_hdr.efcp._PRESENT) {
+        // if( (egress_pkt.efcp_hdr.efcp.pdutype != DATA_TRANSFER) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != LAYER_MANAGEMENT) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != ACK_ONLY) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != NACK_ONLY) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != ACK_AND_FLOW_CONTROL) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != NACK_AND_FLOW_CONTROL) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != FLOW_CONTROL_ONLY) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != SELECTIVE_ACK) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != SELECTIVE_NACK) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != SELECTIVE_ACK_AND_FLOW_CONTROL) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != SELECTIVE_NACK_AND_FLOW_CONTROL) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != CONTROL_ACK) ||
+        //     (egress_pkt.efcp_hdr.efcp.pdutype != RENDEVOUS)) {
+        print("Pdu type in bus: obj_bus.pdutype = 0x%x\n", obj_bus.pdutype);
+        if (obj_bus.pdutype != 0x80){
+                print("Wrong PDU Type, droping packet...\n");
+                local.wrong_pdu_type = 1;
+                packet_drop(local.wrong_pdu_type, 0x00000001, 0);
+
+                // Set drop_vector at egress based on BM implemetation
+                egr_aux_bus.drop_vector = 0x00000001;
+        }
+    }
+}
+
+
 /*************************************
 SETUP FOR NPL ENVIRONMENT
 *************************************/
@@ -172,6 +202,8 @@ program efcp_router {
     // Egress pipeline
     // - Copies content of one bus into another. Optional
     assign_ing_to_egr_bus();
+    // - Check if the packet needs to be dropped due to wrong pdu type
+    egress_pdu_check();
     // - Manage the existence of the VLAN header
     handle_vlan();
     do_modify_packet();
