@@ -89,8 +89,8 @@ class BatchTestBase(object):
             return True: connected; False: not connected
         """
         self.connect(host, socket_port, regfile)
-        self.configure(cfgfile)
-        return True
+        status = self.configure(cfgfile)
+        return (True, status)
 
     def send_pkt(self, port, pkt, pkt_len):
         """

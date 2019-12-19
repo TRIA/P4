@@ -50,6 +50,20 @@ function load_model {
 
 function load_cli {
     cmd="python ${test_path}/cli/bmif_cli.py --port 9090 \
+                --regfile ${base_path}/fe_output/bmodel/dfiles/bm_all.yml"
+
+    if [ "${test_with_xterm}" = true ]; then
+        xterm -title "BMCLI (port 9090)" -e $cmd &
+    else
+        # Ignoring output from the error console
+        $cmd > /dev/null 2>&1 &
+    fi
+}
+
+# Not invoked by default because the NPLBaseTest class
+# already provides a "CFG_FILE" in its initialisation
+function load_cli_with_cfg {
+    cmd="python ${test_path}/cli/bmif_cli.py --port 9090 \
                 --regfile ${base_path}/fe_output/bmodel/dfiles/bm_all.yml \
                 --rcfile ${base_path}/bm_tests/tests/tbl_cfg.txt"
 
