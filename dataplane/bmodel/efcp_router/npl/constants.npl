@@ -14,7 +14,8 @@
 #define EFCP_ETYPE 0x0D1F
 #define IPv4_ETYPE 0x0800
 
-#define DATA_TRANSFER = 0x80;
+//PDU TYPES
+#define DATA_TRANSFER = 128 //0x80;
 #define LAYER_MANAGEMENT = 0x40;
 #define ACK_ONLY = 0xC1;
 #define NACK_ONLY = 0xC2;
@@ -27,3 +28,9 @@
 #define SELECTIVE_NACK_AND_FLOW_CONTROL = 0xCE;
 #define CONTROL_ACK = 0xC0;
 #define RENDEVOUS = 0xCF;
+
+// DROP REASONS
+#define DROP_REASON__WRONG_PDU = 0x00000001
+
+
+
