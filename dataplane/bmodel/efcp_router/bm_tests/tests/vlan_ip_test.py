@@ -78,9 +78,11 @@ class Test(NPLBaseTest):
                     # - Note: not use of equals but a substring in the emitted packet due to the presence of multiple
                     # - non-ASCII symbols in the received payload and because this may be incomplete as well
                     ip_payload_excerpt = str(tx_pkt.getlayer("IP").payload)[:20]
-                    self.assertTrue(ip_payload_excerpt in str(rx_pkt["PACKET"]))
+                    self.assert_contained_in(str(rx_pkt["PACKET"]), ip_payload_excerpt)
                     # Verify that the port where the packet was submitted to is correct
-                    self.assertTrue(ip_dst_addr == tx_pkt.getlayer("IP").fields["dst"])
+                    self.assert_equal(ip_dst_addr, tx_pkt.getlayer("IP").fields["dst"])
+                    # Verify that the port where the packet was received from is correct (2, according to tbl_cfg.txt)
+                    self.assert_equal(2, rx_pkt["PORT"])
 
 
 if __name__ == "__main__":

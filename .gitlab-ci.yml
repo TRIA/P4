@@ -1,8 +1,7 @@
 job_npl_bmodel:
   script:
     - sudo -S su
-    - source /home/npl/ncsc-1.3.3rc4/bin/setup.sh
     - cd dataplane/bmodel/efcp_router
-    - make fe_nplsim
-    - make nplsim_comp
+    - make build
+    - make test
   tags: [npl_bmodel]
