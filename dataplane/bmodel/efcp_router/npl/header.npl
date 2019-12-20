@@ -24,7 +24,7 @@ struct efcp_t {
         // Connection Endpoint IDs
     	bit[16]     cep_dst_id;
         bit[16]     cep_src_id;
-    	bit[8]      pdutype;
+    	bit[16]      pdutype;
     	bit[8]      flags;
     	bit[16]     length;
     	bit[32]     seq_num;

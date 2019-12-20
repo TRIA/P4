@@ -39,6 +39,9 @@ parser_node vlan {
 
 parser_node efcp {
     extract_fields(ingress_pkt.efcp_hdr.efcp);
+    // Save pdutype value in order to evaluate later in egress processing whether
+    // the packet should be dropped or not.
+    obj_bus.pdutype = ingress_pkt.efcp_hdr.efcp.pdutype; 
     next_node ingress;
 }
 
