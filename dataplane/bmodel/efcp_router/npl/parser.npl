@@ -42,7 +42,6 @@ parser_node efcp {
     // Save pdutype value in order to evaluate later in egress processing whether
     // the packet should be dropped or not.
     obj_bus.pdutype = ingress_pkt.efcp_hdr.efcp.pdutype; 
-    print("In parser, obj_bus.pdutype = 0x%x\n", obj_bus.pdutype);
     next_node ingress;
 }
 
