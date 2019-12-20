@@ -14,7 +14,7 @@ class EFCP(Packet):
                     XByteField("qos_id", 0x00),
                     ShortField("cep_dst_id", 0),
                     ShortField("cep_src_id", 0),
-                    XByteField("pdutype", 0x00),
+                    ShortField("pdutype", 0x0000),
                     XByteField("flags", 0x00),
                     ShortField("length", 1),
                     IntField("seq_num", 0),

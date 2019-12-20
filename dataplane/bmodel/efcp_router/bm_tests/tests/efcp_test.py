@@ -23,9 +23,9 @@ class Test(NPLBaseTest):
     """
 
     def __get_tx_packet(self, test_num, ipc_dst_addr, ipc_src_addr):
-        pkt = Ether() / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdutype=0x80)
+        pkt = Ether() / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdutype=0x8001)
         pkt[Ether].dst = mac_dst_addr
-        pkt[Ether].src = mac_src_addr
+        pkt[Ether].src = mac_src_addr        
         pkt = pkt/"EFCP packet #{} sent from CLI to BM :)".format(test_num)
         return pkt
 
