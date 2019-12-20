@@ -118,29 +118,35 @@ function update_checksum() {
 
 
 // Egress pdu type check 
-function egress_pdu_check() {
+// NOTES:
+    // - In current BM implementation, packet drop construct will not take effect.
+    // - This NPL code uses drop_vector defined in egr_aux_bus to do packet drop.
+    //   The implementation of packet drop_vector is in special function
+    //  _BModel::sfc_edb in bm_tests/sf_definition/bm_sfc.cpp
+function pdu_check() {
     // Check that injected packet is EFCP
     if (ingress_pkt.efcp_hdr.efcp._PRESENT) {
-        if ( (obj_bus.pdutype != 0x8001) &&
-             (obj_bus.pdutype != 0xC000) &&
-             (obj_bus.pdutype != 0x8804) &&
-             (obj_bus.pdutype != 0x8805) &&
-             (obj_bus.pdutype != 0x880C) &&
-             (obj_bus.pdutype != 0x880D) &&
-             (obj_bus.pdutype != 0x8808) &&
-             (obj_bus.pdutype != 0x8806) &&
-             (obj_bus.pdutype != 0x8807) &&
-             (obj_bus.pdutype != 0x880E) &&
-             (obj_bus.pdutype != 0x880F) &&
-             (obj_bus.pdutype != 0x8803) &&
-             (obj_bus.pdutype != 0x8804) ) {
+        if ( (obj_bus.pdutype != DATA_TRANSFER) &&
+             (obj_bus.pdutype != LAYER_MANAGEMENT) &&
+             (obj_bus.pdutype != ACK_ONLY) &&
+             (obj_bus.pdutype != NACK_ONLY) &&
+             (obj_bus.pdutype != ACK_AND_FLOW_CONTROL) &&
+             (obj_bus.pdutype != NACK_AND_FLOW_CONTROL) &&
+             (obj_bus.pdutype != FLOW_CONTROL_ONLY) &&
+             (obj_bus.pdutype != SELECTIVE_ACK) &&
+             (obj_bus.pdutype != SELECTIVE_NACK) &&
+             (obj_bus.pdutype != SELECTIVE_ACK_AND_FLOW_CONTROL) &&
+             (obj_bus.pdutype != SELECTIVE_NACK_AND_FLOW_CONTROL) &&
+             (obj_bus.pdutype != CONTROL_ACK) &&
+             (obj_bus.pdutype != RENDEVOUS) ) {
 
             print("Wrong PDU Type, droping packet...\n");
             local.wrong_pdu_type = 1;
-            packet_drop(local.wrong_pdu_type, 0x00000001, 0);
+
+            packet_drop(local.wrong_pdu_type, DROP_REASON__WRONG_PDU, 0);
 
             // Set drop_vector at egress based on BM implemetation
-            egr_aux_bus.drop_vector = 0x00000001;
+            egr_aux_bus.drop_vector = DROP_REASON__WRONG_PDU;
         }
     }
 }
@@ -202,7 +208,7 @@ program efcp_router {
     // - Copies content of one bus into another. Optional
     assign_ing_to_egr_bus();
     // - Check if the packet needs to be dropped due to wrong pdu type
-    egress_pdu_check();
+    pdu_check();
     // - Manage the existence of the VLAN header
     handle_vlan();
     do_modify_packet();
