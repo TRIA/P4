@@ -15,7 +15,7 @@
 #define IPv4_ETYPE 0x0800
 
 //PDU TYPES
-#define DATA_TRANSFER = 128 //0x80;
+//#define DATA_TRANSFER = 128 //0x80;
 #define LAYER_MANAGEMENT = 0x40;
 #define ACK_ONLY = 0xC1;
 #define NACK_ONLY = 0xC2;
