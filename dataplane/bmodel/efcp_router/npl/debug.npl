@@ -1,6 +1,6 @@
 function print_egress_packet() {
     print("\n### Ethernet ###\n");
-    print("\nMAC destiation = 0X%x\n", egress_pkt.l2_hdr.l2.mac_dst_addr);
+    print("\nMAC destination = 0X%x\n", egress_pkt.l2_hdr.l2.mac_dst_addr);
     print("MAC source = 0X%x\n", egress_pkt.l2_hdr.l2.mac_src_addr);
     print("Ethertype = 0X%x\n", egress_pkt.l2_hdr.l2.ethertype);
 

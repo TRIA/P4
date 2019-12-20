@@ -15,43 +15,29 @@ parser_node ethernet {
     // - Packet parsing pointer also moves extract_fields
     extract_fields(ingress_pkt.l2_hdr.l2); 
 
-    if (control_id.ts_enable == 0) { 
-        if (control_id.otpid_enable[3:3] && latest.ethertype == VLAN_ETYPE) {
-            // 0x8100 VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging
-            // IEEE 802.1aq with NNI compatibility[10]
-            print("Inside latest.ethertype = 0x8100\n");
-            next_node vlan;
-        } 
-        
-        if (latest.ethertype == EFCP_ETYPE) {
-            // 0x0D1F
-            print("Inside latest.ethertype = 0xD1F\n");
-            next_node efcp;
-        }
-
-        if (latest.ethertype == IPv4_ETYPE) {
-            // 0x0800
-            print("Inside latest.ethertype = 0x0800\n");
-            next_node ipv4;
-        }                    
-    } else {
+    if (control_id.ts_enable != 0) { 
         next_node ingress;
+    }
+
+    switch (latest.ethertype) {
+        VLAN_ETYPE     :   next_node vlan;
+        EFCP_ETYPE     :   next_node efcp;
+        IPv4_ETYPE     :   next_node ipv4;
+        default        :   next_node ingress;
     }
 }
 
 parser_node vlan {
-    print("Inside parser_node vlan\n");
     extract_fields(ingress_pkt.l2_hdr.vlan);
 
-    if (latest.ethertype == IPv4_ETYPE) {
-        next_node ipv4;
-    } else if (latest.ethertype == EFCP_ETYPE) {
-        next_node efcp;
-    }    
+    switch (latest.ethertype) {
+        IPv4_ETYPE     :   next_node ipv4;
+        EFCP_ETYPE     :   next_node efcp;
+        default        :   next_node ingress;
+    }
 }
 
 parser_node efcp {
-    print("Inside parser_node efcp\n");
     extract_fields(ingress_pkt.efcp_hdr.efcp);
     // Save pdutype value in order to evaluate later in egress processing whether
     // the packet should be dropped or not.
@@ -61,7 +47,6 @@ parser_node efcp {
 }
 
 parser_node ipv4 {
-    print("Inside parser_node ipv4\n");
     extract_fields(ingress_pkt.l3_hdr.ipv4);
     next_node ingress;
 }

@@ -71,6 +71,56 @@ class NPLBaseTest(unittest.TestCase):
     def __get_tx_packet(self, test_num):
         raise NotImplementedError("Must be implemented in test class")
 
+    def test_pkt_transmitted_is_received(self, fun_get_tx_packet, opts, layer_name, layer_dst_field_name, src_addr, dst_addr, dst_port):
+        # List of ports to send packets to
+        ports = [1]
+
+        # Number of packets to be sent
+        numpkts = 1
+
+        # Fill optional variab;es
+        mac_src_addr = opts.get("mac_src_addr", "")
+        mac_dst_addr = opts.get("mac_dst_addr", "")
+
+        for count in range(numpkts):
+            for port in ports:
+                # Get packet
+                ##tx_pkt = self.__get_tx_packet(port+1, dst_addr, src_addr)
+                #tx_pkt = fun_get_tx_packet(port+1, dst_addr, src_addr)
+                tx_pkt = fun_get_tx_packet(port+1, mac_src_addr, mac_dst_addr, src_addr, dst_addr)
+
+                print("--- Submitting packet(s)")
+                print("TX PKT num #{} to port {}:".format(count, port))
+                hexdump(tx_pkt)
+
+                # Transmit packet
+                recv_pkts = self.bt_if.send_pkt(port, tx_pkt, len(str(tx_pkt)))
+
+                print("--- Receiving packet(s)")
+                for rx_pkt in recv_pkts:
+                    # Check tx status
+                    if rx_pkt["STATUS"] < 0:
+                        print("TX ERROR")
+                        continue
+
+                    # Check receive packet status
+                    if rx_pkt["STATUS"]:
+                        print("Packet is dropped!")
+                        continue
+
+                    print("RX PKT in port {}:".format(rx_pkt["PORT"]))
+                    hexdump(rx_pkt["PACKET"])
+
+                    # Verify that the payload of each sent packet is present at each received packet
+                    # - Note: not use of equals but a substring in the emitted packet due to the presence of multiple
+                    # - non-ASCII symbols in the received payload and because this may be incomplete as well
+                    payload_excerpt = str(tx_pkt.getlayer(layer_name).payload)[:20]
+                    self.assert_contained_in(str(rx_pkt["PACKET"]), payload_excerpt)
+                    # Verify that the port where the packet was submitted to is correct
+                    self.assert_equal(dst_addr, tx_pkt.getlayer(layer_name).fields[layer_dst_field_name])
+                    # Verify that the port where the packet was received from is correct
+                    self.assert_equal(dst_port, rx_pkt["PORT"])
+
     def run(self):
         """
         Main body of the test
