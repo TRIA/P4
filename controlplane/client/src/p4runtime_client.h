@@ -2,9 +2,10 @@
 #define P4RUNTIME_CLIENT_H
 
 #include <queue>
-#include "p4info.pb.h"
-#include "p4runtime.grpc.pb.h"
-#include "p4runtime.pb.h"
+#include "grpc_out/p4/config/v1/p4info.pb.h"
+#include "grpc_out/p4/v1/p4runtime.grpc.pb.h"
+#include "grpc_out/p4/v1/p4runtime.pb.h"
+
 // Import declarations after any other
 #include "p4runtime_ns_def.inc"
 
@@ -15,7 +16,7 @@ class P4RuntimeClient {
     P4RuntimeClient(std::string targetStr, 
                     std::string config,
                     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
-                    std::string electionId) {};
+                    std::string electionId);
 
     // RPC methods
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();

@@ -115,17 +115,17 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
 
   int fd = open(p4InfoPath_.c_str(), O_RDONLY);
   ZeroCopyInputStream* p4InfoFile = new FileInputStream(fd);
-
-  std::ifstream binaryCfgFile(binaryCfgPath_);
-  ZeroCopyInputStream* binaryCfgFile = new IstreamInputStream(&binaryCfgFile, -1);
-  std::stringstream binaryCfgFileStr;
-  binaryCfgFileStr << binaryCfgFile.rdbuf();
+  std::ifstream binaryCfgFileIfStream(binaryCfgPath_);
+  ZeroCopyInputStream* binaryCfgFile = new IstreamInputStream(&binaryCfgFileIfStream, -1);
+  std::stringstream binaryCfgFileStream;
+  binaryCfgFileStream << binaryCfgFileIfStream.rdbuf();
+  std::string binaryCfgFileStr = binaryCfgFileStream.str();
 
   // Data (1st arg) merged into given Message (2nd arg)
   ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &request);
 
   ForwardingPipelineConfig* config = request.mutable_config();
-  config->set_allocated_p4_device_config(&binaryCfgFileStr.str());
+  config->set_allocated_p4_device_config(&binaryCfgFileStr);
 
   ClientContext* context;
   ::P4_NAMESPACE_ID::SetForwardingPipelineConfigResponse* response;
