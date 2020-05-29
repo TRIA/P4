@@ -13,7 +13,7 @@ ENV GOOGLE_PROTO_DIR ${BASE_PATH_P4R}/googleapis
 # Install requirements
 #
 RUN apt-get update
-RUN apt-get install -y sudo build-essential cmake gcc git pkg-config
+RUN apt-get install -y sudo build-essential cmake gcc git pkg-config libc-ares-dev
 ## Install openssl (to use instead of boringssl)
 RUN apt-get install -y libssl-dev
 ## Install bash for easier operation in the future
@@ -55,7 +55,7 @@ WORKDIR ${BASE_PATH_GRPC}
 FROM p4runtime-cpp-deps
 
 LABEL maintainer="Carolina Fernandez <carolina.fernandez@i2cat.net>"
-LABEL description="Access methods for P4Runtime based on C++"
+LABEL description="P4Runtime client developed in C++"
 
 ENV BASE_PATH_EDF /opt/p4runtime-cpp
 
@@ -85,7 +85,7 @@ $PROTO_DIR/p4/config/v1/p4types.proto \
 $GOOGLE_PROTO_DIR/google/rpc/status.proto \
 $GOOGLE_PROTO_DIR/google/rpc/code.proto"
 ENV PROTOFLAGS "-I$GOOGLE_PROTO_DIR -I$PROTO_DIR"
-ENV PROTO_BUILD_DIR ${BASE_PATH_P4R}/gcc_out
+ENV PROTO_BUILD_DIR ${BASE_PATH_EDF}/grpc_out
 
 #COPY p4runtime ${BASE_PATH_P4R}/
 
@@ -93,15 +93,9 @@ WORKDIR ${BASE_PATH_P4R}
 
 RUN mkdir -p $PROTO_BUILD_DIR && \
     echo $PWD && ls -lah && \
-#    mv /opt/googleapis $GOOGLE_PROTO_DIR && \
     protoc $PROTOS --cpp_out $PROTO_BUILD_DIR $PROTOFLAGS \
         --grpc_out $PROTO_BUILD_DIR --plugin=protoc-gen-grpc=$(which grpc_cpp_plugin) && \
     rm -rf $GOOGLE_PROTO_DIR
-
-RUN echo "\
-Generated C++ classes from P4Runtime proto files located at ${PROTO_BUILD_DIR}\
-\
-" >> /etc/motd
 
 # Get back to the EDF base directory
 WORKDIR ${BASE_PATH_EDF}

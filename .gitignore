@@ -1,5 +1,16 @@
-*.pyc
+# Transient files
 *.swp
+
+# Logs
 bmodel.log
+
+# Python generated classes
+*.pyc
+
+# IDE
+.vscode/
+*.code-workspace
+
+# C++ generated classes
 *.o
-controlplane/client/src/grcp_out
+controlplane/client/src/grpc_out

@@ -7,14 +7,15 @@ using ::GRPC_NAMESPACE_ID::CreateChannel;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 
 std::string* parseArguments(char** argv, std::string argName) {
-  std::string argValue = "";
+  std::string* argValue;
   std::string argVal = argv[1];
 
   size_t startPos = argVal.find(argName);
   if (startPos != std::string::npos) {
     startPos += argName.size();
     if (argVal[startPos] == '=') {
-      argValue = argVal.substr(startPos + 1);
+      argVal = argVal.substr(startPos + 1);
+      argValue = &argVal;
     } else {
       std::cout << "The correct argument syntax is " << argName << "=" << std::endl;
       return 0;
@@ -23,7 +24,7 @@ std::string* parseArguments(char** argv, std::string argName) {
     std::cout << "The acceptable argument is " << argName << "=" << std::endl;
     return 0;
   }
-  return &argValue;
+  return argValue;
 }
 
 int main(int argc, char** argv) {
