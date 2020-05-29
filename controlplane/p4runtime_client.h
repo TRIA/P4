@@ -8,8 +8,6 @@
 // Import declarations after any other
 #include "p4runtime_ns_def.inc"
 
-// using std;
-
 class P4RuntimeClient {
 
   public:
