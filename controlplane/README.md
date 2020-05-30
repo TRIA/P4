@@ -1,4 +1,4 @@
-# Control plane
+# P4-based control plane for the EDF RINA router
 
 Components of the control plane interacting with the P4-based RINA router
 

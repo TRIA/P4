@@ -1,8 +1,9 @@
 # Transient files
 *.swp
+dataplane/p4/env/tmp
 
 # Logs
-bmodel.log
+*.log
 
 # Python generated classes
 *.pyc
