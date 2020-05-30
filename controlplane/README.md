@@ -1,1 +1,1 @@
-This folder contains the control plane components of the NPL-based RINA router
+Control plane components for the P4-based RINA router

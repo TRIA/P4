@@ -54,25 +54,21 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
   auto electionIdIndex = electionId.find_first_of(",");
   ::PROTOBUF_NAMESPACE_ID::uint64 electionIdHigh = std::stoull(electionId.substr(0, electionIdIndex));
   ::PROTOBUF_NAMESPACE_ID::uint64 electionIdLow = std::stoull(electionId.substr(electionIdIndex + 1));
+  electionId_ = ::P4_NAMESPACE_ID::Uint128().New();
   electionId_->set_high(electionIdHigh);
   electionId_->set_low(electionIdLow);
 
-  ::GRPC_NAMESPACE_ID::ClientContext* context;
-  std::unique_ptr<streamType_> stream_ = stub_->StreamChannel(context);
+  ClientContext context;
+  std::unique_ptr<streamType_> stream_ = stub_->StreamChannel(&context);
+
+  SetUp();
 }
 
 // RPC methods
 
-// @parse_p4runtime_error
-// def get_p4info(self):
-//     logging.debug("Retrieving P4Info file")
-//     req = p4runtime_pb2.GetForwardingPipelineConfigRequest()
-//     req.device_id = self.device_id
-//     req.response_type = p4runtime_pb2.GetForwardingPipelineConfigRequest.P4INFO_AND_COOKIE
-//     rep = self.stub.GetForwardingPipelineConfig(req)
-//     return rep.config.p4info
+// See reference/p4runtime-shell-python/p4runtime.py#get_p4info
 P4Info P4RuntimeClient::GetP4Info() {
-  std::cout << "Retrieving P4 info object" << std::endl;
+  std::cout << "Retrieving P4Info file" << std::endl;
   GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
   request.set_device_id(deviceId_);
   request.set_response_type(request.P4INFO_AND_COOKIE);
@@ -88,24 +84,7 @@ P4Info P4RuntimeClient::GetP4Info() {
   return response.config().p4info();
 }
 
-// @parse_p4runtime_error
-// def set_fwd_pipe_config(self, p4info_path, bin_path):
-//     logging.debug("Setting forwarding pipeline config")
-//     req = p4runtime_pb2.SetForwardingPipelineConfigRequest()
-//     req.device_id = self.device_id
-//     election_id = req.election_id
-//     election_id.high = self.election_id[0]
-//     election_id.low = self.election_id[1]
-//     req.action = p4runtime_pb2.SetForwardingPipelineConfigRequest.VERIFY_AND_COMMIT
-//     with open(p4info_path, 'r') as f1:
-//         with open(bin_path, 'rb') as f2:
-//             try:
-//                 google.protobuf.text_format.Merge(f1.read(), req.config.p4info)
-//             except google.protobuf.text_format.ParseError:
-//                 logging.error("Error when parsing P4Info")
-//                 raise
-//             req.config.p4_device_config = f2.read()
-//     return self.stub.SetForwardingPipelineConfig(req)
+// See reference/p4runtime-shell-python/p4runtime.py#set_fwd_pipe_config
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
@@ -133,13 +112,7 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   return stub_->SetForwardingPipelineConfig(context, request, response);
 }
 
-// @parse_p4runtime_write_error
-// def write(self, req):
-//     req.device_id = self.device_id
-//     election_id = req.election_id
-//     election_id.high = self.election_id[0]
-//     election_id.low = self.election_id[1]
-//     return self.stub.Write(req)
+// See reference/p4runtime-shell-python/p4runtime.py#write
 Status P4RuntimeClient::Write(::P4_NAMESPACE_ID::WriteRequest* request) {
   std::cout << "Submitting writing request" << std::endl;
   request->set_device_id(deviceId_);
@@ -150,15 +123,7 @@ Status P4RuntimeClient::Write(::P4_NAMESPACE_ID::WriteRequest* request) {
   return stub_->Write(&context, *request, &response);
 }
 
-// @parse_p4runtime_write_error
-// def write_update(self, update):
-//     req = p4runtime_pb2.WriteRequest()
-//     req.device_id = self.device_id
-//     election_id = req.election_id
-//     election_id.high = self.election_id[0]
-//     election_id.low = self.election_id[1]
-//     req.updates.extend([update])
-//     return self.stub.Write(req)
+// See reference/p4runtime-shell-python/p4runtime.py#write_update
 Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
   std::cout << "Submitting write-update request" << std::endl;
   WriteRequest request = WriteRequest();
@@ -174,14 +139,7 @@ Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
   return stub_->Write(&context, request, &response);
 }
 
-// # Decorator is useless here: in case of server error, the exception is raised during the
-// # iteration (when next() is called).
-// @parse_p4runtime_error
-// def read_one(self, entity):
-//     req = p4runtime_pb2.ReadRequest()
-//     req.device_id = self.device_id
-//     req.entities.extend([entity])
-//     return self.stub.Read(req)
+// See reference/p4runtime-shell-python/p4runtime.py#read_one
 ReadResponse P4RuntimeClient::ReadOne() {
   std::cout << "Submitting single read request" << std::endl;
   ReadRequest request = ReadRequest();
@@ -196,11 +154,7 @@ ReadResponse P4RuntimeClient::ReadOne() {
   return response;
 }
 
-// @parse_p4runtime_error
-// def api_version(self):
-//     req = p4runtime_pb2.CapabilitiesRequest()
-//     rep = self.stub.Capabilities(req)
-//     return rep.p4runtime_api_version
+// See reference/p4runtime-shell-python/p4runtime.py#api_version
 std::string P4RuntimeClient::APIVersion() {
   std::cout << "Fetching version of the API" << std::endl;
   CapabilitiesRequest request = CapabilitiesRequest();
@@ -217,88 +171,43 @@ std::string P4RuntimeClient::APIVersion() {
 
 // Ancillary methods
 
-// TODO: finalise
-
-// def set_up_stream(self):
-//     self.stream_out_q = queue.Queue()
-//     self.stream_in_q = queue.Queue()
-
-//     def stream_req_iterator():
-//         while True:
-//             p = self.stream_out_q.get()
-//             if p is None:
-//                 break
-//             yield p
-
-//     def stream_recv_wrapper(stream):
-//         @parse_p4runtime_error
-//         def stream_recv():
-//             for p in stream:
-//                 self.stream_in_q.put(p)
-//         try:
-//             stream_recv()
-//         except P4RuntimeException as e:
-//             logging.critical("StreamChannel error, closing stream")
-//             logging.critical(e)
-//             self.stream_in_q.put(None)
-
-//     self.stream = self.stub.StreamChannel(stream_req_iterator())
-//     self.stream_recv_thread = threading.Thread(
-//         target=stream_recv_wrapper, args=(self.stream,))
-//     self.stream_recv_thread.start()
-
-//     self.handshake()
+// TODO: finalise. See reference/p4runtime-shell-python/p4runtime.py#set_up_stream
 void P4RuntimeClient::SetUp() {
   // Setup queues
+  std::cout << "SOME 20 " << std::endl;
   std::queue<streamType_> streamQueueIn_();
+  std::cout << "SOME 21 " << std::endl;
   std::queue<streamType_> streamQueueOut_();
-  grpc::ClientContext* context;
-  stream_ = stub_->StreamChannel(context);
+  std::cout << "SOME 22 " << std::endl;
+  grpc::ClientContext context;
+  std::cout << "SOME 23 " << std::endl;
+  stream_ = stub_->StreamChannel(&context);
+  std::cout << "SOME 24 " << std::endl;
   Handshake();
+  std::cout << "SOME 25 " << std::endl;
 }
 
-// TODO: finalise
-
-// def tear_down(self):
-//     if self.stream_out_q:
-//         logging.debug("Cleaning up stream")
-//         self.stream_out_q.put(None)
-//         self.stream_recv_thread.join()
-//     self.channel.close()
-//     del self.channel  # avoid a race condition if channel deleted when process terminates
+// TODO: finalise. Check reference/p4runtime-shell-python/p4runtime.py#tear_down
 void P4RuntimeClient::TearDown() {
   if (!streamQueueOut_.empty()) {
-    std::cout << "Cleaning up stream" << std::endl;
     streamQueueOut_.push(NULL);
   }
-  channel_->~Channel();
+  // channel_->~Channel();
+  channel_.reset();
 }
 
-// TODO: finalise
-
-// def handshake(self):
-//     req = p4runtime_pb2.StreamMessageRequest()
-//     arbitration = req.arbitration
-//     arbitration.device_id = self.device_id
-//     election_id = arbitration.election_id
-//     election_id.high = self.election_id[0]
-//     election_id.low = self.election_id[1]
-//     self.stream_out_q.put(req)
-
-//     rep = self.get_stream_packet("arbitration", timeout=2)
-//     if rep is None:
-//         logging.critical("Failed to establish session with server")
-//         sys.exit(1)
-//     is_master = (rep.arbitration.status.code == code_pb2.OK)
-//     logging.debug("Session established, client is '{}'".format(
-//         'master' if is_master else 'slave'))
-//     if not is_master:
-//         print("You are not master, you only have read access to the server")
+// TODO: finalise. Check reference/p4runtime-shell-python/p4runtime.py#handshake
 void P4RuntimeClient::Handshake() {
+  std::cout << "SOME 30 " << std::endl;
   StreamMessageRequest request = StreamMessageRequest();
+  std::cout << "SOME 31 " << std::endl;
   const ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = request.arbitration();
+  std::cout << "SOME 32 " << std::endl;
   SetElectionId(const_cast<::P4_NAMESPACE_ID::Uint128*>(&arbitration.election_id()));
+  std::cout << "SOME 33 " << std::endl;
+  std::cout << "SOME 34 " << std::endl;
   streamQueueOut_.push(&request);
+  std::cout << "SOME 35 " << std::endl;
 }
 
 void P4RuntimeClient::SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId) {

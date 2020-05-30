@@ -13,4 +13,5 @@ bmodel.log
 
 # C++ generated classes
 *.o
+controlplane/client/src/control_plane
 controlplane/client/src/grpc_out

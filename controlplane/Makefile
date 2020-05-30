@@ -22,7 +22,7 @@ edf-cp-client-build:
 
 edf-cp-client-run: edf-cp-client-build
 	@echo "Running image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} in container ${EDF_CONTROL_C_NAME}, then attaching to it"
-	docker run -it -v ${PWD}/client/src:/opt/p4runtime-cpp \
+	docker run -it -v ${PWD}/client:/opt/p4runtime-cpp \
 	--entrypoint /bin/bash --name ${EDF_CONTROL_C_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}
 
 edf-cp-client-attach:
