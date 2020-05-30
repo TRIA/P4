@@ -1,69 +1,156 @@
 #include <grpcpp/grpcpp.h>
+
 #include "p4runtime_client.h"
 // Import declarations after any other
 #include "p4runtime_ns_def.inc"
 
+using ::GRPC_NAMESPACE_ID::Status;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 
-int isSubstringOf(std::string subString, std::string string) {
-  size_t startPosition = string.find(subString);
-  return (startPosition != std::string::npos) ? startPosition : -1;
+int is_substring_of(std::string substring, std::string string) {
+  size_t position_start = string.find(substring);
+  return (position_start != std::string::npos) ? position_start : -1;
 }
 
-std::string parseArguments(int numArgs, char** args, std::string argName, std::string defaultValue) {
-  std::string argValue;
-  std::string argVal;
+std::string parse_arguments(int num_args, char** args, std::string arg_name, std::string default_value) {
+  std::string arg_val;
 
-  while (numArgs > 1) {
-    argVal = args[numArgs-1];
-    int startPosition = isSubstringOf(argName, argVal);
-    if (startPosition >= 0) {
-      startPosition += argName.size();
-      if (argVal[startPosition] == '=') {
-        argVal = argVal.substr(startPosition + 1);
-        return argVal;
+  while (num_args > 1) {
+    arg_val = args[num_args-1];
+    int position_start = is_substring_of(arg_name, arg_val);
+    if (position_start >= 0) {
+      position_start += arg_name.size();
+      if (arg_val[position_start] == '=') {
+        arg_val = arg_val.substr(position_start + 1);
+        return arg_val;
       } else {
-        std::cout << "Argument syntax: " << argName << "=<value>" << std::endl;
-        return defaultValue;
+        std::cout << "Argument syntax: " << arg_name << "=<value>" << std::endl;
+        return default_value;
       }
     } else {
-      argVal = "";
+      arg_val = "";
     }
-    numArgs--;
+    num_args--;
   }
 
-  return argVal == "" ? defaultValue : argVal;
+  return arg_val.length() == 0 ? default_value : arg_val;
+}
+
+void segfault_sigaction(int signal, siginfo_t *si, void *arg) {
+    printf("Caught segfault at address=%p\n", si->si_addr);
+    exit(1);
+}
+
+void setup_segfault() {
+  int *foo = NULL;
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(struct sigaction));
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = segfault_sigaction;
+  sa.sa_flags   = SA_SIGINFO;
+
+  sigaction(SIGSEGV, &sa, NULL);
+
+  // Cause a seg fault
+  *foo = 1;
 }
 
 int main(int argc, char** argv) {
 
-  std::cout << "\n** Running the client for the EDF control plane **\n\n" << std::endl;
+  // INFO: uncomment to hide memory stack trace after p4RuntimeClient.SetFwdPipeConfig() issue
+  // setup_segfault();
+
+  std::cout << "\n** Running the client for the EDF control plane **" << std::endl;
 
   // Parse arguments given to the P4Runtime client
-  const std::string targetAddress = parseArguments(argc, argv, "--target", "localhost:50051");
-  const std::string configPaths = parseArguments(argc, argv, "--config", "p4src/build/p4info.txt,p4src/build/bmv2.json");
-  const std::string electionId = parseArguments(argc, argv, "--election-id", "0,1");
+  // TODO: consider implemeting another argument to run a specific RPC method
+  const std::string grpc_server_addr = parse_arguments(argc, argv, "--grpc-addr", "localhost:50001");
+  const std::string config_paths = parse_arguments(argc, argv, "--config", "p4src/build/p4info.txt,p4src/build/bmv2.json");
+  const std::string election_id = parse_arguments(argc, argv, "--election-id", "0,1");
   const ::PROTOBUF_NAMESPACE_ID::uint64 deviceId = 1;
-  std::cout << "P4RuntimeClient running with arguments:" << std::endl;
-  std::cout << "\t--target=" << targetAddress << std::endl;
-  std::cout << "\t--config=" << configPaths << std::endl;
-  std::cout << "\t--election-id=" << electionId << std::endl;
+  std::cout << "\nP4RuntimeClient running with arguments:" << std::endl;
+  std::cout << "\t--grpc-addr=" << grpc_server_addr << std::endl;
+  std::cout << "\t--config=" << config_paths << std::endl;
+  std::cout << "\t--election-id=" << election_id << "\n" << std::endl;
 
   // Instantiate the client. It uses a non-authenticated channel, which models a connection to an endpoint
   // (as specified by the "--target" argument). The actual RPCs are created out of this channel.
-  P4RuntimeClient p4RuntimeClient = P4RuntimeClient(targetAddress, configPaths, deviceId, electionId);
+  P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
 
-  // TODO: consider implemeting another argument to run a specific RPC method
+  // INFO: uncomment when testing the server in the real target
+
   try {
     P4Info p4Info = p4RuntimeClient.GetP4Info();
-    std::cout << "Obtained P4Info data: " << p4Info.SerializeAsString() << std::endl;
+    std:: string p4InfoData = p4Info.SerializeAsString();
+    if (p4InfoData.size() > 0) {
+      std::cout << "Obtained P4Info data: " << p4InfoData << std::endl;
+    } else {
+      std::cerr << "Warning: no P4Info data obtained" << std::endl;
+    }
   } catch (...) {
-    const std::string errorMessage = "Cannot get the configuration from ForwardingPipelineConfig";
-    std::cerr << errorMessage << std::endl;
-    throw errorMessage;
+    const std::string errorMessage = "Cannot get the P4Info data";
+    std::cerr << "Exception: " << errorMessage << std::endl;
+    exit(1);
   }
 
-  p4RuntimeClient.SetFwdPipeConfig();
+  // try {
+  //   Status status = p4RuntimeClient.SetFwdPipeConfig();
+  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
+  // } catch (std::exception& e) {
+  //   std::cerr << "Exception caught : " << e.what() << std::endl;
+  // } catch (...) {
+  //   const std::string errorMessage = "Cannot get the ForwardingPipeline configuration";
+  //   std::cerr << "Exception: " << errorMessage << std::endl;
+  //   exit(1);
+  // }
+
+  // try {
+  //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
+  //   Status status = p4RuntimeClient.Write(&writeRequest);
+  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
+  // } catch (...) {
+  //   const std::string errorMessage = "Cannot call the Write method";
+  //   std::cerr << "Exception: " << errorMessage << std::endl;
+  //   exit(1);
+  // }
+
+  // try {
+  //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
+  //   Status status = p4RuntimeClient.WriteUpdate(&writeRequest);
+  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
+  // } catch (...) {
+  //   const std::string errorMessage = "Cannot call the WriteUpdate method";
+  //   std::cerr << "Exception: " << errorMessage << std::endl;
+  //   exit(1);
+  // }
+
+  try {
+    ::P4_NAMESPACE_ID::ReadResponse response = p4RuntimeClient.ReadOne();
+    std:: string responseData = response.SerializeAsString();
+    if (responseData.size() > 0) {
+      std::cout << "Obtained response data: " << responseData << std::endl;
+    } else {
+      std::cerr << "Warning: no response data obtained" << std::endl;
+    }
+  } catch (...) {
+    const std::string errorMessage = "Cannot call the ReadOne method";
+    std::cerr << "Exception: " << errorMessage << std::endl;
+    exit(1);
+  }
+
+  try {
+    std::string version = p4RuntimeClient.APIVersion();
+    if (version.length() > 0) {
+      std::cout << "Obtained API version: " << version << std::endl;
+    } else {
+      std::cerr << "Warning: no API version obtained" << std::endl;
+    }
+  } catch (...) {
+    const std::string errorMessage = "Cannot call the APIVersion method";
+    std::cerr << "Exception: " << errorMessage << std::endl;
+    exit(1);
+  }
 
   p4RuntimeClient.TearDown();
 

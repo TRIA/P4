@@ -3,6 +3,7 @@
 #include <grpcpp/grpcpp.h>
 #include <queue>
 #include <sstream>
+#include <unistd.h>
 
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
@@ -41,8 +42,14 @@ using ::P4_NAMESPACE_ID::WriteResponse;
 P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
                 std::string config,
                 ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
-                std::string electionId) {
+                std::string electionId)/* : stub_(
+                  P4Runtime::NewStub(CreateChannel(bindAddress, InsecureChannelCredentials()))
+                )*/ {
   channel_ = CreateChannel(bindAddress, InsecureChannelCredentials());
+  // FIXME: channel seems idle
+  // Details: state=0 (ref.: https://grpc.github.io/grpc/cpp/connectivity__state_8h.html#a065b65f5cdd062a67d82e2b6bcf68cf2)
+  // Notes: get state can try to connect to channel (true) or not (false)
+  std::cout << "Channel status = " << channel_->GetState(false) << std::endl;
   stub_ = P4Runtime::NewStub(channel_);
 
   auto configIndex = config.find_first_of(",");
@@ -85,6 +92,8 @@ P4Info P4RuntimeClient::GetP4Info() {
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#set_fwd_pipe_config
+// FIXME: *** Error in `./edf-cp': double free or corruption (out)
+// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
@@ -94,27 +103,40 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
 
   int fd = open(p4InfoPath_.c_str(), O_RDONLY);
   ZeroCopyInputStream* p4InfoFile = new FileInputStream(fd);
-  std::ifstream binaryCfgFileIfStream(binaryCfgPath_);
+  off_t fsize = lseek(fd, 0, SEEK_END);
+  if (lseek(fd, 0, SEEK_END) < 0) {
+    const std::string errorMessage = "Cannot open file " + p4InfoPath_;
+    HandleException(errorMessage.c_str());
+  }
+
+  std::ifstream binaryCfgFileIfStream("./" + binaryCfgPath_);
+  if (!binaryCfgFileIfStream.is_open()) {
+    const std::string errorMessage = "Cannot open file " + binaryCfgPath_;
+    HandleException(errorMessage.c_str());
+  }
+
+  // Data (1st arg) merged into given Message (2nd arg)
+  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &request);
+
   ZeroCopyInputStream* binaryCfgFile = new IstreamInputStream(&binaryCfgFileIfStream, -1);
   std::stringstream binaryCfgFileStream;
   binaryCfgFileStream << binaryCfgFileIfStream.rdbuf();
   std::string binaryCfgFileStr = binaryCfgFileStream.str();
 
-  // Data (1st arg) merged into given Message (2nd arg)
-  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &request);
-
   ForwardingPipelineConfig* config = request.mutable_config();
   config->set_allocated_p4_device_config(&binaryCfgFileStr);
 
-  ClientContext* context;
-  ::P4_NAMESPACE_ID::SetForwardingPipelineConfigResponse* response;
+  ClientContext context;
+  SetForwardingPipelineConfigResponse response;
 
-  return stub_->SetForwardingPipelineConfig(context, request, response);
+  return stub_->SetForwardingPipelineConfig(&context, request, &response);
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#write
-Status P4RuntimeClient::Write(::P4_NAMESPACE_ID::WriteRequest* request) {
-  std::cout << "Submitting writing request" << std::endl;
+// FIXME: does not return a successful status
+// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
+Status P4RuntimeClient::Write(WriteRequest* request) {
+  std::cout << "Submitting write request" << std::endl;
   request->set_device_id(deviceId_);
   deviceId_ = request->device_id();
   SetElectionId(request->mutable_election_id());
@@ -124,6 +146,8 @@ Status P4RuntimeClient::Write(::P4_NAMESPACE_ID::WriteRequest* request) {
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#write_update
+// FIXME: does not return a successful status
+// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
 Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
   std::cout << "Submitting write-update request" << std::endl;
   WriteRequest request = WriteRequest();
@@ -174,17 +198,11 @@ std::string P4RuntimeClient::APIVersion() {
 // TODO: finalise. See reference/p4runtime-shell-python/p4runtime.py#set_up_stream
 void P4RuntimeClient::SetUp() {
   // Setup queues
-  std::cout << "SOME 20 " << std::endl;
   std::queue<streamType_> streamQueueIn_();
-  std::cout << "SOME 21 " << std::endl;
   std::queue<streamType_> streamQueueOut_();
-  std::cout << "SOME 22 " << std::endl;
   grpc::ClientContext context;
-  std::cout << "SOME 23 " << std::endl;
   stream_ = stub_->StreamChannel(&context);
-  std::cout << "SOME 24 " << std::endl;
   Handshake();
-  std::cout << "SOME 25 " << std::endl;
 }
 
 // TODO: finalise. Check reference/p4runtime-shell-python/p4runtime.py#tear_down
@@ -198,16 +216,10 @@ void P4RuntimeClient::TearDown() {
 
 // TODO: finalise. Check reference/p4runtime-shell-python/p4runtime.py#handshake
 void P4RuntimeClient::Handshake() {
-  std::cout << "SOME 30 " << std::endl;
   StreamMessageRequest request = StreamMessageRequest();
-  std::cout << "SOME 31 " << std::endl;
   const ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = request.arbitration();
-  std::cout << "SOME 32 " << std::endl;
   SetElectionId(const_cast<::P4_NAMESPACE_ID::Uint128*>(&arbitration.election_id()));
-  std::cout << "SOME 33 " << std::endl;
-  std::cout << "SOME 34 " << std::endl;
   streamQueueOut_.push(&request);
-  std::cout << "SOME 35 " << std::endl;
 }
 
 void P4RuntimeClient::SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId) {
@@ -230,7 +242,7 @@ void P4RuntimeClient::SetElectionId(std::string electionId) {
 }
 
 void P4RuntimeClient::HandleException(const char* errorMessage) {
-  std::cerr << errorMessage << std::endl;
+  std::cerr << "Exception: " << errorMessage << std::endl;
   throw errorMessage;
 }
 

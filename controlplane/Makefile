@@ -5,13 +5,12 @@ GRPC_RELEASE := $(or $(grpc_release), $(GRPC_RELEASE_DEFAULT))
 
 EDF_CONTROL_C_NAME := edf-cp-client
 EDF_CONTROL_TAG := ubuntu18
-#P4R_SERVER_IP := 127.0.0.1
-#P4R_SERVER_PORT := 50002
+EDF_CLIENT_CFG := $(PWD)/client/cfg
 
 default:
 	$(error Please specify a make target (see README.md))
 
-edf-cp-client-reset:
+edf-cp-client-clean:
 	@echo "Clean-up any related image and container"
 	docker rm -f ${EDF_CONTROL_C_NAME} || true
 	docker image rm ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
@@ -22,6 +21,8 @@ edf-cp-client-build:
 
 edf-cp-client-run: edf-cp-client-build
 	@echo "Running image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} in container ${EDF_CONTROL_C_NAME}, then attaching to it"
+	-mkdir -p ${EDF_CLIENT_CFG}
+	-cp -Rp $(PWD)/../dataplane/p4/model/build/* ${EDF_CLIENT_CFG}/
 	docker run -it -v ${PWD}/client:/opt/p4runtime-cpp \
 	--entrypoint /bin/bash --name ${EDF_CONTROL_C_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}
 

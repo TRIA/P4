@@ -13,5 +13,7 @@ bmodel.log
 
 # C++ generated classes
 *.o
-controlplane/client/src/control_plane
+controlplane/client/cfg
+controlplane/client/src/edf-cp-client
+controlplane/client/src/edf-cp-server
 controlplane/client/src/grpc_out
