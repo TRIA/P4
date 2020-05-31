@@ -5,14 +5,23 @@
 // Import declarations after any other
 #include "p4runtime_ns_def.inc"
 
+// using ::GRPC_NAMESPACE_ID::ServerContext;
 using ::GRPC_NAMESPACE_ID::Server;
 using ::GRPC_NAMESPACE_ID::ServerBuilder;
+using ::GRPC_NAMESPACE_ID::ServerContext;
+using ::GRPC_NAMESPACE_ID::ServerWriter;
 using ::GRPC_NAMESPACE_ID::Status;
+using ::GRPC_NAMESPACE_ID::WriteOptions;
 
 // Server
 using ::P4_NAMESPACE_ID::P4Runtime;
 // Data structures
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
+using ::P4_NAMESPACE_ID::CapabilitiesRequest;
+using ::P4_NAMESPACE_ID::CapabilitiesResponse;
+using ::P4_NAMESPACE_ID::GetForwardingPipelineConfigRequest;
+using ::P4_NAMESPACE_ID::GetForwardingPipelineConfigResponse;
+using ::P4_NAMESPACE_ID::ReadRequest;
 using ::P4_NAMESPACE_ID::ReadResponse;
 using ::P4_NAMESPACE_ID::WriteRequest;
 
@@ -20,9 +29,12 @@ class P4RuntimeServer final : public P4Runtime::Service {
   public:
     explicit P4RuntimeServer() {}
 
-    P4Info GetP4Info() {
+    Status GetForwardingPipelineConfig(ServerContext* context, const GetForwardingPipelineConfigRequest* request,
+        GetForwardingPipelineConfigResponse* response) override {
       std::cout << "Returning P4Info file" << std::endl;
-      return P4Info();
+      std::string fwdPipelineCfg = "Sample pipeline cfg";
+      response->mutable_config()->mutable_p4info()->ParseFromString(fwdPipelineCfg);
+      return Status::OK;
     }
 
     Status SetFwdPipeConfig() {
@@ -40,15 +52,23 @@ class P4RuntimeServer final : public P4Runtime::Service {
       return Status::OK;
     }
 
-    ReadResponse ReadOne() {
+    Status Read(ServerContext* context, const ReadRequest* request,
+        ServerWriter<ReadResponse>* writer) override {
       std::cout << "Receiving single read request" << std::endl;
-      return ReadResponse();
+      ReadResponse response = ReadResponse();
+      std::string readEntry = "Sample entry";
+      response.ParseFromString(readEntry);
+      WriteOptions options;
+      writer->WriteLast(response, options);
+      return Status::OK;
     }
 
-    std::string APIVersion() {
+    Status Capabilities(ServerContext* context, const CapabilitiesRequest* request, 
+        CapabilitiesResponse* response) override {
       std::cout << "Returning API version" << std::endl;
       std::string version = "1.23-r4";
-      return version;
+      response->set_p4runtime_api_version(version.c_str());
+      return Status::OK;
     }
 };
 

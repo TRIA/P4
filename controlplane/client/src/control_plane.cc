@@ -6,6 +6,7 @@
 
 using ::GRPC_NAMESPACE_ID::Status;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
+using ::P4_NAMESPACE_ID::ReadResponse;
 
 int is_substring_of(std::string substring, std::string string) {
   size_t position_start = string.find(substring);
@@ -80,6 +81,7 @@ int main(int argc, char** argv) {
 
   // INFO: uncomment when testing the server in the real target
 
+  std::cout << "-------------- GetP4Info --------------" << std::endl;
   try {
     P4Info p4Info = p4RuntimeClient.GetP4Info();
     std:: string p4InfoData = p4Info.SerializeAsString();
@@ -94,6 +96,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
+  // std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
   // try {
   //   Status status = p4RuntimeClient.SetFwdPipeConfig();
   //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
@@ -105,6 +108,7 @@ int main(int argc, char** argv) {
   //   exit(1);
   // }
 
+  // std::cout << "-------------- Write --------------" << std::endl;
   // try {
   //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
   //   Status status = p4RuntimeClient.Write(&writeRequest);
@@ -115,6 +119,7 @@ int main(int argc, char** argv) {
   //   exit(1);
   // }
 
+  // std::cout << "-------------- WriteUpdate --------------" << std::endl;
   // try {
   //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
   //   Status status = p4RuntimeClient.WriteUpdate(&writeRequest);
@@ -125,8 +130,9 @@ int main(int argc, char** argv) {
   //   exit(1);
   // }
 
+  std::cout << "-------------- ReadOne --------------" << std::endl;
   try {
-    ::P4_NAMESPACE_ID::ReadResponse response = p4RuntimeClient.ReadOne();
+    ReadResponse response = p4RuntimeClient.ReadOne();
     std:: string responseData = response.SerializeAsString();
     if (responseData.size() > 0) {
       std::cout << "Obtained response data: " << responseData << std::endl;
@@ -139,6 +145,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
+  std::cout << "-------------- APIVersion --------------" << std::endl;
   try {
     std::string version = p4RuntimeClient.APIVersion();
     if (version.length() > 0) {

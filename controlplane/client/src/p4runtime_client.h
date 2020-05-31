@@ -53,6 +53,7 @@ class P4RuntimeClient {
     void SetElectionId(std::string electionId);
     void SetupStream();
     void HandleException(const char* errorMessage);
+    void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 
 };
 

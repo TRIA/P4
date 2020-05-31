@@ -26,13 +26,15 @@ default:
 	${CXX} ${CXXFLAGS} ${LDFLAGS} -I${GRPC_BUILDDIR} -I${dir $<} -c $< -o $@
 
 # Compiles all dependency files that were found under this folder (recursive)
-all: ${EDF_DEPENDENCIES_OBJ} ${EDF_SOURCES_OBJ}
+sources-all: ${EDF_DEPENDENCIES_OBJ} ${EDF_SOURCES_OBJ}
 
-${EDF_CP_CLIENT_BIN}: all p4runtime_client.o
+${EDF_CP_CLIENT_BIN}: sources-all p4runtime_client.o
 	${CXX} ${CXXFLAGS} -I${GRPC_BUILDDIR} ${EDF_DEPENDENCIES_OBJ} ${EDF_SOURCES_OBJ} p4runtime_client.o ${LDFLAGS} -o $@
 
-${EDF_CP_SERVER_BIN}: all p4runtime_server.o
+${EDF_CP_SERVER_BIN}: sources-all p4runtime_server.o
 	${CXX} ${CXXFLAGS} -I${GRPC_BUILDDIR} ${EDF_DEPENDENCIES_OBJ} p4runtime_server.o ${LDFLAGS} -o $@
+
+all: ${EDF_CP_CLIENT_BIN} ${EDF_CP_SERVER_BIN}
 
 clean:
 	rm -f ${EDF_SOURCES_OBJ} p4runtime_client.o p4runtime_server.o ${EDF_CP_CLIENT_BIN} ${EDF_CP_SERVER_BIN}

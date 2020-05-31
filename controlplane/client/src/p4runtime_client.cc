@@ -13,6 +13,7 @@
 
 using ::GRPC_NAMESPACE_ID::Channel;
 using ::GRPC_NAMESPACE_ID::ClientContext;
+using ::GRPC_NAMESPACE_ID::ClientReader;
 using ::GRPC_NAMESPACE_ID::Status;
 using ::PROTOBUF_NAMESPACE_ID::io::IstreamInputStream;
 using ::PROTOBUF_NAMESPACE_ID::io::FileInputStream;
@@ -42,14 +43,8 @@ using ::P4_NAMESPACE_ID::WriteResponse;
 P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
                 std::string config,
                 ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
-                std::string electionId)/* : stub_(
-                  P4Runtime::NewStub(CreateChannel(bindAddress, InsecureChannelCredentials()))
-                )*/ {
+                std::string electionId) {
   channel_ = CreateChannel(bindAddress, InsecureChannelCredentials());
-  // FIXME: channel seems idle
-  // Details: state=0 (ref.: https://grpc.github.io/grpc/cpp/connectivity__state_8h.html#a065b65f5cdd062a67d82e2b6bcf68cf2)
-  // Notes: get state can try to connect to channel (true) or not (false)
-  std::cout << "Channel status = " << channel_->GetState(false) << std::endl;
   stub_ = P4Runtime::NewStub(channel_);
 
   auto configIndex = config.find_first_of(",");
@@ -74,6 +69,7 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
 // RPC methods
 
 // See reference/p4runtime-shell-python/p4runtime.py#get_p4info
+// FIXME: read the whole data (garbage is obtained instead)
 P4Info P4RuntimeClient::GetP4Info() {
   std::cout << "Retrieving P4Info file" << std::endl;
   GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
@@ -82,10 +78,12 @@ P4Info P4RuntimeClient::GetP4Info() {
 
   ClientContext context;
   GetForwardingPipelineConfigResponse response;
+  Status status;
+  const std::string errorMessage = "Cannot get configuration from the forwarding pipeline";
   try {
-    stub_->GetForwardingPipelineConfig(&context, request, &response);
+    status = stub_->GetForwardingPipelineConfig(&context, request, &response);
+    HandleStatus(status, errorMessage.c_str());
   } catch (...) {
-    const std::string errorMessage = "Cannot get the configuration from ForwardingPipelineConfig";
     HandleException(errorMessage.c_str());
   }
   return response.config().p4info();
@@ -93,7 +91,7 @@ P4Info P4RuntimeClient::GetP4Info() {
 
 // See reference/p4runtime-shell-python/p4runtime.py#set_fwd_pipe_config
 // FIXME: *** Error in `./edf-cp': double free or corruption (out)
-// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
+// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
@@ -134,7 +132,7 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
 
 // See reference/p4runtime-shell-python/p4runtime.py#write
 // FIXME: does not return a successful status
-// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
+// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 Status P4RuntimeClient::Write(WriteRequest* request) {
   std::cout << "Submitting write request" << std::endl;
   request->set_device_id(deviceId_);
@@ -147,7 +145,7 @@ Status P4RuntimeClient::Write(WriteRequest* request) {
 
 // See reference/p4runtime-shell-python/p4runtime.py#write_update
 // FIXME: does not return a successful status
-// Details: grpc::status.error_code() == 14 (ref.: https://developers.google.com/maps-booking/reference/grpc-api/status_codes)
+// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
   std::cout << "Submitting write-update request" << std::endl;
   WriteRequest request = WriteRequest();
@@ -155,7 +153,7 @@ Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
   SetElectionId(request.mutable_election_id());
   // Extend request.updates with the new update object provided
   for (Update singleUpdate : *(update->mutable_updates())) {
-    // Note: add already allocated objects in memory. Might use "Add" isntead
+    // Note: add already allocated objects in memory. Might use "Add" instead
     request.mutable_updates()->AddAllocated(&singleUpdate);
   }
   WriteResponse response;
@@ -164,17 +162,20 @@ Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#read_one
+// FIXME: read the whole data (garbage is obtained instead)
 ReadResponse P4RuntimeClient::ReadOne() {
   std::cout << "Submitting single read request" << std::endl;
   ReadRequest request = ReadRequest();
   request.set_device_id(deviceId_);
   for (Entity singleEntity : *request.mutable_entities()) {
-    // Note: add already allocated objects in memory. Might use "Add" isntead
+    // Note: add already allocated objects in memory. Might use "Add" instead
     request.mutable_entities()->AddAllocated(&singleEntity);
   }
   ClientContext context;
   ReadResponse response = ReadResponse();
-  stub_->Read(&context, request).get()->Read(&response);
+  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
+  clientReader->Read(&response);
+  clientReader->Finish();
   return response;
 }
 
@@ -184,12 +185,16 @@ std::string P4RuntimeClient::APIVersion() {
   CapabilitiesRequest request = CapabilitiesRequest();
   CapabilitiesResponse response = CapabilitiesResponse();
   ClientContext context;
+  
+  Status status;
+  const std::string errorMessage = "Cannot retrieve information on the API version";
   try {
-    stub_->Capabilities(&context, request, &response);
+    status = stub_->Capabilities(&context, request, &response);
+    HandleStatus(status, errorMessage.c_str());
   } catch (...) {
-    const std::string errorMessage = "Cannot retrieve information on the API version";
     HandleException(errorMessage.c_str());
   }
+
   return response.p4runtime_api_version();
 }
 
@@ -244,6 +249,12 @@ void P4RuntimeClient::SetElectionId(std::string electionId) {
 void P4RuntimeClient::HandleException(const char* errorMessage) {
   std::cerr << "Exception: " << errorMessage << std::endl;
   throw errorMessage;
+}
+
+void P4RuntimeClient::HandleStatus(Status status, const char* errorMessage) {
+  if (!status.ok()) {
+    std::cout << errorMessage << ". Error code: " << status.error_code() << std::endl;
+  }
 }
 
 #include "p4runtime_ns_undef.inc"
