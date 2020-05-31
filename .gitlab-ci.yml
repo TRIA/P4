@@ -10,7 +10,8 @@ job_efcp_build:
   script:
     - cd dataplane/p4
     - make efcp-build
-  tags: [p4_dp_build]
+#  tags: [p4_dp_build]
+  tags: [npl_bmodel]
 
 job_cp_run:
   script:
@@ -19,4 +20,5 @@ job_cp_run:
     - make edf-cp-test
     - cat client/test/edf-cp-server.log 
     - cat client/test/edf-cp-client.log 
-  tags: [p4_cp_test]
+#  tags: [p4_cp_test]
+  tags: [npl_bmodel]
