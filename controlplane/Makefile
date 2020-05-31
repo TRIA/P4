@@ -60,8 +60,8 @@ edf-cp-test: edf-cp-client-build
 	mkdir -p ${EDF_CLIENT_CFG}
 	cp -Rp ${PWD}/../dataplane/p4/model/build/* ${EDF_CLIENT_CFG}/
 	${EDF_CONTROL_C_T_EXISTS} && docker rm -f ${EDF_CONTROL_C_T_NAME} || true
-	docker run -it -v ${PWD}/client:/${EDF_CLIENT_R_PATH}/client \
+	docker run -d -v ${PWD}/client:/${EDF_CLIENT_R_PATH}/client \
 	--entrypoint ${EDF_CLIENT_R_PATH}/client/test/docker-test-entrypoint.sh \
 	--name ${EDF_CONTROL_C_T_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
-	docker stop ${EDF_CONTROL_C_T_NAME} || true
+	sleep 1m
 	sudo chown ${USER}:${USER} -R ${EDF_CLIENT_TEST}/*.log
