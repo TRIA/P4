@@ -65,3 +65,4 @@ edf-cp-test: edf-cp-client-build
 	--name ${EDF_CONTROL_C_T_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
 	sleep 1m
 	sudo chown ${USER}:${USER} -R ${EDF_CLIENT_TEST}/*.log
+	sudo chown ${USER}:${USER} -R ${EDF_CLIENT_SRC}/grpc_out
