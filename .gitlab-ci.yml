@@ -10,15 +10,17 @@ job_efcp_build:
   script:
     - cd dataplane/p4
     - make efcp-build
-#  tags: [p4_dp_build]
+#  tags: [build]
   tags: [npl_bmodel]
 
-job_cp_run:
+job_cp_test:
   script:
     - sudo -S su
     - cd controlplane
     - make edf-cp-test
     - cat client/test/edf-cp-server.log 
     - cat client/test/edf-cp-client.log 
-#  tags: [p4_cp_test]
+  dependencies:
+    - job_efcp_build
+#  tags: [test]
   tags: [npl_bmodel]
