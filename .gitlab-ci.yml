@@ -25,6 +25,10 @@ job_cp_test:
     - make edf-cp-test
     - cat client/test/edf-cp-server.log
     - cat client/test/edf-cp-client.log
+    - rm -rf client/test/*.log
+    - cd client/src
+    - make clean-deep
+    - rm -rf grpc_out
   dependencies:
     - job_efcp_build
   stage: test
