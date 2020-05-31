@@ -1,3 +1,7 @@
+stages:
+  - build
+  - test
+
 #job_npl_bmodel:
 #  script:
 #    - sudo -S su
@@ -11,6 +15,7 @@ job_efcp_build:
     - cd dataplane/p4
     - make efcp-build
 #  tags: [build]
+  stage: build
   tags: [npl_bmodel]
 
 job_cp_test:
@@ -18,9 +23,10 @@ job_cp_test:
     - sudo -S su
     - cd controlplane
     - make edf-cp-test
-    - cat client/test/edf-cp-server.log 
-    - cat client/test/edf-cp-client.log 
+    - cat client/test/edf-cp-server.log
+    - cat client/test/edf-cp-client.log
   dependencies:
     - job_efcp_build
+  stage: test
 #  tags: [test]
   tags: [npl_bmodel]
