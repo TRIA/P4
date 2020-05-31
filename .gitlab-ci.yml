@@ -1,7 +1,22 @@
-job_npl_bmodel:
+#job_npl_bmodel:
+#  script:
+#    - sudo -S su
+#    - cd dataplane/npl/bmodel/efcp_router
+#    - make build
+#    - make test
+#  tags: [npl_bmodel]
+
+job_efcp_build:
+  script:
+    - cd dataplane/p4
+    - make efcp-build
+  tags: [p4_dp_build]
+
+job_cp_run:
   script:
     - sudo -S su
-    - cd dataplane/bmodel/efcp_router
-    - make build
-    - make test
-  tags: [npl_bmodel]
+    - cd controlplane
+    - make edf-cp-test
+    - cat client/test/edf-cp-server.log 
+    - cat client/test/edf-cp-client.log 
+  tags: [p4_cp_test]

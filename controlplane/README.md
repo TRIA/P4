@@ -22,7 +22,7 @@ cd $current
 Now, spin up a container with the environment for running the control plane. This will take plenty of time, as this installs all the dependencies like protbufs, gRPC and other libraries. Wait for it to finish before running the control plane client (or the mocked gRPC server).
 
 ```bash
-make edf-cp-client-run
+make edf-cp-client-start
 ```
 
 ### Data plane server
@@ -45,7 +45,7 @@ Run the following in a new terminal to attach to the container created in "Contr
 
 ```bash
 make edf-cp-client-attach
-cd src
+cd client/src
 make edf-cp-server
 ./edf-cp-server
 ```
@@ -60,10 +60,18 @@ Run the program, providing any suitable argument. If none is provided, defaults 
 
 ```bash
 make edf-cp-client-attach
-cd src
+cd client/src
 make edf-cp-client
 # Option 1 for data plane server
 ./edf-cp-client --grpc-addr=localhost:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
 ./edf-cp-client --grpc-addr=localhost:50051 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
+```
+
+### Extra: all-in-one testing
+
+The following will compile and run all needed control plane components. This expects the configuration files generated during the "Data plane program compilation" step.
+
+```bash
+make edf-cp-test
 ```

@@ -17,4 +17,4 @@ dataplane/p4/env/tmp
 controlplane/client/cfg
 controlplane/client/src/edf-cp-client
 controlplane/client/src/edf-cp-server
-controlplane/client/src/grpc_out
+controlplane/client/src/grpc_out*

@@ -87,8 +87,6 @@ $GOOGLE_PROTO_DIR/google/rpc/code.proto"
 ENV PROTOFLAGS "-I$GOOGLE_PROTO_DIR -I$PROTO_DIR"
 ENV PROTO_BUILD_DIR ${BASE_PATH_EDF}/grpc_out
 
-#COPY p4runtime ${BASE_PATH_P4R}/
-
 WORKDIR ${BASE_PATH_P4R}
 
 RUN apt-get install -y libc-ares-dev gdb
@@ -101,3 +99,7 @@ RUN mkdir -p $PROTO_BUILD_DIR && \
 
 # Get back to the EDF base directory
 WORKDIR ${BASE_PATH_EDF}
+
+COPY docker-entrypoint.sh ${BASE_PATH_EDF}/
+
+ENTRYPOINT ["docker-entrypoint.sh"]
