@@ -22,7 +22,7 @@ job_cp_test:
   script:
     - sudo -S su
     - cd controlplane
-    - make edf-cp-test
+    - make edf-cp-test-mock
     - cat client/test/edf-cp-server.log
     - cat client/test/edf-cp-client.log
     - rm -rf client/test/*.log

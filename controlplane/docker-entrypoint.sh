@@ -11,6 +11,6 @@ echo ""
 echo ""
 while true; do
     echo ""
-    echo "Infinite loop. Use a new terminal to attach (\"make edf-cp-client-attach\") or stop (\"make edf-cp-client-stop\")"
+    echo "Infinite loop. Use a new terminal to attach (\"make edf-cp-client-attach\") or stop (\"make edf-cp-client-stop\") the client"
     sleep 60
 done

@@ -32,10 +32,7 @@ make edf-cp-client-start
 In the typical scenario you will run a container with a Mininet instance that runs a bmv2 switch model. The process will run on address `0.0.0.0:50001`.
 
 ```bash
-current=${PWD}
-cd ../dataplane/p4
-make env-start
-cd $current
+make edf-dp-mininet-start
 ```
 
 #### Option 2: mocked server
@@ -63,15 +60,18 @@ make edf-cp-client-attach
 cd client/src
 make edf-cp-client
 # Option 1 for data plane server
-./edf-cp-client --grpc-addr=localhost:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
+./edf-cp-client --grpc-addr=mininet-p4:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
 ./edf-cp-client --grpc-addr=localhost:50051 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
 ```
 
 ### Extra: all-in-one testing
 
-The following will compile and run all needed control plane components. This expects the configuration files generated during the "Data plane program compilation" step.
+The following will compile and run the control plane client, so that it interacts with a compatible server. This expects the configuration files generated during the "Data plane program compilation" step.
 
 ```bash
-make edf-cp-test
+# Use mocked server as an automated test
+make edf-cp-test-mock
+# Use mininet for manual testing
+make edf-cp-test-mininet
 ```

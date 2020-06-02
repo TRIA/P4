@@ -2,7 +2,7 @@ version: "3"
 
 services:
   mininet:
-    container_name: mininet-mod
+    container_name: mininet-p4
     hostname: mininet
     image: sergiogimenez/mininet-mod:latest
     privileged: true
@@ -18,4 +18,4 @@ services:
 networks:
   default:
     external:
-      name: rinap4controlplane
+      name: rina-controlplane

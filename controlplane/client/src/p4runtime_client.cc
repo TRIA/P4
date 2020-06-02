@@ -68,30 +68,9 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
 
 // RPC methods
 
-// See reference/p4runtime-shell-python/p4runtime.py#get_p4info
-// FIXME: read the whole data (garbage is obtained instead)
-P4Info P4RuntimeClient::GetP4Info() {
-  std::cout << "Retrieving P4Info file" << std::endl;
-  GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
-  request.set_device_id(deviceId_);
-  request.set_response_type(request.P4INFO_AND_COOKIE);
-
-  ClientContext context;
-  GetForwardingPipelineConfigResponse response;
-  Status status;
-  const std::string errorMessage = "Cannot get configuration from the forwarding pipeline";
-  try {
-    status = stub_->GetForwardingPipelineConfig(&context, request, &response);
-    HandleStatus(status, errorMessage.c_str());
-  } catch (...) {
-    HandleException(errorMessage.c_str());
-  }
-  return response.config().p4info();
-}
+// NOTE: any fix should check gRPC status codes at https://grpc.github.io/grpc/core/md_doc_statuscodes.html
 
 // See reference/p4runtime-shell-python/p4runtime.py#set_fwd_pipe_config
-// FIXME: *** Error in `./edf-cp': double free or corruption (out)
-// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
@@ -99,42 +78,63 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   SetElectionId(request.mutable_election_id());
   request.set_action(SetForwardingPipelineConfigRequest().VERIFY_AND_COMMIT);
 
-  int fd = open(p4InfoPath_.c_str(), O_RDONLY);
-  ZeroCopyInputStream* p4InfoFile = new FileInputStream(fd);
-  off_t fsize = lseek(fd, 0, SEEK_END);
-  if (lseek(fd, 0, SEEK_END) < 0) {
+  std::ifstream p4InfoFileIfStream("./" + p4InfoPath_);
+  if (!p4InfoFileIfStream.is_open()) {
     const std::string errorMessage = "Cannot open file " + p4InfoPath_;
     HandleException(errorMessage.c_str());
   }
+  ZeroCopyInputStream* p4InfoFile = new IstreamInputStream(&p4InfoFileIfStream, -1);
 
   std::ifstream binaryCfgFileIfStream("./" + binaryCfgPath_);
   if (!binaryCfgFileIfStream.is_open()) {
     const std::string errorMessage = "Cannot open file " + binaryCfgPath_;
     HandleException(errorMessage.c_str());
   }
-
-  // Data (1st arg) merged into given Message (2nd arg)
-  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &request);
-
   ZeroCopyInputStream* binaryCfgFile = new IstreamInputStream(&binaryCfgFileIfStream, -1);
   std::stringstream binaryCfgFileStream;
   binaryCfgFileStream << binaryCfgFileIfStream.rdbuf();
   std::string binaryCfgFileStr = binaryCfgFileStream.str();
 
-  ForwardingPipelineConfig* config = request.mutable_config();
-  config->set_allocated_p4_device_config(&binaryCfgFileStr);
+  ForwardingPipelineConfig* config = ForwardingPipelineConfig().New();
+  config->set_p4_device_config(binaryCfgFileStr);
+  // P4Info p4Info = P4Info();
+  // p4Info.ParseFromBoundedZeroCopyStream(p4InfoFile, p4InfoFile->ByteCount());
+  P4Info p4Info = request.config().p4info();
+  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &p4Info);
+  // The current information (already allocated in memory) is shared with the config object
+  config->set_allocated_p4info(&p4Info);
+  request.set_allocated_config(config);
 
   ClientContext context;
-  SetForwardingPipelineConfigResponse response;
+  SetForwardingPipelineConfigResponse response = SetForwardingPipelineConfigResponse();
+  Status status = stub_->SetForwardingPipelineConfig(&context, request, &response);
 
-  return stub_->SetForwardingPipelineConfig(&context, request, &response);
+  // Free the memory right after the request to the server (otherwise expect segfault)
+  config->release_p4info();
+  config->release_p4_device_config();
+
+  return status;
+}
+
+// See reference/p4runtime-shell-python/p4runtime.py#get_p4info
+// TODO
+P4Info P4RuntimeClient::GetP4Info() {
+  std::cout << "\n" << "Retrieving P4Info file" << std::endl;
+  GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
+  request.set_device_id(deviceId_);
+  request.set_response_type(request.P4INFO_AND_COOKIE);
+  GetForwardingPipelineConfigResponse response = GetForwardingPipelineConfigResponse();
+  ClientContext context;
+  const std::string errorMessage = "Cannot get configuration from the forwarding pipeline";
+  Status status = stub_->GetForwardingPipelineConfig(&context, request, &response);
+  HandleStatus(status, errorMessage.c_str());
+  return response.config().p4info();
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#write
-// FIXME: does not return a successful status
-// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
+// TODO
 Status P4RuntimeClient::Write(WriteRequest* request) {
-  std::cout << "Submitting write request" << std::endl;
+  std::cout << "\n" << "Submitting write request" << std::endl;
   request->set_device_id(deviceId_);
   deviceId_ = request->device_id();
   SetElectionId(request->mutable_election_id());
@@ -144,10 +144,9 @@ Status P4RuntimeClient::Write(WriteRequest* request) {
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#write_update
-// FIXME: does not return a successful status
-// Details: grpc::status.error_code() == 14 (ref.: https://grpc.github.io/grpc/core/md_doc_statuscodes.html)
+// TODO
 Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
-  std::cout << "Submitting write-update request" << std::endl;
+  std::cout << "\n" << "Submitting write-update request" << std::endl;
   WriteRequest request = WriteRequest();
   request.set_device_id(deviceId_);
   SetElectionId(request.mutable_election_id());
@@ -162,9 +161,9 @@ Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#read_one
-// FIXME: read the whole data (garbage is obtained instead)
+// TODO
 ReadResponse P4RuntimeClient::ReadOne() {
-  std::cout << "Submitting single read request" << std::endl;
+  std::cout << "\n" << "Submitting single read request" << std::endl;
   ReadRequest request = ReadRequest();
   request.set_device_id(deviceId_);
   for (Entity singleEntity : *request.mutable_entities()) {
@@ -181,19 +180,15 @@ ReadResponse P4RuntimeClient::ReadOne() {
 
 // See reference/p4runtime-shell-python/p4runtime.py#api_version
 std::string P4RuntimeClient::APIVersion() {
-  std::cout << "Fetching version of the API" << std::endl;
+  std::cout << "\n" << "Fetching version of the API" << std::endl;
+
   CapabilitiesRequest request = CapabilitiesRequest();
   CapabilitiesResponse response = CapabilitiesResponse();
   ClientContext context;
-  
-  Status status;
+
+  Status status = stub_->Capabilities(&context, request, &response);
   const std::string errorMessage = "Cannot retrieve information on the API version";
-  try {
-    status = stub_->Capabilities(&context, request, &response);
-    HandleStatus(status, errorMessage.c_str());
-  } catch (...) {
-    HandleException(errorMessage.c_str());
-  }
+  HandleStatus(status, errorMessage.c_str());
 
   return response.p4runtime_api_version();
 }
@@ -215,8 +210,8 @@ void P4RuntimeClient::TearDown() {
   if (!streamQueueOut_.empty()) {
     streamQueueOut_.push(NULL);
   }
-  // channel_->~Channel();
   channel_.reset();
+  // channel_->~Channel();
 }
 
 // TODO: finalise. Check reference/p4runtime-shell-python/p4runtime.py#handshake

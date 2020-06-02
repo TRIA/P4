@@ -20,8 +20,8 @@ class P4RuntimeClient {
                     std::string electionId);
 
     // RPC methods
-    ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
+    ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
     ::GRPC_NAMESPACE_ID::Status Write(::P4_NAMESPACE_ID::WriteRequest* request);
     ::GRPC_NAMESPACE_ID::Status WriteUpdate(::P4_NAMESPACE_ID::WriteRequest* update);
     ::P4_NAMESPACE_ID::ReadResponse ReadOne();

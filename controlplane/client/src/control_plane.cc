@@ -59,6 +59,8 @@ void setup_segfault() {
 
 int main(int argc, char** argv) {
 
+  GOOGLE_PROTOBUF_VERIFY_VERSION;
+
   // INFO: uncomment to hide memory stack trace after p4RuntimeClient.SetFwdPipeConfig() issue
   // setup_segfault();
 
@@ -67,7 +69,7 @@ int main(int argc, char** argv) {
   // Parse arguments given to the P4Runtime client
   // TODO: consider implemeting another argument to run a specific RPC method
   const std::string grpc_server_addr = parse_arguments(argc, argv, "--grpc-addr", "localhost:50001");
-  const std::string config_paths = parse_arguments(argc, argv, "--config", "p4src/build/p4info.txt,p4src/build/bmv2.json");
+  const std::string config_paths = parse_arguments(argc, argv, "--config", "../cfg/p4info.txt,../cfg/bmv2.json");
   const std::string election_id = parse_arguments(argc, argv, "--election-id", "0,1");
   const ::PROTOBUF_NAMESPACE_ID::uint64 deviceId = 1;
   std::cout << "\nP4RuntimeClient running with arguments:" << std::endl;
@@ -79,34 +81,23 @@ int main(int argc, char** argv) {
   // (as specified by the "--target" argument). The actual RPCs are created out of this channel.
   P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
 
-  // INFO: uncomment when testing the server in the real target
+  std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
+  Status status = p4RuntimeClient.SetFwdPipeConfig();
+  if (!status.ok()) {
+    std::cerr << "Warning: obtained error=" << status.error_code() << std::endl;
+  }
 
   std::cout << "-------------- GetP4Info --------------" << std::endl;
   try {
     P4Info p4Info = p4RuntimeClient.GetP4Info();
-    std:: string p4InfoData = p4Info.SerializeAsString();
-    if (p4InfoData.size() > 0) {
-      std::cout << "Obtained P4Info data: " << p4InfoData << std::endl;
-    } else {
-      std::cerr << "Warning: no P4Info data obtained" << std::endl;
-    }
+    std::cout << "Number of tables: " << p4Info.tables_size() << std::endl;
+    std::cout << "Number of action profiles: " << p4Info.action_profiles_size() << std::endl;
+    std::cout << "Number of actions: " << p4Info.actions_size() << std::endl;
   } catch (...) {
-    const std::string errorMessage = "Cannot get the P4Info data";
+    const std::string errorMessage = "Cannot get the ForwardingPipeline configuration";
     std::cerr << "Exception: " << errorMessage << std::endl;
     exit(1);
   }
-
-  // std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
-  // try {
-  //   Status status = p4RuntimeClient.SetFwdPipeConfig();
-  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
-  // } catch (std::exception& e) {
-  //   std::cerr << "Exception caught : " << e.what() << std::endl;
-  // } catch (...) {
-  //   const std::string errorMessage = "Cannot get the ForwardingPipeline configuration";
-  //   std::cerr << "Exception: " << errorMessage << std::endl;
-  //   exit(1);
-  // }
 
   // std::cout << "-------------- Write --------------" << std::endl;
   // try {
@@ -130,20 +121,20 @@ int main(int argc, char** argv) {
   //   exit(1);
   // }
 
-  std::cout << "-------------- ReadOne --------------" << std::endl;
-  try {
-    ReadResponse response = p4RuntimeClient.ReadOne();
-    std:: string responseData = response.SerializeAsString();
-    if (responseData.size() > 0) {
-      std::cout << "Obtained response data: " << responseData << std::endl;
-    } else {
-      std::cerr << "Warning: no response data obtained" << std::endl;
-    }
-  } catch (...) {
-    const std::string errorMessage = "Cannot call the ReadOne method";
-    std::cerr << "Exception: " << errorMessage << std::endl;
-    exit(1);
-  }
+  // std::cout << "-------------- ReadOne --------------" << std::endl;
+  // try {
+  //   ReadResponse response = p4RuntimeClient.ReadOne();
+  //   std:: string responseData = response.SerializeAsString();
+  //   if (responseData.size() > 0) {
+  //     std::cout << "Obtained response data: " << responseData << std::endl;
+  //   } else {
+  //     std::cerr << "Warning: no response data obtained" << std::endl;
+  //   }
+  // } catch (...) {
+  //   const std::string errorMessage = "Cannot call the ReadOne method";
+  //   std::cerr << "Exception: " << errorMessage << std::endl;
+  //   exit(1);
+  // }
 
   std::cout << "-------------- APIVersion --------------" << std::endl;
   try {

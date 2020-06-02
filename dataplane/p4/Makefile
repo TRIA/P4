@@ -1,7 +1,7 @@
 P4C_IMG := opennetworking/p4c:stable
 P4C_SHA := sha256:8f9d27a6edf446c3801db621359fec5de993ebdebc6844d8b1292e369be5dfea
 
-DOCKER_NET := rinap4controlplane
+DOCKER_NET := rina-controlplane
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
@@ -29,10 +29,10 @@ mn-cli:
 	-@docker attach --detach-keys "ctrl-z" $(shell docker-compose ps -q mininet) || echo "*** Detached from Mininet CLI"
 
 mn-attach:
-	-@docker exec -it mininet-mod bash
+	-@docker exec -it mininet-p4 bash
 
 mn-log:
-	docker logs -f mininet-mod
+	docker logs -f mininet-p4
 
 reset: env-stop
 	-rm -rf ./tmp
