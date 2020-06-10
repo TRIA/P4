@@ -6,7 +6,6 @@
 
 using ::GRPC_NAMESPACE_ID::Status;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
-using ::P4_NAMESPACE_ID::ReadResponse;
 
 int is_substring_of(std::string substring, std::string string) {
   size_t position_start = string.find(substring);
@@ -57,6 +56,14 @@ void setup_segfault() {
   *foo = 1;
 }
 
+void handle_status(Status status) {
+  if (!status.ok()) {
+    std::cerr << "Warning: obtained error=" << status.error_code() << std::endl;
+  } else {
+    std::cout << "Success: obtained status=" << status.error_code() << std::endl;
+  }
+}
+
 int main(int argc, char** argv) {
 
   GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -80,74 +87,45 @@ int main(int argc, char** argv) {
   // Instantiate the client. It uses a non-authenticated channel, which models a connection to an endpoint
   // (as specified by the "--target" argument). The actual RPCs are created out of this channel.
   P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
+  Status status;
 
   std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
-  Status status = p4RuntimeClient.SetFwdPipeConfig();
-  if (!status.ok()) {
-    std::cerr << "Warning: obtained error=" << status.error_code() << std::endl;
-  }
+  status = p4RuntimeClient.SetFwdPipeConfig();
+  handle_status(status);
 
   std::cout << "-------------- GetP4Info --------------" << std::endl;
-  try {
-    P4Info p4Info = p4RuntimeClient.GetP4Info();
+  P4Info p4Info = p4RuntimeClient.GetP4Info();
+  if (p4Info.ByteSizeLong() > 0) {
     std::cout << "Number of tables: " << p4Info.tables_size() << std::endl;
     std::cout << "Number of action profiles: " << p4Info.action_profiles_size() << std::endl;
     std::cout << "Number of actions: " << p4Info.actions_size() << std::endl;
-  } catch (...) {
-    const std::string errorMessage = "Cannot get the ForwardingPipeline configuration";
-    std::cerr << "Exception: " << errorMessage << std::endl;
-    exit(1);
   }
 
-  // std::cout << "-------------- Write --------------" << std::endl;
-  // try {
-  //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
-  //   Status status = p4RuntimeClient.Write(&writeRequest);
-  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
-  // } catch (...) {
-  //   const std::string errorMessage = "Cannot call the Write method";
-  //   std::cerr << "Exception: " << errorMessage << std::endl;
-  //   exit(1);
-  // }
+  std::cout << "-------------- Write --------------" << std::endl;
+  ::P4_NAMESPACE_ID::WriteRequest writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  status = p4RuntimeClient.Write(&writeRequest);
+  handle_status(status);
 
-  // std::cout << "-------------- WriteUpdate --------------" << std::endl;
-  // try {
-  //   ::P4_NAMESPACE_ID::WriteRequest writeRequest;
-  //   Status status = p4RuntimeClient.WriteUpdate(&writeRequest);
-  //   std::cerr << "Warning: obtained status with error=" << status.error_code() << std::endl;
-  // } catch (...) {
-  //   const std::string errorMessage = "Cannot call the WriteUpdate method";
-  //   std::cerr << "Exception: " << errorMessage << std::endl;
-  //   exit(1);
-  // }
+  std::cout << "-------------- WriteUpdate --------------" << std::endl;
+  writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  status = p4RuntimeClient.WriteUpdate(&writeRequest);
+  handle_status(status);
 
-  // std::cout << "-------------- ReadOne --------------" << std::endl;
-  // try {
-  //   ReadResponse response = p4RuntimeClient.ReadOne();
-  //   std:: string responseData = response.SerializeAsString();
-  //   if (responseData.size() > 0) {
-  //     std::cout << "Obtained response data: " << responseData << std::endl;
-  //   } else {
-  //     std::cerr << "Warning: no response data obtained" << std::endl;
-  //   }
-  // } catch (...) {
-  //   const std::string errorMessage = "Cannot call the ReadOne method";
-  //   std::cerr << "Exception: " << errorMessage << std::endl;
-  //   exit(1);
-  // }
+  std::cout << "-------------- ReadOne --------------" << std::endl;
+  ::P4_NAMESPACE_ID::ReadResponse response = p4RuntimeClient.ReadOne();
+  std:: string responseData = response.SerializeAsString();
+  if (responseData.size() > 0) {
+    std::cout << "Success: obtained response data=" << responseData << std::endl;
+  } else {
+    std::cerr << "Warning: no response data obtained" << std::endl;
+  }
 
   std::cout << "-------------- APIVersion --------------" << std::endl;
-  try {
-    std::string version = p4RuntimeClient.APIVersion();
-    if (version.length() > 0) {
-      std::cout << "Obtained API version: " << version << std::endl;
-    } else {
-      std::cerr << "Warning: no API version obtained" << std::endl;
-    }
-  } catch (...) {
-    const std::string errorMessage = "Cannot call the APIVersion method";
-    std::cerr << "Exception: " << errorMessage << std::endl;
-    exit(1);
+  std::string version = p4RuntimeClient.APIVersion();
+  if (version.length() > 0) {
+    std::cout << "Success: obtained API version=" << version << std::endl;
+  } else {
+    std::cerr << "Warning: no API version obtained" << std::endl;
   }
 
   p4RuntimeClient.TearDown();

@@ -106,13 +106,13 @@ edf-cp-test-mock: edf-cp-client-build edf-cp-docker-net-create
 	make edf-cp-docker-net-rm
 
 edf-dp-mininet-start: edf-cp-docker-net-create
-	cd ../${EDF_DATA_ENV_PATH} && docker-compose up -d && cd ${CURRENT}
-	make edf-cp-docker-net-rm
+	cd ../${EDF_DATA_PATH} && make mn-single-start && cd ${CURRENT}
 
 edf-dp-mininet-stop:
-	cd ../${EDF_DATA_ENV_PATH} && docker-compose down -t0 && cd ${CURRENT}
+	cd ../${EDF_DATA_PATH} && make mn-single-stop && cd ${CURRENT}
 
-# Manual test with bmv2-enabled virtual P4 switches running in Mininet
+# Manual test with bmv2's P4 virtual switches running in Mininet (mn-stratum)
+# Note: Dockerfile for mn-stratum in https://github.com/stratum/stratum/blob/master/tools/mininet/Dockerfile
 edf-cp-test-mininet: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"

@@ -3,6 +3,7 @@
 
 #include <queue>
 
+// #include "data_struct/blocking_queue.h"
 #include "grpc_out/p4/config/v1/p4info.pb.h"
 #include "grpc_out/p4/v1/p4runtime.grpc.pb.h"
 #include "grpc_out/p4/v1/p4runtime.pb.h"
@@ -28,7 +29,7 @@ class P4RuntimeClient {
     std::string APIVersion();
 
     // Ancillary methods
-    void SetUp();
+    void SetUpStream();
     void TearDown();
 
   private:
@@ -41,17 +42,22 @@ class P4RuntimeClient {
     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId_;
     ::P4_NAMESPACE_ID::Uint128* electionId_;
 
+    // Ancillary for RPC
+    ::GRPC_NAMESPACE_ID::Status WriteInternal(::P4_NAMESPACE_ID::WriteRequest* request);
+
     // Ancillary
     typedef ::GRPC_NAMESPACE_ID::ClientReaderWriter<
       ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamType_;
     std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueIn_;
     std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
+    // blocking_queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueIn_;
+    // blocking_queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
     std::unique_ptr<streamType_> stream_;
 
     void Handshake();
     void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);
     void SetElectionId(std::string electionId);
-    void SetupStream();
+    ::P4_NAMESPACE_ID::StreamMessageRequest* GetStreamPacket(std::string type_, long timeout);
     void HandleException(const char* errorMessage);
     void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 

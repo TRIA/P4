@@ -60,7 +60,7 @@ make edf-cp-client-attach
 cd client/src
 make edf-cp-client
 # Option 1 for data plane server
-./edf-cp-client --grpc-addr=mininet-p4:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
+./edf-cp-client --grpc-addr=mn-stratum:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
 ./edf-cp-client --grpc-addr=localhost:50051 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
 ```
@@ -70,8 +70,8 @@ make edf-cp-client
 The following will compile and run the control plane client, so that it interacts with a compatible server. This expects the configuration files generated during the "Data plane program compilation" step.
 
 ```bash
-# Use mocked server as an automated test
-make edf-cp-test-mock
-# Use mininet for manual testing
+# Use mininet for manual testing (option #1)
 make edf-cp-test-mininet
+# Use mocked server as an automated test (option #2)
+make edf-cp-test-mock
 ```

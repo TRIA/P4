@@ -1,7 +1,6 @@
 P4C_IMG := opennetworking/p4c:stable
-P4C_SHA := sha256:8f9d27a6edf446c3801db621359fec5de993ebdebc6844d8b1292e369be5dfea
-
 DOCKER_NET := rina-controlplane
+MN_STR_NAME := mn-stratum
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
@@ -14,25 +13,28 @@ docker_net_create:
 	@echo "setup"
 	@docker network create ${DOCKER_NET} || true
 
+docker_net_rm:
+	@docker network rm ${DOCKER_NET} || true
+
 env-start: docker_net_create
 	cd env && docker-compose up -d && cd ..
 
 env-stop:
 	cd env && docker-compose down -t0 && cd ..
-	@docker network rm ${DOCKER_NET} || true
+	@make docker_net_rm
 
 env-restart: reset env-start
 
 mn-cli:
 	$(info *** Attaching to Mininet CLI...)
 	$(info *** To detach press Ctrl-Z (Mininet will keep running))
-	-@docker attach --detach-keys "ctrl-z" $(shell docker-compose ps -q mininet) || echo "*** Detached from Mininet CLI"
+	-@docker attach --detach-keys "ctrl-z" ${MN_STR_NAME} || echo "*** Detached from Mininet CLI"
 
 mn-attach:
-	-@docker exec -it mininet-p4 bash
+	-@docker exec -it ${MN_STR_NAME} bash
 
 mn-log:
-	docker logs -f mininet-p4
+	docker logs -f ${MN_STR_NAME}
 
 reset: env-stop
 	-rm -rf ./tmp
@@ -49,5 +51,9 @@ efcp-build: model/efcp.p4
 		model/efcp.p4
 	@echo "*** P4 program compiled successfully! Output files are in model/build"
 
-mn-single: docker_net_create
-	docker run --privileged --rm -it -v /tmp/mn-stratum:/tmp -p 50001:50001 --name "mininet-stratum" --network=${DOCKER_NET} ${MN_STRATUM_IMG}
+mn-single-start: docker_net_create
+	docker run --privileged --rm -it -v /tmp/${MN_STR_NAME}:/tmp -p50001-50030:50001-50030 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} opennetworking/${MN_STR_NAME}
+
+mn-single-stop:
+	docker rm -f ${MN_STR_NAME}
+	@make docker_net_rm
