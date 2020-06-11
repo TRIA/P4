@@ -8,9 +8,9 @@
 
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
-#include "p4runtime_client.h"
+#include "client.h"
 // Import declarations after any other
-#include "p4runtime_ns_def.inc"
+#include "../common/ns_def.inc"
 
 using ::GRPC_NAMESPACE_ID::Channel;
 using ::GRPC_NAMESPACE_ID::ClientContext;
@@ -392,4 +392,4 @@ void P4RuntimeClient::HandleStatus(Status status, const char* errorMessage) {
   }
 }
 
-#include "p4runtime_ns_undef.inc"
+#include "../common/ns_undef.inc"

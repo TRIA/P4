@@ -42,9 +42,9 @@ Run the following in a new terminal to attach to the container created in "Contr
 
 ```bash
 make edf-cp-client-attach
-cd client/src
-make edf-cp-server
-./edf-cp-server
+cd p4
+make edf-cp-server-mock
+./bin/edf-cp-server-mock
 ```
 
 ### Control plane client
@@ -57,12 +57,12 @@ Run the program, providing any suitable argument. If none is provided, defaults 
 
 ```bash
 make edf-cp-client-attach
-cd client/src
+cd p4
 make edf-cp-client
 # Option 1 for data plane server
-./edf-cp-client --grpc-addr=mn-stratum:50001 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
-./edf-cp-client --grpc-addr=localhost:50051 --config=../cfg/p4info.txt,../cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=localhost:50051 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 ```
 
 ### Extra: all-in-one testing

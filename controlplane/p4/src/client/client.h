@@ -3,13 +3,13 @@
 
 #include <queue>
 
-// #include "data_struct/blocking_queue.h"
-#include "grpc_out/p4/config/v1/p4info.pb.h"
-#include "grpc_out/p4/v1/p4runtime.grpc.pb.h"
-#include "grpc_out/p4/v1/p4runtime.pb.h"
+// #include "../common/data_struct/blocking_queue.h"
+#include "../common/grpc_out/p4/config/v1/p4info.pb.h"
+#include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
+#include "../common/grpc_out/p4/v1/p4runtime.pb.h"
 
 // Import declarations after any other
-#include "p4runtime_ns_def.inc"
+#include "../common/ns_def.inc"
 
 class P4RuntimeClient {
 
@@ -63,5 +63,5 @@ class P4RuntimeClient {
 
 };
 
-#include "p4runtime_ns_undef.inc"
+#include "../common/ns_undef.inc"
 #endif

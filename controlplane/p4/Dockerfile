@@ -59,20 +59,6 @@ LABEL description="P4Runtime client developed in C++"
 
 ENV BASE_PATH_EDF /opt/p4runtime-cpp
 
-# Copy gRPC binaries
-#COPY --from=p4runtime-cpp-deps /usr/local/bin/grpc* /usr/local/bin/
-#COPY --from=p4runtime-cpp-deps /usr/local/lib/libgrpc* /usr/local/lib/
-#RUN mkdir -p /usr/local/lib/cmake
-#COPY --from=p4runtime-cpp-deps /usr/local/lib/cmake/grpc /usr/local/lib/cmake/
-#RUN mkdir -p /usr/local/lib/pkgconfig
-#COPY --from=p4runtime-cpp-deps /usr/local/lib/pkgconfig/grpc* /usr/local/lib/pkgconfig/
-#COPY --from=p4runtime-cpp-deps /usr/local/share/grpc /usr/local/share/
-#COPY --from=p4runtime-cpp-deps /usr/local/include/grpc /usr/local/include/
-#COPY --from=p4runtime-cpp-deps /usr/local/include/grpcpp /usr/local/include/
-#COPY --from=p4runtime-cpp-deps /usr/local/include/grpc++ /usr/local/include/
-# Copy protobuf binaries
-## TODO
-
 # The following is adapted from Python3's "p4lang/p4runtime-shell's"
 # Dockerfile to be used with C++
 

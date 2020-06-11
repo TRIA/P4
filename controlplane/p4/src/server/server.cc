@@ -1,13 +1,11 @@
-// #include <fcntl.h>
 #include <fstream>
 #include <grpc/grpc.h>
 #include <grpcpp/server_builder.h>
 #include <sstream>
-// #include <unistd.h>
 
-#include "grpc_out/p4/v1/p4runtime.grpc.pb.h"
+#include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
 // Import declarations after any other
-#include "p4runtime_ns_def.inc"
+#include "../common/ns_def.inc"
 
 // using ::GRPC_NAMESPACE_ID::ServerContext;
 using ::GRPC_NAMESPACE_ID::Server;
@@ -31,6 +29,7 @@ using ::P4_NAMESPACE_ID::ReadResponse;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigRequest;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigResponse;
 using ::P4_NAMESPACE_ID::WriteRequest;
+using ::P4_NAMESPACE_ID::WriteResponse;
 
 class P4RuntimeServer final : public P4Runtime::Service {
   public:
@@ -80,14 +79,8 @@ class P4RuntimeServer final : public P4Runtime::Service {
       return Status::OK;
     }
 
-    Status Write(WriteRequest* request) {
+    Status Write(ServerContext* context, const WriteRequest* request, WriteResponse* response) override {
       std::cout << "\n" << "Receiving Write request" << std::endl;
-
-      return Status::OK;
-    }
-
-    Status WriteUpdate(WriteRequest* update) {
-      std::cout << "\n" << "Receiving WriteUpdate request" << std::endl;
 
       return Status::OK;
     }
@@ -178,3 +171,5 @@ int main(int argc, char** argv) {
 
   return 0;
 }
+
+#include "../common/ns_undef.inc"

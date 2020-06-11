@@ -1,8 +1,8 @@
 #include <grpcpp/grpcpp.h>
 
-#include "p4runtime_client.h"
+#include "client.h"
 // Import declarations after any other
-#include "p4runtime_ns_def.inc"
+#include "../common/ns_def.inc"
 
 using ::GRPC_NAMESPACE_ID::Status;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;

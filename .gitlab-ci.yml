@@ -21,14 +21,10 @@ job_efcp_build:
 job_cp_test:
   script:
     - sudo -S su
-    - cd controlplane
+    - cd controlplane/p
     - make edf-cp-test-mock
-    - cat client/test/edf-cp-server.log
-    - cat client/test/edf-cp-client.log
-    - rm -rf client/test/*.log
-    - cd client/src
-    - make clean-deep
-    - rm -rf grpc_out
+    - cat test/edf-cp-server.log
+    - cat test/edf-cp-client.log
   dependencies:
     - job_efcp_build
   stage: test

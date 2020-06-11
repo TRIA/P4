@@ -14,7 +14,7 @@ dataplane/p4/env/tmp
 
 # C++ generated classes
 *.o
-controlplane/client/cfg
-controlplane/client/src/edf-cp-client
-controlplane/client/src/edf-cp-server
-controlplane/client/src/grpc_out*
+controlplane/cfg
+controlplane/p4/bin/edf-cp-client
+controlplane/p4/bin/edf-cp-server
+controlplane/p4/src/grpc_out*

@@ -1,7 +1,6 @@
 #!/bin/bash
 
-CLIENT_PATH=${PWD}/client
-SRC_PATH=${CLIENT_PATH}/src
+SRC_PATH=${PWD}/p4/src/common
 
 # Copy generated gRPC classes where these can be used for compilation
 cp -R grpc_out ${SRC_PATH}/
