@@ -35,7 +35,15 @@ In the typical scenario you will run a container with a Mininet instance that ru
 make edf-dp-mininet-start
 ```
 
-#### Option 2: mocked server
+### Option 2: single bmv2 switch model
+
+Similar to option 1, but the bmv2 model runs directly from the Stratum source. The process will run on address `0.0.0.0:28000`.
+
+```bash
+make edf-cp-server-start
+```
+
+#### Option 3: mocked server
 
 This option is quicker to quickly verify the proper working of the RPC methods. The process will run on address `0.0.0.0:50051`.
 Run the following in a new terminal to attach to the container created in "Control plane environment".
@@ -62,6 +70,8 @@ make edf-cp-client
 # Option 1 for data plane server
 ./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
+./bin/edf-cp-client --grpc-addr=edf-cp-server:28000 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
+# Option 3 for data plane server
 ./bin/edf-cp-client --grpc-addr=localhost:50051 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 ```
 

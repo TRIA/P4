@@ -1,4 +1,40 @@
 #
+# Code (vars)
+#
+
+HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
+SYSTEM ?= ${HOST_SYSTEM}
+EDF_COMMON_SRC_PATH := ${PWD}/src/common
+EDF_CFG_PATH := ${PWD}/cfg
+EDF_CLIENT_SRC_PATH := ${PWD}/src/client
+EDF_REFERENCE_SRC_PATH := ${PWD}/src/reference
+EDF_SERVER_SRC_PATH := ${PWD}/src/server
+GRPC_BUILDDIR := ${EDF_COMMON_SRC_PATH}/grpc_out
+GRPC_BUILDDIR_EXISTS := $(shell test -d ${GRPC_BUILDDIR} && echo "true" || echo "false")
+ifeq (${GRPC_BUILDDIR_EXISTS},true)
+	EDF_DEPENDENCIES := $(shell find ${GRPC_BUILDDIR} -type f -name "*.cc")
+	EDF_DEPENDENCIES_OBJ := ${EDF_DEPENDENCIES:%.cc=%.o}
+else
+	EDF_DEPENDENCIES := ""
+	EDF_DEPENDENCIES_OBJ := ""
+endif
+#EDF_SOURCES := $(shell find ${PWD} -maxdepth 1 -type f -name "*.cc")
+EDF_SOURCES := ${EDF_CLIENT_SRC_PATH}/main.cc
+EDF_SOURCES_OBJ := ${EDF_SOURCES:%.cc=%.o}
+EDF_CP_CLIENT_BIN := edf-cp-client
+EDF_CP_SERVER_BIN := edf-cp-server
+EDF_CP_SERVER_MOCK_BIN := ${EDF_CP_SERVER_BIN}-mock
+CXX := g++
+CXXFLAGS += -std=c++17
+LDFLAGS += -L/usr/local/lib $(shell pkg-config --libs protobuf grpc++) -pthread
+ifeq (${SYSTEM},Darwin)
+	LDFLAGS += -lgrpc++_reflection
+else
+	LDFLAGS += -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed -Wno-deprecated
+endif
+LDFLAGS += -ldl
+
+#
 # Containers (vars)
 #
 
@@ -7,14 +43,12 @@ GRPC_RELEASE_DEFAULT := v1.29.1
 GRPC_RELEASE := $(or ${grpc_release}, $(GRPC_RELEASE_DEFAULT))
 
 # Control plane variables (client binary)
-EDF_CONTROL_C_NAME := edf-cp-client
+EDF_CONTROL_C_NAME := ${EDF_CP_CLIENT_BIN}
 EDF_CONTROL_C_T_NAME := ${EDF_CONTROL_C_NAME}_test
 EDF_CONTROL_TAG := ubuntu18
-EDF_CFG_PATH := ${PWD}/cfg
-EDF_CLIENT_SRC_PATH := ${PWD}/src/client
-EDF_COMMON_SRC_PATH := ${PWD}/src/common
-EDF_TEST_PATH := ${PWD}/test
 EDF_CLIENT_R_PATH := /opt/p4runtime-cpp
+EDF_CONTROL_S_NAME := ${EDF_CP_SERVER_BIN}
+EDF_TEST_PATH := ${PWD}/test
 
 # Data plane variables (using a modified Mininet for P4/bmv2-enabled switches, emulating the data plane)
 EDF_DATA_C_T_NAME := mininet-p4
@@ -45,30 +79,6 @@ else
 	EDF_CONTROL_C_T_EXISTS := false
 endif
 
-#
-# Code (vars)
-#
-
-HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
-SYSTEM ?= ${HOST_SYSTEM}
-GRPC_BUILDDIR := ${EDF_COMMON_SRC_PATH}/grpc_out
-EDF_DEPENDENCIES := $(shell find ${GRPC_BUILDDIR} -type f -name "*.cc")
-EDF_DEPENDENCIES_OBJ := ${EDF_DEPENDENCIES:%.cc=%.o}
-#EDF_SOURCES := $(shell find ${PWD} -maxdepth 1 -type f -name "*.cc")
-EDF_SOURCES := ${EDF_CLIENT_SRC_PATH}/main.cc
-EDF_SOURCES_OBJ := ${EDF_SOURCES:%.cc=%.o}
-EDF_CP_CLIENT_BIN := edf-cp-client
-EDF_CP_SERVER_MOCK_BIN := edf-cp-server-mock
-CXX := g++
-CXXFLAGS += -std=c++17
-LDFLAGS += -L/usr/local/lib $(shell pkg-config --libs protobuf grpc++) -pthread
-ifeq (${SYSTEM},Darwin)
-	LDFLAGS += -lgrpc++_reflection
-else
-	LDFLAGS += -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed -Wno-deprecated
-endif
-LDFLAGS += -ldl
-
 default:
 	$(error Please specify a make target (see README.md))
 
@@ -82,7 +92,18 @@ edf-cp-docker-net-create:
 edf-cp-docker-net-rm:
 	docker network rm ${EDF_C_NET} || true
 
+# Data plane model generation
+
+edf-dp-model-build:
+	mkdir -p ${EDF_CFG_PATH}
+	cp -Rp ${EDF_DATA_PATH}/model/build/* ${EDF_CFG_PATH}/
+
 # Client environment setup
+
+edf-cp-setup:
+	mkdir -p ${EDF_CFG_PATH}
+	mkdir -p ${GRPC_BUILDDIR}
+	sudo chown ${USER}:${USER} -R ${GRPC_BUILDDIR}
 
 edf-cp-client-clean:
 	@echo "Clean-up any related image and container"
@@ -90,12 +111,7 @@ edf-cp-client-clean:
 	docker image rm ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
 	make edf-cp-docker-net-rm
 
-edf-cp-client-setup:
-	mkdir -p ${EDF_CFG_PATH}
-	mkdir -p ${GRPC_BUILDDIR}
-	sudo chown ${USER}:${USER} -R ${GRPC_BUILDDIR}
-
-edf-cp-client-build: edf-cp-client-setup
+edf-cp-client-build: edf-cp-setup
 	@echo "Building and tagging image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}"
 	docker build --build-arg GRPC_RELEASE=${GRPC_RELEASE} -f Dockerfile -t ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} .
 
@@ -116,11 +132,29 @@ edf-cp-client-stop:
 
 edf-cp-client-restart: edf-cp-client-stop edf-cp-client-start
 
-# Data plane model generation
+# Server environment setup
 
-edf-dp-model-build:
-	mkdir -p ${EDF_CFG_PATH}
-	cp -Rp ${EDF_DATA_PATH}/model/build/* ${EDF_CFG_PATH}/
+edf-cp-server-build: edf-cp-setup
+	@echo "Cloning Stratum if not there"
+	if [ ! -d ${EDF_SERVER_SRC_PATH}/stratum ]; then git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/ ; fi
+	@echo "Building and tagging image ${EDF_CONTROL_S_NAME}:${GRPC_RELEASE}"
+	cd ${EDF_SERVER_SRC_PATH}/stratum && \
+	docker build -t stratum-dev --build-arg USER_NAME="${USER}" --build-arg USER_ID="1000" -f Dockerfile.dev .
+
+edf-cp-server-start: edf-cp-server-build edf-cp-docker-net-create
+	@echo "Starting image stratum-dev in container ${EDF_CONTROL_S_NAME}"
+	cd ${EDF_SERVER_SRC_PATH} && \
+	docker run -d -v ${PWD}/src/server/stratum/:/stratum -v /home/${USER}/.cache:/home/${USER}/.cache \
+	-v ${EDF_SERVER_SRC_PATH}/docker-entrypoint.sh:/docker-entrypoint.sh \
+	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/common/p4_service.cc:/p4_service.cc \
+	-e NP4_INSTALL=/usr -p 28000:28000 -p 9339:9339 -w /stratum \
+	--network=${EDF_C_NET} \
+	--entrypoint /docker-entrypoint.sh \
+	--user ${USER} --name ${EDF_CONTROL_S_NAME} stratum-dev
+
+edf-cp-server-attach:
+	@echo "Attaching to container ${EDF_CONTROL_S_NAME}"
+	docker exec -it ${EDF_CONTROL_S_NAME} /bin/bash
 
 # Tests
 
