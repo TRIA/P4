@@ -1,5 +1,6 @@
 #include <grpcpp/grpcpp.h>
 
+// #include <unistd.h>
 #include "client.h"
 // Import declarations after any other
 #include "../common/ns_def.inc"
@@ -88,6 +89,11 @@ int main(int argc, char** argv) {
   // (as specified by the "--target" argument). The actual RPCs are created out of this channel.
   P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
   Status status;
+
+  // DEBUG
+  // sleep(5000);
+  std::cout << "\n" << std::endl;
+  // END DEBUG
 
   std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
   status = p4RuntimeClient.SetFwdPipeConfig();

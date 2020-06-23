@@ -2,8 +2,8 @@
 #define P4RUNTIME_CLIENT_H
 
 #include <queue>
+#include <thread>
 
-// #include "../common/data_struct/blocking_queue.h"
 #include "../common/grpc_out/p4/config/v1/p4info.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.pb.h"
@@ -15,7 +15,7 @@ class P4RuntimeClient {
 
   public:
 
-    P4RuntimeClient(std::string targetStr, 
+    P4RuntimeClient(std::string bindAddress, 
                     std::string config,
                     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
                     std::string electionId);
@@ -48,16 +48,25 @@ class P4RuntimeClient {
     // Ancillary
     typedef ::GRPC_NAMESPACE_ID::ClientReaderWriter<
       ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamType_;
-    std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueIn_;
-    std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
-    // blocking_queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueIn_;
-    // blocking_queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
+    typedef ::GRPC_NAMESPACE_ID::ClientAsyncReaderWriter<
+      ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamAsyncType_;
+
+    // ::GRPC_NAMESPACE_ID::CompletionQueue streamQueue_;
+    std::deque<::P4_NAMESPACE_ID::StreamMessageResponse*> streamQueueIn_;
+    std::deque<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
     std::unique_ptr<streamType_> stream_;
+    std::unique_ptr<streamAsyncType_> streamAsync_;
+    std::thread streamIncomingThread_;
+    std::thread streamOutgoingThread_;
 
     void Handshake();
     void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);
     void SetElectionId(std::string electionId);
-    ::P4_NAMESPACE_ID::StreamMessageRequest* GetStreamPacket(std::string type_, long timeout);
+    ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(std::string type_, long timeout);
+    void CheckForNewIncomingMessagesInStream();
+    void CheckForNewOutgoingMessagesInQueue();
+    void CheckForNewIncomingMessagesInStreamOnBackground();
+    void CheckForNewOutgoingMessagesInQueueOnBackground();
     void HandleException(const char* errorMessage);
     void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 

@@ -15,6 +15,7 @@
 using ::GRPC_NAMESPACE_ID::Channel;
 using ::GRPC_NAMESPACE_ID::ClientContext;
 using ::GRPC_NAMESPACE_ID::ClientReader;
+using ::GRPC_NAMESPACE_ID::CompletionQueue;
 using ::GRPC_NAMESPACE_ID::Status;
 using ::PROTOBUF_NAMESPACE_ID::io::IstreamInputStream;
 using ::PROTOBUF_NAMESPACE_ID::io::FileInputStream;
@@ -38,6 +39,7 @@ using ::P4_NAMESPACE_ID::ReadResponse;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigRequest;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigResponse;
 using ::P4_NAMESPACE_ID::StreamMessageRequest;
+using ::P4_NAMESPACE_ID::StreamMessageResponse;
 using ::P4_NAMESPACE_ID::Update;
 using ::P4_NAMESPACE_ID::WriteRequest;
 using ::P4_NAMESPACE_ID::WriteResponse;
@@ -46,6 +48,7 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
                 std::string config,
                 ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
                 std::string electionId) {
+
   channel_ = CreateChannel(bindAddress, InsecureChannelCredentials());
   stub_ = P4Runtime::NewStub(channel_);
 
@@ -67,9 +70,6 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
   // std::cout << "0. electionId.high = " << electionIdHigh << std::endl;
   // std::cout << "0. electionId.low = " << electionIdLow << std::endl;
 
-  ClientContext context;
-  std::unique_ptr<streamType_> stream_ = stub_->StreamChannel(&context);
-
   SetUpStream();
 }
 
@@ -84,8 +84,7 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
   request.set_action(request.VERIFY_AND_COMMIT);
   request.set_device_id(deviceId_);
-  std::cout << "election_id (content - high) = " << electionId_->high() << std::endl;
-  std::cout << "election_id (content - low) = " << electionId_->low() << std::endl;
+  std::cout << "SetFwdPipeConfig. election_id (content - low) = " << electionId_->low() << std::endl;
   // NOTE: this is probably feeding something that is not proper
   // This provides "Warning: obtained error=3" (INVALID_ARGUMENT)
   // SetElectionId(request.mutable_election_id());
@@ -164,12 +163,16 @@ Status P4RuntimeClient::WriteInternal(WriteRequest* request) {
   deviceId_ = request->device_id();
   // TODO: uncomment when queueing system, threadings, etc are implemented
   // SetElectionId(request->mutable_election_id());
+  // // request->set_allocated_election_id(electionId_);
 
   WriteResponse response = WriteResponse();
   ClientContext context;
   const std::string errorMessage = "Cannot issue the Write command";
+  std::cout << "\n" << "WriteInternal. Trace 1" << std::endl;
   Status status = stub_->Write(&context, *request, &response);
+  std::cout << "\n" << "WriteInternal. Trace 2" << std::endl;
   HandleStatus(status, errorMessage.c_str());
+  std::cout << "\n" << "WriteInternal. Trace 3" << std::endl;
   return status;
 }
 
@@ -221,160 +224,282 @@ std::string P4RuntimeClient::APIVersion() {
   Status status = stub_->Capabilities(&context, request, &response);
   const std::string errorMessage = "Cannot retrieve information on the API version";
   HandleStatus(status, errorMessage.c_str());
-
   return response.p4runtime_api_version();
+
+  // std::cout << "B3-0 > content: " << response.p4runtime_api_version() << std::endl;
+  // CompletionQueue cq;
+//   std::cout << "B3-1" << std::endl;
+//   std::unique_ptr<grpc::ClientAsyncResponseReader<CapabilitiesResponse> > rpc(
+//     stub_->AsyncCapabilities(&context, request, &cq));
+//   std::cout << "B3-1a" << std::endl;
+//   rpc->StartCall();
+//   std::cout << "B3-2" << std::endl;
+//   Status status;
+//   rpc->Finish(&response, &status, (void*)1);
+//   std::cout << "B3-3" << std::endl;
+//   void* got_tag;
+//   bool ok = false;
+//   // cq.Next(&got_tag, &ok);
+//   GPR_ASSERT(cq.Next(&got_tag, &ok));
+//   // Verify that the result from "cq" corresponds, by its tag, our previous request.
+//   GPR_ASSERT(got_tag == (void*)1);
+//   // ... and that the request was completed successfully. Note that "ok"
+//   // corresponds solely to the request for updates introduced by Finish().
+//   GPR_ASSERT(ok);
+//   std::cout << "B3-4" << std::endl;
+//   if (ok && got_tag == (void*)1) {
+//     // check response and status
+//     std::cout << "B3-5" << std::endl;
+//     std::cout << "B3-5 > content: " << response.p4runtime_api_version() << std::endl;
+//     return response.p4runtime_api_version();
+//   }
+//   std::cout << "B3-6" << std::endl;
+//   return "no-version";
 }
 
 // Ancillary methods
 
 // TODO: complete. See reference/p4runtime-shell-python/p4runtime.py#set_up_stream
 void P4RuntimeClient::SetUpStream() {
+  ClientContext context;
   // Setup queues
-  std::queue<streamType_> streamQueueIn_ = std::queue<streamType_>();
-  std::queue<streamType_> streamQueueOut_();
-  grpc::ClientContext context;
+  std::deque<streamType_> streamQueueIn_();
+  std::deque<streamType_> streamQueueOut_();
+  // grpc::ClientContext context;
+  std::cout << "SetUpStream. Setting up stream from channel" << std::endl;
   stream_ = stub_->StreamChannel(&context);
+
+  // Create an async stream
+  // GPR_ASSERT(streamQueue_.GOT_EVENT == 1);
+  // streamAsync_ = stub_->PrepareAsyncStreamChannel(&context, &streamQueue_);
+  // // void* tag;
+  // // streamAsync_ = stub_->AsyncStreamChannel(&context, &streamQueue_, &tag);
+
+  // Order matters here
+  CheckForNewIncomingMessagesInStreamOnBackground();
+  CheckForNewOutgoingMessagesInQueueOnBackground();
   Handshake();
 }
 
 // TODO: complete. Check reference/p4runtime-shell-python/p4runtime.py#tear_down
 void P4RuntimeClient::TearDown() {
   if (!streamQueueOut_.empty()) {
-    std::cout << "Cleaning up stream" << std::endl;
-    streamQueueOut_.push(NULL);
-    // NOTE: translate this command (and create new object)
-    // self.stream_recv_thread.join()
+    std::cout << "TearDown. Cleaning up stream" << std::endl;
+    streamQueueOut_.push_back(NULL);
+    streamOutgoingThread_.join();
+    streamIncomingThread_.join();
   }
+  stream_->Finish();
   channel_.reset();
   // NOTE: translate this command
   //channel_.close();
 }
 
-// TODO: check if this works. Check reference/p4runtime-shell-python/p4runtime.py#get_stream_packet
+// // TODO: complete and check if this works. Check reference/p4runtime-shell-python/p4runtime.py#get_stream_packet
+// // NOTE: FIXME - if this takes as much as "timeout" it is because some condition is not met
+// // (queueIn is still empty!) - this has to be set inside SetUpStream()
+// StreamMessageResponse* P4RuntimeClient::GetStreamPacket(std::string type_, long timeout=1) {
+//     StreamMessageResponse* request;
+//     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
+//     std::cout << "GetStreamPacket. Size for queueOUT = " << streamQueueOut_.size() << std::endl;
+//     std::cout << "GetStreamPacket. Size for queueIN = " << streamQueueIn_.size() << std::endl;
+//     while (true) {
+//       std::chrono::duration<long> timeoutDuration(timeout);
+//       auto remaining = timeoutDuration - (std::chrono::system_clock::now() - start);
+
+//       if (remaining < std::chrono::seconds{0}) {
+//         std::cout << "GetStreamPacket. Returning when timeout expires" << std::endl;
+//         break;
+//       }
+
+//       request = streamQueueIn_.front();
+//       if (request == NULL) {
+//         std::cout << "GetStreamPacket. Returning due to NULL request" << std::endl;
+//       } else if (request->IsInitialized() && !request->has_arbitration()) {
+//         std::cout << "GetStreamPacket. Request has no arbitration" << std::endl;
+//         continue;
+//       }
+
+//       if (!streamQueueIn_.empty()) {
+//         std::cout << "GetStreamPacket. Arbitration device ID = " << request->mutable_arbitration()->device_id() << std::endl;
+//         std::cout << "GetStreamPacket. Arbitration election ID (high) = " << request->mutable_arbitration()->election_id().high() << std::endl;
+//         std::cout << "GetStreamPacket. Arbitration election ID (low) = " << request->mutable_arbitration()->election_id().low() << std::endl;
+//         std::cout << "GetStreamPacket. Arbitration role ID = " << request->mutable_arbitration()->role().id() << std::endl;
+//         streamQueueIn_.pop_front();
+//         std::cout << "GetStreamPacket. Size for queueIN = " << streamQueueIn_.size() << std::endl;
+//       }
+//     }
+//     return request;
+// }
+
+// TODO: complete and check if this works. Check reference/p4runtime-shell-python/p4runtime.py#get_stream_packet
 // NOTE: FIXME - if this takes as much as "timeout" it is because some condition is not met
 // (queueIn is still empty!) - this has to be set inside SetUpStream()
-StreamMessageRequest* P4RuntimeClient::GetStreamPacket(std::string type_, long timeout=1) {
-    StreamMessageRequest* request;
+StreamMessageResponse* P4RuntimeClient::GetStreamPacket(std::string type_, long timeout=1) {
+    StreamMessageResponse* request;
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    // DEBUG
-    std::cout << "QUEUE EMPTY? = " << streamQueueIn_.empty() << std::endl;
-    std::cout << "QUEUE SIZE = " << streamQueueIn_.size() << std::endl;
+    std::cout << "GetStreamPacket. Size for queueOUT = " << streamQueueOut_.size() << std::endl;
+    std::cout << "GetStreamPacket. Size for queueIN = " << streamQueueIn_.size() << std::endl;
     while (true) {
       std::chrono::duration<long> timeoutDuration(timeout);
       auto remaining = timeoutDuration - (std::chrono::system_clock::now() - start);
 
       if (remaining < std::chrono::seconds{0}) {
-        std::cout << "RETURNING WHEN TIMEOUT EXPIRES" << std::endl;
+        std::cout << "GetStreamPacket. Returning when timeout expires" << std::endl;
         break;
       }
+
       if (!streamQueueIn_.empty()) {
         request = streamQueueIn_.front();
-        std::cout << "QUEUE NOT EMPTY. RETRIEVING ARBITRATION = " << std::endl;
-        std::cout << "ARBITRATION . DEVICE ID = " << request->mutable_arbitration()->device_id() << std::endl;
-        std::cout << "ARBITRATION . ELECTION ID - HIGH = " << request->mutable_arbitration()->election_id().high() << std::endl;
-        std::cout << "ARBITRATION . ELECTION ID - LOW = " << request->mutable_arbitration()->election_id().low() << std::endl;
-        std::cout << "ARBITRATION . (ROLE ID?) = " << request->mutable_arbitration()->role().id() << std::endl;
-        streamQueueIn_.pop();
-        // streamQueueIn_.pop(&request);
+        std::cout << "GetStreamPacket. Arbitration device ID = " << request->mutable_arbitration()->device_id() << std::endl;
+        std::cout << "GetStreamPacket. Arbitration election ID (high) = " << request->mutable_arbitration()->election_id().high() << std::endl;
+        std::cout << "GetStreamPacket. Arbitration election ID (low) = " << request->mutable_arbitration()->election_id().low() << std::endl;
+        std::cout << "GetStreamPacket. Arbitration role ID = " << request->mutable_arbitration()->role().id() << std::endl;
+        streamQueueIn_.pop_front();
+        std::cout << "GetStreamPacket. Size for queueIN = " << streamQueueIn_.size() << std::endl;
       }
+
       if (request == NULL) {
-        std::cout << "REQUEST IS NULL. RETURNING" << std::endl;
-        return NULL;
-      }
-      // NOTE: translate this command
-      // if request.HasField(type_):
-      if (request->IsInitialized() && !request->has_arbitration()) {
-        std::cout << "REQUEST HAS NO ARBITRATION: " << request->has_arbitration() << std::endl;
+        std::cout << "GetStreamPacket. Returning due to NULL request" << std::endl;
+        break;
+      } else if (request->IsInitialized() && !request->has_arbitration()) {
+        std::cout << "GetStreamPacket. Request has no arbitration" << std::endl;
         continue;
       }
     }
     return request;
 }
 
+void P4RuntimeClient::CheckForNewIncomingMessagesInStream() {
+    // // DEBUG
+    // StreamMessageRequest *requestOut = StreamMessageRequest().New();
+    // StreamMessageResponse* requestIn = StreamMessageResponse().New();
+    // const MasterArbitrationUpdate* arbitrationTmp = &requestIn->arbitration();
+    // MasterArbitrationUpdate arbitration = *arbitrationTmp;
+    // arbitration.set_device_id(deviceId_);
+    // requestIn->set_allocated_arbitration(&arbitration);
+    // requestOut->set_allocated_arbitration(&arbitration);
+    // std::cout << "CheckForNewMessagesInStream. Debug: write to queueIN\n" << std::endl;
+    // streamQueueIn_.push_back(requestIn);
+    // std::cout << "CheckForNewMessagesInStream. Debug: write to stream\n" << std::endl;
+    // const StreamMessageRequest *requestOutConst = requestOut;
+    // stream_->Write(*requestOutConst);
+    // // END DEBUG
+    std::cout << "CheckForNewMessagesInStream\n" << std::endl;
+    ::P4_NAMESPACE_ID::StreamMessageResponse* messageResponse;
+    while (stream_->Read(messageResponse)) {
+      std::cout << "CheckForNewMessagesInStream. Reading streams from message\n" << std::endl;
+      streamQueueIn_.push_back(messageResponse);
+      std::cout << "CheckForNewMessagesInStream. Pushing message response to queueIN\n" << std::endl;
+      std::cout << "CheckForNewMessagesInStream. Size for queueOUT = " << streamQueueOut_.size() << std::endl;
+      std::cout << "CheckForNewMessagesInStream. Size for queueIN = " << streamQueueIn_.size() << std::endl;
+    }
+}
+
+void P4RuntimeClient::CheckForNewIncomingMessagesInStreamOnBackground() {
+  try {
+    streamIncomingThread_ = std::thread(&P4RuntimeClient::CheckForNewIncomingMessagesInStream, this);
+  } catch (...) {
+    std::cerr << "CheckForNewIncomingMessagesInStreamOnBackground. StreamChannel error. Closing stream" << std::endl;
+    streamQueueIn_.push_back(NULL);
+  }
+}
+
+void P4RuntimeClient::CheckForNewOutgoingMessagesInQueue() {
+  StreamMessageRequest* request;
+  std::cout << "CheckForNewOutgoingMessagesInQueue" << std::endl;
+  while (true) {
+    if (!streamQueueOut_.empty()) {
+      request = streamQueueOut_.front();
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Device ID of obtained request = " << request->mutable_arbitration()->device_id() << std::endl;
+      streamQueueOut_.pop_front();
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Size for queueOUT = " << streamQueueOut_.size() << std::endl;
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Size for queueIN = " << streamQueueIn_.size() << std::endl;
+    }
+
+    if (request == NULL) {
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Returning due to NULL request" << std::endl;
+      break;
+    } else {
+      const StreamMessageRequest* requestConst = request;
+      std::cout << "CheckForNewOutgoingMessagesInQueue. 2" << std::endl;
+      WriteRequest writeRequest = WriteRequest();
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Sending Write request to server" << std::endl;
+      writeRequest.CopyFrom(*requestConst);
+      std::cout << "CheckForNewOutgoingMessagesInQueue. 3" << std::endl;
+      Status status = Write(&writeRequest);
+      std::cout << "CheckForNewOutgoingMessagesInQueue. Status of sent Write request" << status.error_code() << std::endl;
+    }
+  }
+}
+
+void P4RuntimeClient::CheckForNewOutgoingMessagesInQueueOnBackground() {
+  try {
+    streamOutgoingThread_ = std::thread(&P4RuntimeClient::CheckForNewOutgoingMessagesInQueue, this);
+  } catch (...) {
+    std::cerr << "CheckForNewOutgoingMessagesInQueueOnBackground. StreamChannel error. Closing stream" << std::endl;
+    streamQueueOut_.push_back(NULL);
+  }
+}
+
 // TODO: complete. Check reference/p4runtime-shell-python/p4runtime.py#handshake
 void P4RuntimeClient::Handshake() {
 
-  // NOTE: this block should be removed & implemented correctly (not manually) inside P4RuntimeClient::SetUpStream()
-  StreamMessageRequest* requestIn = StreamMessageRequest().New();
-  const MasterArbitrationUpdate* arbitrationTmpIn = &requestIn->arbitration();
-  MasterArbitrationUpdate arbitrationIn = *arbitrationTmpIn;
-  arbitrationIn.set_device_id(deviceId_);
-  requestIn->set_allocated_arbitration(&arbitrationIn);
-  streamQueueIn_.push(requestIn);
-  std::cout << "SIZE OF QUEUE_IN 1 = " << streamQueueIn_.size() << std::endl;
-  // streamQueueIn_.push(requestIn);
-  // std::cout << "SIZE OF QUEUE_IN 2 = " << streamQueueIn_.size() << std::endl;
-  // NOTE: end of block
-
-  // StreamMessageRequest* request = &StreamMessageRequest();
-  StreamMessageRequest* request = StreamMessageRequest().New();
-  // const StreamMessageRequest constRequest;
-
-  // const MasterArbitrationUpdate arbitrationTmp = request.arbitration();
-  // MasterArbitrationUpdate arbitration = arbitrationTmp;
-  // arbitration.set_device_id(deviceId_);
-
-  const MasterArbitrationUpdate* arbitrationTmp = &request->arbitration();
+  StreamMessageRequest* requestOut = StreamMessageRequest().New();
+  const MasterArbitrationUpdate* arbitrationTmp = &requestOut->arbitration();
   MasterArbitrationUpdate arbitration = *arbitrationTmp;
   arbitration.set_device_id(deviceId_);
-  // NOTE: commented to avoid setting electionId_ = (0, 0). May not be properly configured
-  // The arbitration object is not properly filled in here
-  // // SetElectionId(const_cast<::P4_NAMESPACE_ID::Uint128*>(&arbitration.election_id()));
-  // SetElectionId(arbitration.mutable_election_id());
-  // arbitration.set_allocated_election_id(electionId_);
+  requestOut->set_allocated_arbitration(&arbitration);
+  streamQueueOut_.push_back(requestOut);
+  std::cout << "Handshake. Pushing message response to queueOUT" << std::endl;
 
-  // request.set_allocated_arbitration(&arbitration);
-  request->set_allocated_arbitration(&arbitration);
-
-  // constRequest = &request;
-
-  // streamQueueOut_.push(&request);
-  streamQueueOut_.push(request);
+  // DEBUG . COMMENT THIS WHEN CONNECTIVITY IS SOLVED
+  // StreamMessageResponse* requestIn = StreamMessageResponse().New();
+  // requestIn->set_allocated_arbitration(&arbitration);
+  // // Simulate some reply from the server: comment and remove in the future
+  // // std::cout << "Handshake. Debug: write to queueIN\n" << std::endl;
+  // // streamQueueIn_.push_back(requestIn);
+  // std::cout << "Handshake. Debug: write to stream\n" << std::endl;
+  // const StreamMessageRequest *requestOutConst = requestOut;
+  // stream_->Write(*requestOutConst);
+  // END DEBUG
 
   // NOTE: (FIXME?) this introduces delays as it waits for as much time as defined in the timeout
-  StreamMessageRequest* reply = GetStreamPacket("arbitration", 2);
-  // if (reply == NULL) {
-  //   std::cout << "Failed to establish session with server" << std::endl;
-  //   exit(1);
-  // }
+  StreamMessageResponse* reply = GetStreamPacket("arbitration", 2);
 
-  // ::P4_NAMESPACE_ID::Uint128 electionIdTmp = reply->arbitration().election_id();
-  // SetElectionId(&electionIdTmp);
+  if (reply == NULL) {
+    std::cerr << "Handshake. Failed to establish session with server" << std::endl;
+    exit(1);
+  }
+  std::cout << "Handshake. Get arbitration stream. Status code = " << reply->arbitration().status().code() << std::endl;
 
-  // bool isMaster = reply->arbitration().status().code() == ::GRPC_NAMESPACE_ID::StatusCode::OK;
-  // std::cout << "Session established, client is master (true) or slave (false)? " << isMaster << std::endl;
-  // if (!isMaster) {
-  //     std::cout << "You are not master, you only have read access to the server" << std::endl;
-  // }
-
-  // FIXME: set to avoid Segfault. But it does not makes sense to release something that is needed
-  // request.release_arbitration();
+  bool isMaster = reply->arbitration().status().code() == ::GRPC_NAMESPACE_ID::StatusCode::OK;
+  std::string role = isMaster ? "master" : "slave";
+  std::cout << "Handshake. Session established. Role for controller = " << role << std::endl;
+  if (!isMaster) {
+      std::cout << "Handshake. You only have read access to the server" << std::endl;
+  }
 }
 
 void P4RuntimeClient::SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId) {
-  std::cout << "1 . electionId = " << electionId << std::endl;
+  std::cout << "SetElectionId. electionId = " << electionId << std::endl;
   electionId_ = electionId;
   electionId_->set_high(electionId->high());
   electionId_->set_low(electionId->low());
-  // electionId_->set_high((*electionId).high());
-  // electionId_->set_low((*electionId).low());
-  std::cout << "1 . electionId_.high = " << electionId_->high() << std::endl;
-  std::cout << "1 . electionId_.low = " << electionId_->low() << std::endl;
+  std::cout << "SetElectionId. electionId_.high = " << electionId_->high() << std::endl;
+  std::cout << "SetElectionId. electionId_.low = " << electionId_->low() << std::endl;
 }
 
 void P4RuntimeClient::SetElectionId(std::string electionId) {
   try {
-    std::cout << "2 . electionId = " << electionId << std::endl;
+    std::cout << "SetElectionId. electionId_ (str) = " << electionId << std::endl;
     auto electionIdIndex = electionId.find_first_of(",");
     ::PROTOBUF_NAMESPACE_ID::uint64 electionIdHigh = std::stoull(electionId.substr(0, electionIdIndex));
     ::PROTOBUF_NAMESPACE_ID::uint64 electionIdLow = std::stoull(electionId.substr(electionIdIndex + 1));
-    std::cout << "2 . electionId.high = " << electionIdHigh << std::endl;
-    std::cout << "2 . electionId.low = " << electionIdLow << std::endl;
-    electionId_ = ::P4_NAMESPACE_ID::Uint128().New();
-    electionId_->set_high(electionIdHigh);
-    electionId_->set_low(electionIdLow);
-    std::cout << "2 . electionId_.high = " << electionId_->high() << std::endl;
-    std::cout << "2 . electionId_.low = " << electionId_->low() << std::endl;
+    ::P4_NAMESPACE_ID::Uint128* electionId = ::P4_NAMESPACE_ID::Uint128().New();
+    electionId->set_high(electionIdHigh);
+    electionId->set_low(electionIdLow);
+    SetElectionId(electionId);
   } catch (...) {
     const std::string errorMessage = "Cannot parse electionId with value = " + electionId;
     HandleException(errorMessage.c_str());

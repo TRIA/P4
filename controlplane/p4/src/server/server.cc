@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
+#include "../common/grpc_out/google/rpc/code.grpc.pb.h"
 // Import declarations after any other
 #include "../common/ns_def.inc"
 
@@ -12,6 +13,7 @@ using ::GRPC_NAMESPACE_ID::Server;
 using ::GRPC_NAMESPACE_ID::ServerBuilder;
 using ::GRPC_NAMESPACE_ID::ServerContext;
 using ::GRPC_NAMESPACE_ID::ServerWriter;
+using ::GRPC_NAMESPACE_ID::ServerReaderWriter;
 using ::GRPC_NAMESPACE_ID::Status;
 using ::GRPC_NAMESPACE_ID::WriteOptions;
 
@@ -28,6 +30,8 @@ using ::P4_NAMESPACE_ID::ReadRequest;
 using ::P4_NAMESPACE_ID::ReadResponse;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigRequest;
 using ::P4_NAMESPACE_ID::SetForwardingPipelineConfigResponse;
+using ::P4_NAMESPACE_ID::StreamMessageRequest;
+using ::P4_NAMESPACE_ID::StreamMessageResponse;
 using ::P4_NAMESPACE_ID::WriteRequest;
 using ::P4_NAMESPACE_ID::WriteResponse;
 
@@ -41,8 +45,40 @@ class P4RuntimeServer final : public P4Runtime::Service {
       binaryCfg_ = "";
     }
 
-    Status SetForwardingPipelineConfig(ServerContext* context, const SetForwardingPipelineConfigRequest* request, 
-        SetForwardingPipelineConfigResponse* response) override {
+    Status StreamChannel(ServerContext* context, ServerReaderWriter< 
+        StreamMessageResponse, StreamMessageRequest>* stream) override {
+      std::cout << "\n" << "Receiving StreamChannel request" << std::endl;
+      StreamMessageRequest* messageRequest;
+      while (stream->Read(messageRequest)) {
+        std::cout << "StreamChannel. Reading stream" << std::endl;
+        if (messageRequest != NULL) {
+          std::cout << "StreamChannel. Received message: " << messageRequest->SerializeAsString() << std::endl;
+          if (messageRequest->has_arbitration()) {
+            std::cout << "StreamChannel. Received message = arbitration. Election ID: " << messageRequest->arbitration().election_id().SerializeAsString() << std::endl;
+            std::cout << "StreamChannel. Received message = arbitration. Device ID: " << messageRequest->arbitration().device_id() << std::endl;
+            std::cout << "StreamChannel. Received message = arbitration. Role: " << messageRequest->arbitration().role().SerializeAsString() << std::endl;
+
+            StreamMessageResponse messageResponse = StreamMessageResponse();
+            // Return arbitration message with OK status
+            const ::P4_NAMESPACE_ID::MasterArbitrationUpdate* arbitrationTmp = &messageRequest->arbitration();
+            ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = *arbitrationTmp;
+            // arbitration.set_device_id(arbitrationTmp->device_id());
+            ::google::rpc::Status *arbitrationStatus = new ::google::rpc::Status();
+            arbitrationStatus->set_code(::google::rpc::Code::OK);
+            arbitration.set_allocated_status(arbitrationStatus);
+            messageResponse.set_allocated_arbitration(&arbitration);
+
+            const StreamMessageResponse messageResponseConst = messageResponse;
+            stream->Write(messageResponseConst);
+          }
+        }
+      }
+      return Status::OK;
+    }
+
+    Status SetForwardingPipelineConfig(ServerContext* context, 
+      const SetForwardingPipelineConfigRequest* request,
+       SetForwardingPipelineConfigResponse* response) override {
       std::cout << "\n" << "Receiving SetForwardingPipelineConfig request" << std::endl;
 
       // P4Info p4InfoRequest = request->config().p4info();
