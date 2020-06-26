@@ -51,7 +51,6 @@ class P4RuntimeClient {
     typedef ::GRPC_NAMESPACE_ID::ClientAsyncReaderWriter<
       ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamAsyncType_;
 
-    // ::GRPC_NAMESPACE_ID::CompletionQueue streamQueue_;
     std::deque<::P4_NAMESPACE_ID::StreamMessageResponse*> streamQueueIn_;
     std::deque<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
     std::unique_ptr<streamType_> stream_;
@@ -62,11 +61,12 @@ class P4RuntimeClient {
     void Handshake();
     void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);
     void SetElectionId(std::string electionId);
-    ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(std::string type_, long timeout);
-    void CheckForNewIncomingMessagesInStream();
-    void CheckForNewOutgoingMessagesInQueue();
-    void CheckForNewIncomingMessagesInStreamOnBackground();
-    void CheckForNewOutgoingMessagesInQueueOnBackground();
+    ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(int expectedType, long timeout);
+    void CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse* response);
+    void ReadOutgoingMessagesFromQueue();
+    void ReadOutgoingMessagesFromQueueInBg();
+    void ReadIncomingMessagesFromStream();
+    void ReadIncomingMessagesFromStreamInBg();
     void HandleException(const char* errorMessage);
     void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 

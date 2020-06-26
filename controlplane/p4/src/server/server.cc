@@ -49,27 +49,64 @@ class P4RuntimeServer final : public P4Runtime::Service {
         StreamMessageResponse, StreamMessageRequest>* stream) override {
       std::cout << "\n" << "Receiving StreamChannel request" << std::endl;
       StreamMessageRequest* messageRequest;
-      while (stream->Read(messageRequest)) {
-        std::cout << "StreamChannel. Reading stream" << std::endl;
-        if (messageRequest != NULL) {
-          std::cout << "StreamChannel. Received message: " << messageRequest->SerializeAsString() << std::endl;
-          if (messageRequest->has_arbitration()) {
-            std::cout << "StreamChannel. Received message = arbitration. Election ID: " << messageRequest->arbitration().election_id().SerializeAsString() << std::endl;
-            std::cout << "StreamChannel. Received message = arbitration. Device ID: " << messageRequest->arbitration().device_id() << std::endl;
-            std::cout << "StreamChannel. Received message = arbitration. Role: " << messageRequest->arbitration().role().SerializeAsString() << std::endl;
+      if (stream != NULL) {
+        std::cout << "\n" << "Receiving StreamChannel request (stream not null)" << std::endl;
+        // DEBUG
+        // StreamMessageResponse messageResponse = StreamMessageResponse();
+        // // Return arbitration message with OK status
+        // std::cout << "\n" << "111" << std::endl;
+        // uint32_t num1;
+        // std::cout << "\n" << "message size: " << stream->NextMessageSize(&num1) << std::endl;
+        // std::cout << "\n" << "111a" << std::endl;
+        // stream->SendInitialMetadata();
+        // if (stream->Read(messageRequest)) {
+        //   std::cout << "\n" << "11b" << std::endl;
+        //   const ::P4_NAMESPACE_ID::MasterArbitrationUpdate* arbitrationTmp = &messageRequest->arbitration();
+        //   std::cout << "\n" << "112" << std::endl;
+        //   ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = *arbitrationTmp;
+        //   // arbitration.set_device_id(arbitrationTmp->device_id());
+        //   std::cout << "\n" << "113" << std::endl;
+        //   ::google::rpc::Status *arbitrationStatus = new ::google::rpc::Status();
+        //   std::cout << "\n" << "114" << std::endl;
+        //   arbitrationStatus->set_code(::google::rpc::Code::OK);
+        //   std::cout << "\n" << "115" << std::endl;
+        //   arbitration.set_allocated_status(arbitrationStatus);
+        //   std::cout << "\n" << "116" << std::endl;
+        //   messageResponse.set_allocated_arbitration(&arbitration);
+        //   std::cout << "\n" << "117" << std::endl;
+        //   const StreamMessageResponse messageResponseConst = messageResponse;
+        //   std::cout << "\n" << "118" << std::endl;
+        //   stream->Write(messageResponseConst);
+        //   std::cout << "\n" << "119" << std::endl;
+        //   // stream->WriteLast(messageResponseConst, grpc::WriteOptions());
+        // }
+        // END DEBUG
 
-            StreamMessageResponse messageResponse = StreamMessageResponse();
-            // Return arbitration message with OK status
-            const ::P4_NAMESPACE_ID::MasterArbitrationUpdate* arbitrationTmp = &messageRequest->arbitration();
-            ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = *arbitrationTmp;
-            // arbitration.set_device_id(arbitrationTmp->device_id());
-            ::google::rpc::Status *arbitrationStatus = new ::google::rpc::Status();
-            arbitrationStatus->set_code(::google::rpc::Code::OK);
-            arbitration.set_allocated_status(arbitrationStatus);
-            messageResponse.set_allocated_arbitration(&arbitration);
+        // TEST?
+        stream->SendInitialMetadata();
+        while (stream->Read(messageRequest)) {
+          std::cout << "StreamChannel. Reading stream" << std::endl;
+          if (messageRequest != NULL) {
+            std::cout << "StreamChannel. Received message: " << messageRequest->SerializeAsString() << std::endl;
+            if (messageRequest->has_arbitration()) {
+              std::cout << "StreamChannel. Received message = arbitration. Election ID: " << messageRequest->arbitration().election_id().SerializeAsString() << std::endl;
+              std::cout << "StreamChannel. Received message = arbitration. Device ID: " << messageRequest->arbitration().device_id() << std::endl;
+              std::cout << "StreamChannel. Received message = arbitration. Role: " << messageRequest->arbitration().role().SerializeAsString() << std::endl;
 
-            const StreamMessageResponse messageResponseConst = messageResponse;
-            stream->Write(messageResponseConst);
+              StreamMessageResponse messageResponse = StreamMessageResponse();
+              // Return arbitration message with OK status
+              const ::P4_NAMESPACE_ID::MasterArbitrationUpdate* arbitrationTmp = &messageRequest->arbitration();
+              ::P4_NAMESPACE_ID::MasterArbitrationUpdate arbitration = *arbitrationTmp;
+              // arbitration.set_device_id(arbitrationTmp->device_id());
+              ::google::rpc::Status *arbitrationStatus = new ::google::rpc::Status();
+              arbitrationStatus->set_code(::google::rpc::Code::OK);
+              arbitration.set_allocated_status(arbitrationStatus);
+              messageResponse.set_allocated_arbitration(&arbitration);
+
+              const StreamMessageResponse messageResponseConst = messageResponse;
+              // stream->Write(messageResponseConst);
+              stream->WriteLast(messageResponseConst, grpc::WriteOptions());
+            }
           }
         }
       }
