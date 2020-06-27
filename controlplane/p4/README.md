@@ -84,4 +84,6 @@ The following will compile and run the control plane client, so that it interact
 make edf-cp-test-mininet
 # Use mocked server as an automated test (option #2)
 make edf-cp-test-mock
+# Use Stratum-enabled bmv2 server as an automated test (option #3)
+make edf-cp-test-stratum
 ```

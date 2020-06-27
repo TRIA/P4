@@ -147,10 +147,12 @@ edf-dp-server-build: edf-cp-setup
 
 edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	@echo "Starting image stratum-dev in container ${EDF_DATA_S_NAME}"
+	docker rm -f ${EDF_DATA_S_NAME} || true
 	cd ${EDF_SERVER_SRC_PATH} && \
 	docker run -d -v ${PWD}/src/server/stratum/:/stratum -v /home/${USER}/.cache:/home/${USER}/.cache \
 	-v ${EDF_SERVER_SRC_PATH}/docker-entrypoint.sh:/docker-entrypoint.sh \
 	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/common/p4_service.cc:/p4_service.cc \
+	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/bmv2/bmv2_switch.cc:/bmv2_switch.cc \
 	-e NP4_INSTALL=/usr -p 28000:28000 -p 9339:9339 -w /stratum \
 	--network=${EDF_C_NET} \
 	--entrypoint /docker-entrypoint.sh \
@@ -169,6 +171,17 @@ edf-dp-server-clean:
 
 # Tests
 
+# Manual test with bmv2's P4 virtual switches running in Mininet (mn-stratum)
+# Note: Dockerfile for mn-stratum in https://github.com/stratum/stratum/blob/master/tools/mininet/Dockerfile
+edf-cp-test-mininet: edf-cp-client-build
+	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
+	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
+	make edf-dp-model-build
+	make edf-dp-mininet-start
+	make edf-cp-client-start
+
+edf-cp-test-mininet-clean: edf-cp-client-clean edf-dp-mininet-stop edf-cp-docker-net-rm
+
 # Automated test with a mocked gRPC server
 edf-cp-test-mock: edf-cp-client-build edf-cp-docker-net-create
 	@echo "Starting container ${EDF_CONTROL_C_T_NAME} with image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}, then running a quick test"
@@ -184,16 +197,14 @@ edf-cp-test-mock: edf-cp-client-build edf-cp-docker-net-create
 	sudo chown ${USER}:${USER} -R ${GRPC_BUILDDIR}
 	make edf-cp-docker-net-rm
 
-edf-dp-mininet-start: edf-cp-docker-net-create
+edf-cp-mininet-start: edf-cp-docker-net-create
 	cd ${EDF_DATA_PATH} && make mn-single-start && cd ${CURRENT}
 
-edf-dp-mininet-stop:
+edf-cp-mininet-stop:
 	cd ${EDF_DATA_PATH} && make mn-single-stop && cd ${CURRENT}
 
-edf-dp-test-mininet-clean: edf-cp-client-clean edf-dp-mininet-stop edf-cp-docker-net-rm
-
 # Automated test with the Stratum-enabled bmv2 server
-edf-dp-test-stratum: edf-cp-client-build
+edf-cp-test-stratum: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
 	make edf-dp-model-build
@@ -210,9 +221,9 @@ edf-dp-test-stratum: edf-cp-client-build
 	#sudo cp -p $(docker inspect --format='{{.LogPath}}' ${EDF_DATA_S_NAME}) ${EDF_TEST_PATH}/${EDF_DATA_S_NAME}.log
 	sudo chown ${USER}:${USER} -R ${EDF_TEST_PATH}/*.log
 	sudo chown ${USER}:${USER} -R ${GRPC_BUILDDIR}
-	make edf-dp-test-stratum-clean
+	make edf-cp-test-stratum-clean
 
-edf-dp-test-stratum-clean: edf-cp-client-test-clean edf-dp-server-clean
+edf-cp-test-stratum-clean: edf-cp-client-test-clean edf-dp-server-clean
 
 #
 # Code (logic)

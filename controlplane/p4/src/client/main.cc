@@ -6,6 +6,7 @@
 #include "../common/ns_def.inc"
 
 using ::GRPC_NAMESPACE_ID::Status;
+using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 
 int is_substring_of(std::string substring, std::string string) {
   size_t position_start = string.find(substring);
@@ -89,37 +90,90 @@ int main(int argc, char** argv) {
   P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
   Status status;
 
-  std::cout << "-------------- GetP4Info before pushing pipeline --------------" << std::endl;
+  std::cout << "\n-------------- GetP4Info (before pushing pipeline) --------------" << std::endl;
+  P4Info p4Info = p4RuntimeClient.GetP4Info();
+  if (p4Info.tables_size() == 0) {
+    std::cout << "Warning: forwarding pipeline configuration should be pushed before calling this" << std::endl;
+  }
+
+  std::cout << "\n-------------- SetFwdPipeConfig --------------" << std::endl;
+  if (p4Info.tables_size() == 0) {
+    status = p4RuntimeClient.SetFwdPipeConfig();
+    handle_status(status);
+  } else {
+    std::cout << "Warning: forwarding pipeline configuration already pushed" << std::endl;
+  }
+
+  std::cout << "\n-------------- GetP4Info (after pushing pipeline) --------------" << std::endl;
   p4RuntimeClient.GetP4Info();
 
-  std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
-  status = p4RuntimeClient.SetFwdPipeConfig();
-  handle_status(status);
-
-  std::cout << "-------------- GetP4Info after pushing pipeline --------------" << std::endl;
-  p4RuntimeClient.GetP4Info();
-
-  std::cout << "-------------- Write --------------" << std::endl;
+  std::cout << "\n-------------- Write --------------" << std::endl;
   ::P4_NAMESPACE_ID::WriteRequest writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
-  // writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
+  writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
+  ::P4_NAMESPACE_ID::Entity p4Entity = ::P4_NAMESPACE_ID::Entity();
+  ::PROTOBUF_NAMESPACE_ID::uint32 idTableIpV4Lpm = 33574068;
+  ::PROTOBUF_NAMESPACE_ID::uint32 idActionNoDrop = 16805608;
+  ::PROTOBUF_NAMESPACE_ID::uint32 idActionIpV4Forward = 16799317;
+  p4Entity.mutable_table_entry()->set_table_id(idTableIpV4Lpm);
+  ::P4_NAMESPACE_ID::Action p4EntityAction = ::P4_NAMESPACE_ID::Action();
+  ::P4_NAMESPACE_ID::TableAction p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
+  // Step 1: insert a new entry with action "MyIngress.NoDrop"
+  p4EntityAction.set_action_id(idActionNoDrop);
+  p4EntityTableAction.set_allocated_action(&p4EntityAction);
+  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
+  writeRequest.mutable_updates(0)->set_allocated_entity(&p4Entity);
+  status = p4RuntimeClient.Write(&writeRequest);
+  handle_status(status);
+  // Step 2: insert a new entry with action "MyIngress.ipv4_forward"
+  p4EntityAction = ::P4_NAMESPACE_ID::Action();
+  p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
+  p4EntityAction.set_action_id(idActionIpV4Forward);
+  p4EntityAction.add_params()->set_param_id(1);
+  p4EntityAction.mutable_params(0)->set_value("00:00:00:00:00:02");
+  p4EntityAction.add_params()->set_param_id(2);
+  // p4EntityAction.mutable_params(1)->set_value("000000001");
+  p4EntityAction.mutable_params(1)->set_value("000000002");
+  // FIXME: double free error affects the rest
+  p4EntityTableAction.set_allocated_action(&p4EntityAction);
+  p4Entity = ::P4_NAMESPACE_ID::Entity();
+  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
+  writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  writeRequest.mutable_updates(0)->set_allocated_entity(&p4Entity);
   status = p4RuntimeClient.Write(&writeRequest);
   handle_status(status);
 
-  std::cout << "-------------- WriteUpdate --------------" << std::endl;
-  writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  std::cout << "\n-------------- WriteUpdate --------------" << std::endl;
+  // writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::MODIFY);
+  writeRequest.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
+    mutable_action()->mutable_params(1)->set_value("000000001");
   status = p4RuntimeClient.WriteUpdate(&writeRequest);
   handle_status(status);
 
-  std::cout << "-------------- ReadOne --------------" << std::endl;
-  ::P4_NAMESPACE_ID::ReadResponse response = p4RuntimeClient.ReadOne();
-  std:: string responseData = response.SerializeAsString();
-  if (responseData.size() > 0) {
-    std::cout << "Success: obtained response data=" << responseData << std::endl;
+  std::cout << "\n-------------- ReadOne --------------" << std::endl;
+  ::P4_NAMESPACE_ID::ReadRequest readRequest = ::P4_NAMESPACE_ID::ReadRequest();
+  // p4Entity = ::P4_NAMESPACE_ID::Entity();
+  readRequest.add_entities()->mutable_table_entry()->set_table_id(idTableIpV4Lpm);
+  // TODO: readRequest is missing a correct entity type. How to add?
+  p4EntityAction = ::P4_NAMESPACE_ID::Action();
+  p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
+  p4EntityAction.set_action_id(idActionNoDrop);
+  p4EntityTableAction.set_allocated_action(&p4EntityAction);
+  ::P4_NAMESPACE_ID::TableEntry p4EntityTableEntry = ::P4_NAMESPACE_ID::TableEntry();
+  p4EntityTableEntry.mutable_action()->set_allocated_action(&p4EntityAction);
+  p4EntityTableEntry.set_table_id(idTableIpV4Lpm);
+  // // FIXME: invalid pointer error affects the rest
+  p4EntityTableEntry.set_allocated_action(&p4EntityTableAction);
+  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
+  readRequest.mutable_entities(0)->set_allocated_table_entry(&p4EntityTableEntry);
+  ::P4_NAMESPACE_ID::ReadResponse readResponse = p4RuntimeClient.ReadOne(&readRequest);
+  if (readResponse.entities_size() > 0) {
+    std::cout << "Success: retrieved entry for table id=" << readResponse.entities().Get(0).table_entry().table_id() << std::endl;
   } else {
-    std::cerr << "Warning: no response data obtained" << std::endl;
+    std::cerr << "Warning: no entry retrieved" << std::endl;
   }
 
-  std::cout << "-------------- APIVersion --------------" << std::endl;
+  std::cout << "\n-------------- APIVersion --------------" << std::endl;
   std::string version = p4RuntimeClient.APIVersion();
   if (version.length() > 0) {
     std::cout << "Success: obtained API version=" << version << std::endl;

@@ -239,8 +239,15 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
 
   if (!req->updates_size()) return ::grpc::Status::OK;  // Nothing to do.
 
+  // BEGIN
+  std::cout << "Write -> after auth" << std::endl;
+  // END
+
   // device_id is nothing but the node_id specified in the config for the node.
   uint64 node_id = req->device_id();
+  // BEGIN
+  std::cout << "Write -> node_id = " << node_id << std::endl;
+  // END
   if (node_id == 0) {
     return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                           "Invalid device ID.");
@@ -249,6 +256,9 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
   // Require valid election_id for Write.
   absl::uint128 election_id =
       absl::MakeUint128(req->election_id().high(), req->election_id().low());
+  // BEGIN
+  std::cout << "Write -> election_id.high = " << req->election_id().high() << ", election_id.low = " << req->election_id().low() << std::endl;
+  // END
   if (election_id == 0) {
     return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                           "Invalid election ID.");
@@ -257,6 +267,9 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
   // Make sure this node already has a master controller and the given
   // election_id and the uri of the client matches those of the master.
   if (!IsWritePermitted(node_id, election_id, context->peer())) {
+    // BEGIN
+    std::cout << "Write -> cannot write" << std::endl;
+    // END
     return ::grpc::Status(::grpc::StatusCode::PERMISSION_DENIED,
                           "Write from non-master is not permitted.");
   }
@@ -265,6 +278,9 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
   absl::Time timestamp = absl::Now();
   ::util::Status status =
       switch_interface_->WriteForwardingEntries(*req, &results);
+  // BEGIN
+  std::cout << "Write -> status = " << status.error_code() << std::endl;
+  // END
   if (!status.ok()) {
     LOG(ERROR) << "Failed to write forwarding entries to node " << node_id
                << ": " << status.error_message();
@@ -272,6 +288,10 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
 
   // Log debug info for future debugging.
   LogWriteRequest(node_id, *req, results, timestamp);
+
+  // BEGIN
+  std::cout << "Write -> end" << std::endl;
+  // END
 
   return ToGrpcStatus(status, results);
 }
@@ -281,7 +301,14 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
     ::grpc::ServerWriter<::p4::v1::ReadResponse>* writer) {
   RETURN_IF_NOT_AUTHORIZED(auth_policy_checker_, P4Service, Read, context);
 
+  // BEGIN
+  std::cout << "Read -> after auth" << std::endl;
+  // END
+
   if (!req->entities_size()) return ::grpc::Status::OK;
+  // BEGIN
+  std::cout << "Read -> device_id = " << req->device_id() << std::endl;
+  // END
   if (req->device_id() == 0) {
     return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                           "Invalid device ID.");
@@ -291,11 +318,17 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
   std::vector<::util::Status> details = {};
   ::util::Status status =
       switch_interface_->ReadForwardingEntries(*req, &wrapper, &details);
+  // BEGIN
+  std::cout << "Read -> status = " << status.error_code() << std::endl;
+  // END
   if (!status.ok()) {
     LOG(ERROR) << "Failed to read forwarding entries from node "
                << req->device_id() << ": " << status.error_message();
   }
 
+  // BEGIN
+  std::cout << "Read -> end" << std::endl;
+  // END
   return ToGrpcStatus(status, details);
 }
 
@@ -676,7 +709,7 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
         auto status = AddOrModifyController(node_id, connection_id, election_id,
                                             context->peer(), stream);
         if (!status.ok()) {
-          std::cout << "StreamChannel > Not adding the controller properly..." << ToGrpcCode(status.CanonicalCode()), status.error_message() << std::endl;
+          std::cout << "StreamChannel > Not adding the controller properly..." << status.error_code() << std::endl;
           return ::grpc::Status(ToGrpcCode(status.CanonicalCode()),
                                 status.error_message());
         }

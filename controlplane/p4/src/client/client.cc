@@ -111,7 +111,6 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   config->release_p4info();
   config->release_p4_device_config();
   request.release_election_id();
-  std::cout << "SetFwdPipeConfig. END" << std::endl;
 
   return status;
 }
@@ -129,11 +128,11 @@ P4Info P4RuntimeClient::GetP4Info() {
   Status status = stub_->GetForwardingPipelineConfig(&context, request, &response);
   HandleStatus(status, errorMessage.c_str());
   P4Info p4Info = response.config().p4info();
-  PrintP4Info("", p4Info);
+  PrintP4Info(p4Info);
   return p4Info;
 }
 
-// TODO: validate
+// TODO: finalise, then validate
 Status P4RuntimeClient::WriteInternal(WriteRequest* request) {
   request->set_device_id(deviceId_);
   request->mutable_election_id()->set_high(electionId_->high());
@@ -144,7 +143,6 @@ Status P4RuntimeClient::WriteInternal(WriteRequest* request) {
   const std::string errorMessage = "Cannot issue the Write command";
   Status status = stub_->Write(&context, *request, &response);
   HandleStatus(status, errorMessage.c_str());
-  std::cout << "\n" << "WriteInternal. END" << std::endl;
   return status;
 }
 
@@ -169,17 +167,16 @@ Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
 
 // See reference/p4runtime-shell-python/p4runtime.py#read_one
 // TODO: validate
-ReadResponse P4RuntimeClient::ReadOne() {
+ReadResponse P4RuntimeClient::ReadOne(ReadRequest* request) {
   std::cout << "\n" << "Submitting single read request" << std::endl;
-  ReadRequest request = ReadRequest();
-  request.set_device_id(deviceId_);
-  for (Entity singleEntity : *request.mutable_entities()) {
+  request->set_device_id(deviceId_);
+  for (Entity singleEntity : *request->mutable_entities()) {
     // Note: add already allocated objects in memory. Might use "Add" instead
-    request.mutable_entities()->AddAllocated(&singleEntity);
+    request->mutable_entities()->AddAllocated(&singleEntity);
   }
   ClientContext context;
   ReadResponse response = ReadResponse();
-  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
+  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, *request);
   clientReader->Read(&response);
   clientReader->Finish();
   return response;
@@ -255,7 +252,7 @@ StreamMessageResponse* P4RuntimeClient::GetStreamPacket(int expectedType=-1, lon
           // Details in p4runtime.pb.h:
           //   kArbitration = 1, kPacket = 2, kDigestAck = 3, kOther = 4, UPDATE_NOT_SET = 0
           // Note: -1 to indicate that we do not care about the type of packet (if that ever happens)
-          if (responseType != -1 || responseType != expectedType) {
+          if (expectedType != -1 && responseType != expectedType) {
             std::cout << "GetStreamPacket. Returning due to unexpected type obtained (received = " << responseType << ", expected = " << expectedType << ")" << std::endl;
             break;
           }
@@ -422,33 +419,35 @@ void P4RuntimeClient::CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse
   }
 }
 
-void P4RuntimeClient::PrintP4Info(std::string binaryCfg_, ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
-  std::cout << "PrintP4Info." << std::endl;
-  std::cout << "Arch: " << p4Info_.pkg_info().arch() << std::endl;
-  std::cout << "Table size: " << p4Info_.tables_size() << std::endl;
-  std::string tableName;
-  for (::p4::config::v1::Table table : p4Info_.tables()) {
-    tableName = table.preamble().name();
-    std::cout << "Table name: " << tableName << std::endl;
-    std::cout << "Table id: " << table.preamble().id() << std::endl;
-    for (::p4::config::v1::MatchField matchField : table.match_fields()) {
-      std::cout << "\tMatch name (table=" << tableName << "): " << table.preamble().name() << std::endl;
-      std::cout << "\tMatch type (table=" << tableName << "): " << table.preamble().GetTypeName() << std::endl;
-    }
-    for (::p4::config::v1::ActionRef actionRef : table.action_refs()) {
-      std::cout << "\tAction ref. id (table=" << tableName << "): " << actionRef.id() << std::endl;
-    }
+void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
+  std::cout << "Printing P4Info\n" << std::endl;
+  int tableSize = p4Info_.tables_size();
+  std::cout << "Number of tables: " << tableSize << std::endl;
+  if (tableSize == 0) {
+    return;
   }
-  std::string actionName;
-  for (::p4::config::v1::Action action : p4Info_.actions()) {
-    actionName = action.preamble().name();
-    std::cout << "Action name: " << actionName << std::endl;
-    std::cout << "Action id: " << action.preamble().id() << std::endl;
-
-    for (p4::config::v1::Action_Param param : action.params()) {
-      std::cout << "\tAction param name (action=" << actionName << "): " << param.name() << std::endl;
-      std::cout << "\tAction param id (action=" << actionName << "): " << param.id() << std::endl;
-      std::cout << "\tAction param bitwidth (action=" << actionName << "): " << param.bitwidth() << std::endl;
+  std::cout << "Arch: " << p4Info_.pkg_info().arch() << std::endl;
+  for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
+    std::cout << "  Table id: " << table.preamble().id() << std::endl;
+    std::cout << "  Table name: " << table.preamble().name() << std::endl;
+    for (::P4_CONFIG_NAMESPACE_ID::MatchField matchField : table.match_fields()) {
+      std::cout << "    Match id: " << matchField.id() << std::endl;
+      std::cout << "    Match name: " << matchField.name() << std::endl;
+      std::cout << "    Match type: " << matchField.match_type() << std::endl;
+      std::cout << "    Match case: " << matchField.match_case() << std::endl;
+    }
+    for (::P4_CONFIG_NAMESPACE_ID::ActionRef actionRef : table.action_refs()) {
+      for (::P4_CONFIG_NAMESPACE_ID::Action action : p4Info_.actions()) {
+        if (actionRef.id() == action.preamble().id()) {
+          std::cout << "    Action id: " << action.preamble().id() << std::endl;
+          std::cout << "    Action name: " << action.preamble().name() << std::endl;
+          for (::P4_CONFIG_NAMESPACE_ID::Action_Param param : action.params()) {
+            std::cout << "      Action param id: " << param.id() << std::endl;
+            std::cout << "      Action param name: " << param.name() << std::endl;
+            std::cout << "      Action param bitwidth: " << param.bitwidth() << std::endl;
+          }
+        }
+      }
     }
   }
 }

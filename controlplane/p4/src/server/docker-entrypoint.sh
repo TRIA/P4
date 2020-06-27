@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Copy class with debug options for bmv2 model
+# Copy class with debug options for logic being served
 cp -p /p4_service.cc /stratum/stratum/hal/lib/common/
+# Copy class with debug options for bmv2 handler
+cp -p /bmv2_switch.cc /stratum/stratum/hal/lib/bmv2/
+
 # Copy chassis configuration for bmv2 model
 cp -p /stratum/stratum/hal/bin/bmv2/dummy.json /stratum/bazel-bin/stratum/hal/bin/bmv2/
 

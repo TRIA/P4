@@ -25,7 +25,7 @@ class P4RuntimeClient {
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
     ::GRPC_NAMESPACE_ID::Status Write(::P4_NAMESPACE_ID::WriteRequest* request);
     ::GRPC_NAMESPACE_ID::Status WriteUpdate(::P4_NAMESPACE_ID::WriteRequest* update);
-    ::P4_NAMESPACE_ID::ReadResponse ReadOne();
+    ::P4_NAMESPACE_ID::ReadResponse ReadOne(::P4_NAMESPACE_ID::ReadRequest* request);
     std::string APIVersion();
 
     // Ancillary methods
@@ -69,7 +69,7 @@ class P4RuntimeClient {
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
 
-    void PrintP4Info(std::string binaryCfg_, ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
+    void PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
     void HandleException(const char* errorMessage);
     void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 
