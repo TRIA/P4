@@ -22,8 +22,8 @@ job_cp_test:
   script:
     - sudo -S su
     - cd controlplane/p4
-    - make edf-cp-test-mock
-    - cat test/edf-cp-server-mock.log
+    - make edf-cp-test
+    - cat test/edf-dp-server.log
     - cat test/edf-cp-client.log
   dependencies:
     - job_efcp_build

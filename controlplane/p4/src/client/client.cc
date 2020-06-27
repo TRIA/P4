@@ -74,20 +74,9 @@ P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
-  request.set_action(request.VERIFY_AND_COMMIT);
   request.set_device_id(deviceId_);
-  std::cout << "SetFwdPipeConfig. election_id (content - low) = " << electionId_->low() << std::endl;
-  // NOTE: this is probably feeding something that is not proper
-  // This provides "Warning: obtained error=3" (INVALID_ARGUMENT)
-  // SetElectionId(request.mutable_election_id());
-  // TEST - REMOVE later
-  // This should be already in the request (when queuing system is properly working?). No need to add manually
   request.set_allocated_election_id(electionId_);
-  // std::cout << "request.mutable_election_id (address) = " << request.mutable_election_id() << std::endl;
-  // std::cout << "request.mutable_election_id (address) - high = " << request.mutable_election_id()->high() << std::endl;
-  // std::cout << "request.mutable_election_id (address) - low = " << request.mutable_election_id()->low() << std::endl;
-  // // std::cout << "request.mutable_election_id (content - high) = " << (*request.mutable_election_id()).high() << std::endl;
-  // // std::cout << "request.mutable_election_id (content - low) = " << (*request.mutable_election_id()).low() << std::endl;
+  request.set_action(request.VERIFY_AND_COMMIT);
 
   std::ifstream p4InfoFileIfStream("./" + p4InfoPath_);
   if (!p4InfoFileIfStream.is_open()) {
@@ -139,25 +128,23 @@ P4Info P4RuntimeClient::GetP4Info() {
   const std::string errorMessage = "Cannot get configuration from the forwarding pipeline";
   Status status = stub_->GetForwardingPipelineConfig(&context, request, &response);
   HandleStatus(status, errorMessage.c_str());
-  return response.config().p4info();
+  P4Info p4Info = response.config().p4info();
+  PrintP4Info("", p4Info);
+  return p4Info;
 }
 
 // TODO: validate
 Status P4RuntimeClient::WriteInternal(WriteRequest* request) {
   request->set_device_id(deviceId_);
-  deviceId_ = request->device_id();
-  // TODO: uncomment and check how this is working
-  // SetElectionId(request->mutable_election_id());
-  // // request->set_allocated_election_id(electionId_);
+  request->mutable_election_id()->set_high(electionId_->high());
+  request->mutable_election_id()->set_low(electionId_->low());
 
   WriteResponse response = WriteResponse();
   ClientContext context;
   const std::string errorMessage = "Cannot issue the Write command";
-  std::cout << "\n" << "WriteInternal. Trace 1" << std::endl;
   Status status = stub_->Write(&context, *request, &response);
-  std::cout << "\n" << "WriteInternal. Trace 2" << std::endl;
   HandleStatus(status, errorMessage.c_str());
-  std::cout << "\n" << "WriteInternal. Trace 3" << std::endl;
+  std::cout << "\n" << "WriteInternal. END" << std::endl;
   return status;
 }
 
@@ -432,6 +419,37 @@ void P4RuntimeClient::CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse
     case ::P4_NAMESPACE_ID::StreamMessageRequest::UPDATE_NOT_SET:
       std::cout << "GetStreamPacket. Is a digest" << std::endl;
       break;
+  }
+}
+
+void P4RuntimeClient::PrintP4Info(std::string binaryCfg_, ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
+  std::cout << "PrintP4Info." << std::endl;
+  std::cout << "Arch: " << p4Info_.pkg_info().arch() << std::endl;
+  std::cout << "Table size: " << p4Info_.tables_size() << std::endl;
+  std::string tableName;
+  for (::p4::config::v1::Table table : p4Info_.tables()) {
+    tableName = table.preamble().name();
+    std::cout << "Table name: " << tableName << std::endl;
+    std::cout << "Table id: " << table.preamble().id() << std::endl;
+    for (::p4::config::v1::MatchField matchField : table.match_fields()) {
+      std::cout << "\tMatch name (table=" << tableName << "): " << table.preamble().name() << std::endl;
+      std::cout << "\tMatch type (table=" << tableName << "): " << table.preamble().GetTypeName() << std::endl;
+    }
+    for (::p4::config::v1::ActionRef actionRef : table.action_refs()) {
+      std::cout << "\tAction ref. id (table=" << tableName << "): " << actionRef.id() << std::endl;
+    }
+  }
+  std::string actionName;
+  for (::p4::config::v1::Action action : p4Info_.actions()) {
+    actionName = action.preamble().name();
+    std::cout << "Action name: " << actionName << std::endl;
+    std::cout << "Action id: " << action.preamble().id() << std::endl;
+
+    for (p4::config::v1::Action_Param param : action.params()) {
+      std::cout << "\tAction param name (action=" << actionName << "): " << param.name() << std::endl;
+      std::cout << "\tAction param id (action=" << actionName << "): " << param.id() << std::endl;
+      std::cout << "\tAction param bitwidth (action=" << actionName << "): " << param.bitwidth() << std::endl;
+    }
   }
 }
 

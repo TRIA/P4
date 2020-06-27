@@ -40,7 +40,7 @@ make edf-dp-mininet-start
 Similar to option 1, but the bmv2 model runs directly from the Stratum source. The process will run on address `0.0.0.0:28000`.
 
 ```bash
-make edf-cp-server-start
+make edf-dp-server-start
 ```
 
 #### Option 3: mocked server
@@ -51,8 +51,8 @@ Run the following in a new terminal to attach to the container created in "Contr
 ```bash
 make edf-cp-client-attach
 cd p4
-make edf-cp-server-mock
-./bin/edf-cp-server-mock
+make edf-dp-server-mock
+./bin/edf-dp-server-mock
 ```
 
 ### Control plane client
@@ -70,7 +70,7 @@ make edf-cp-client
 # Option 1 for data plane server
 ./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
-./bin/edf-cp-client --grpc-addr=edf-cp-server:28000 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=edf-dp-server:28000 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 # Option 3 for data plane server
 ./bin/edf-cp-client --grpc-addr=localhost:50051 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 ```

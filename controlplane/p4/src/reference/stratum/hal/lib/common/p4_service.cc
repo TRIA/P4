@@ -28,17 +28,16 @@
 #include "stratum/glue/gtl/cleanup.h"
 #include "stratum/glue/gtl/map_util.h"
 
-DEFINE_string(forwarding_pipeline_configs_file, "",
+DEFINE_string(forwarding_pipeline_configs_file,
+              "/var/run/stratum/pipeline_cfg.pb.txt",
               "The latest set of verified ForwardingPipelineConfig protos "
               "pushed to the switch. This file is updated whenever "
               "ForwardingPipelineConfig proto for switching node is added or "
-              "modified. Default is empty and it is expected to be explicitly "
-              "given by flags.");
-DEFINE_string(write_req_log_file, "",
+              "modified.");
+DEFINE_string(write_req_log_file, "/var/log/stratum/p4_writes.pb.txt",
               "The log file for all the individual write request updates and "
               "the corresponding result. The format for each line is: "
-              "<timestamp>;<node_id>;<update proto>;<status>.  Default is "
-              "empty and it is expected to be explicitly given by flags.");
+              "<timestamp>;<node_id>;<update proto>;<status>.");
 DEFINE_int32(max_num_controllers_per_node, 5,
              "Max number of controllers that can manage a node.");
 DEFINE_int32(max_num_controller_connections, 20,
@@ -388,7 +387,6 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
         ::grpc::StatusCode::INVALID_ARGUMENT,
         absl::StrCat("Invalid election ID for node ", node_id, "."));
   }
-
   // BEGIN test Carolina
   std::cout << "SetForwardingPipelineConfig -> after node_id and election_id" << std::endl;
   // END test Carolina
@@ -534,9 +532,9 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
         absl::StrCat("Failed to set forwarding pipeline config for node ",
                      node_id, ": "),
         GTL_LOC);
-      // BEGIN test Carolina
-      std::cout << "SetForwardingPipelineConfig -> trace 13." << std::endl;
-      // END test Carolina
+    // BEGIN test Carolina
+    std::cout << "SetForwardingPipelineConfig -> trace 13." << std::endl;
+    // END test Carolina
     return ::grpc::Status(ToGrpcCode(status.CanonicalCode()),
                           status.error_message());
   }
@@ -544,7 +542,6 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
   // BEGIN test Carolina
   std::cout << "SetForwardingPipelineConfig -> trace 14." << std::endl;
   // END test Carolina
-
   return ::grpc::Status::OK;
 }
 
@@ -610,8 +607,10 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
 
 ::grpc::Status P4Service::StreamChannel(
     ::grpc::ServerContext* context, ServerStreamChannelReaderWriter* stream) {
+  std::cout << "StreamChannel before auth" << std::endl;
   RETURN_IF_NOT_AUTHORIZED(auth_policy_checker_, P4Service, StreamChannel,
                            context);
+  std::cout << "StreamChannel after auth" << std::endl;
 
   // Here are the rules:
   // 1- When a client (aka controller) connects for the first time, we do not do
@@ -623,11 +622,13 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
 
   // First thing to do is to find a new ID for this connection.
   auto ret = FindNewConnectionId();
+  std::cout << "StreamChannel ret is OK = " << ret.ok() << std::endl;
   if (!ret.ok()) {
     return ::grpc::Status(ToGrpcCode(ret.status().CanonicalCode()),
                           ret.status().error_message());
   }
   uint64 connection_id = ret.ValueOrDie();
+  std::cout << "StreamChannel connection_id = " << connection_id << std::endl;
 
   // The ID of the node this stream channel corresponds to. This is MUST NOT
   // change after it is set for the first time.
@@ -637,16 +638,19 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
   auto cleaner = gtl::MakeCleanup([this, &node_id, &connection_id]() {
     this->RemoveController(node_id, connection_id);
   });
-
   std::cout << "StreamChannel" << std::endl;
 
   ::p4::v1::StreamMessageRequest req;
   while (stream->Read(&req)) {
+    std::cout << "StreamChannel reading request = " << req.SerializeAsString() << std::endl;
     switch (req.update_case()) {
       case ::p4::v1::StreamMessageRequest::kArbitration: {
+        std::cout << "StreamChannel > is arbitration message? = " << req.has_arbitration() << std::endl;
+        std::cout << "StreamChannel > arbitration message = " << req.arbitration().SerializeAsString() << std::endl;
         std::cout << "StreamChannel > device_id = " << req.arbitration().device_id() << std::endl;
         std::cout << "StreamChannel > node_id = " << node_id << std::endl;
         if (req.arbitration().device_id() == 0) {
+          std::cout << "StreamChannel > bad device Id = " << req.arbitration().device_id() << std::endl;
           return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                                 "Invalid node (aka device) ID.");
         } else if (node_id == 0) {
@@ -655,6 +659,7 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
           std::stringstream ss;
           ss << "Node (aka device) ID for this stream has changed. Was "
              << node_id << ", now is " << req.arbitration().device_id() << ".";
+          std::cout << "StreamChannel > bad device Id = " << req.arbitration().device_id() << " != " << node_id << std::endl;
           return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, ss.str());
         }
         absl::uint128 election_id =
@@ -671,13 +676,14 @@ void printForwardingPipelineInfo(std::string binaryCfg_, p4::config::v1::P4Info 
         auto status = AddOrModifyController(node_id, connection_id, election_id,
                                             context->peer(), stream);
         if (!status.ok()) {
+          std::cout << "StreamChannel > Not adding the controller properly..." << ToGrpcCode(status.CanonicalCode()), status.error_message() << std::endl;
           return ::grpc::Status(ToGrpcCode(status.CanonicalCode()),
                                 status.error_message());
         }
         break;
       }
-      std::cout << "StreamChannel > IsMasterController (true=master, false=slave) = " << IsMasterController(node_id, connection_id) << std::endl;
       case ::p4::v1::StreamMessageRequest::kPacket: {
+        std::cout << "StreamChannel > IsMasterController (true=master, false=slave) = " << IsMasterController(node_id, connection_id) << std::endl;
         // If this stream is not the master stream do not do anything.
         if (!IsMasterController(node_id, connection_id)) break;
         // If master, try to transmit the packet. No error reporting.
@@ -920,6 +926,8 @@ bool P4Service::IsWritePermitted(uint64 node_id, absl::uint128 election_id,
     std::cout << "IsWritePermitted -> size / list controllers = " << entry.second.size() << std::endl;
   }
   std::cout << "IsWritePermitted -> 2" << std::endl;
+  std::cout << "IsWritePermitted -> 2 (wrong condition 1 > ) = it == node_id_to_controllers_.end() = " << (it == node_id_to_controllers_.end()) << std::endl;
+  std::cout << "IsWritePermitted -> 2 (wrong condition 2 > ) = it->second.empty() = " << it->second.empty() << std::endl;
   if (it == node_id_to_controllers_.end() || it->second.empty()) {
     std::cout << "IsWritePermitted -> 2a (wrong condition)" << std::endl;
     // std::cout << "IsWritePermitted -> it = " << it._M_node << std::endl;

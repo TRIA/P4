@@ -6,7 +6,6 @@
 #include "../common/ns_def.inc"
 
 using ::GRPC_NAMESPACE_ID::Status;
-using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 
 int is_substring_of(std::string substring, std::string string) {
   size_t position_start = string.find(substring);
@@ -90,20 +89,19 @@ int main(int argc, char** argv) {
   P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
   Status status;
 
+  std::cout << "-------------- GetP4Info before pushing pipeline --------------" << std::endl;
+  p4RuntimeClient.GetP4Info();
+
   std::cout << "-------------- SetFwdPipeConfig --------------" << std::endl;
   status = p4RuntimeClient.SetFwdPipeConfig();
   handle_status(status);
 
-  std::cout << "-------------- GetP4Info --------------" << std::endl;
-  P4Info p4Info = p4RuntimeClient.GetP4Info();
-  if (p4Info.ByteSizeLong() > 0) {
-    std::cout << "Number of tables: " << p4Info.tables_size() << std::endl;
-    std::cout << "Number of action profiles: " << p4Info.action_profiles_size() << std::endl;
-    std::cout << "Number of actions: " << p4Info.actions_size() << std::endl;
-  }
+  std::cout << "-------------- GetP4Info after pushing pipeline --------------" << std::endl;
+  p4RuntimeClient.GetP4Info();
 
   std::cout << "-------------- Write --------------" << std::endl;
   ::P4_NAMESPACE_ID::WriteRequest writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
+  // writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
   status = p4RuntimeClient.Write(&writeRequest);
   handle_status(status);
 
