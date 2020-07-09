@@ -1,6 +1,6 @@
 # Transient files
 *.swp
-dataplane/p4/env/tmp
+dataplane/p4/env/mininet/tmp
 dataplane/p4/model/build
 
 # Logs

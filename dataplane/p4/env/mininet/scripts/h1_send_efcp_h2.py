@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
 import argparse
-import sys
-import socket
-import random
-import struct
-import re
-import pduTypes
 import binascii
-
-from scapy.all import *
-
+import struct
+import pdu_types
+import random
+import re
 import readline
+import socket
+import sys
+from scapy.all import Packet, XByteField, ShortField, XShortField, IntField,\
+        bind_layers, Ether, get_if_hwaddr, sendp, checksum, hexdump
 from time import sleep
 
 class EFCP(Packet):
@@ -19,8 +18,8 @@ class EFCP(Packet):
 
     # XByteField --> 1 Byte-integer (X bc the representation of the fields
     #                               value is in hexadecimal)
-    #ShortField --> 2 Byte-integer
-    #IntEnumField --> 4 Byte-integer
+    # ShortField --> 2 Byte-integer
+    # IntEnumField --> 4 Byte-integer
 
     # EFCP PDU
     #   bytes 1-1 [0:0] = version
@@ -72,25 +71,24 @@ def get_if(if_name = "eth0"):
             iface = i
             break;
     if not iface:
-        print "Cannot find %s interface" % str(if_name)
+        print("Cannot find %s interface" % str(if_name))
         exit(1)
     return iface
 
 def main():
     iface = get_if()
     try:
-        pkt = Ether(src=get_if_hwaddr(iface), dst="08:00:00:00:02:22", type=0xD1F) / EFCP(dst_addr=2, pdu_type=pduTypes.DATA_TRANSFER)
-        #pkt = Ether(src=get_if_hwaddr(iface), dst="08:00:00:00:02:22", type=0xD1F) / EFCP(version=0x01, src_addr=1, qos_id=0x00, dst_cepid=2, src_cepid=1, flags=0x00, length=32, seqnum=0, chksum=0x00, dst_addr=2, pdu_type=pduTypes.DATA_TRANSFER)
+        pkt = Ether(src=get_if_hwaddr(iface), dst="00:00:00:00:00:02", type=0xD1F) / EFCP(dst_addr=2, pdu_type=pdu_types.DATA_TRANSFER)
         pkt = pkt / "Hello World!"
         #srp1(pkt, iface=iface, timeout=1, verbose=True)
         sendp(pkt, iface=iface, verbose=False)
         pkt.show()
-        print "Hex dump for whole packet:"
+        print("Hex dump for whole packet:")
         hexdump(pkt)
-        print "Hex dump for EFCP:"
+        print("Hex dump for EFCP:")
         hexdump(pkt["EFCP"])
     except Exception as error:
-        print error
+        print(error)
 
 if __name__ == "__main__":
     main()
