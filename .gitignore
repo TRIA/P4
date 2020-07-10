@@ -1,3 +1,22 @@
-*.pyc
+# Transient files
 *.swp
-bmodel.log
+dataplane/p4/env/mininet/tmp
+dataplane/p4/model/build
+
+# Logs
+*.log
+
+# Python generated classes
+*.pyc
+
+# IDE
+.vscode/
+*.code-workspace
+
+# C++ generated classes
+*.o
+controlplane/cfg
+controlplane/p4/bin/edf-cp-client
+controlplane/p4/bin/edf-dp-server
+controlplane/p4/src/**/grpc_out*
+controlplane/p4/src/server/stratum

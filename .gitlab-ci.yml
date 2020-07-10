@@ -1,7 +1,18 @@
-job_npl_bmodel:
+stages:
+  - build
+
+#job_npl_bmodel:
+#  script:
+#    - sudo -S su
+#    - cd dataplane/npl/bmodel/efcp_router
+#    - make build
+#    - make test
+#  tags: [npl_bmodel]
+
+job_efcp_build:
   script:
-    - sudo -S su
-    - cd dataplane/bmodel/efcp_router
-    - make build
-    - make test
+    - cd dataplane/p4
+    - make efcp-build
+#  tags: [build]
+  stage: build
   tags: [npl_bmodel]
