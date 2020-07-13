@@ -29,7 +29,7 @@ using ::P4_NAMESPACE_ID::P4Runtime;
 // Channel
 using ::GRPC_NAMESPACE_ID::CreateChannel;
 using ::GRPC_NAMESPACE_ID::InsecureChannelCredentials;
-// Data structures
+// iata structures
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 using ::P4_NAMESPACE_ID::CapabilitiesRequest;
 using ::P4_NAMESPACE_ID::CapabilitiesResponse;
@@ -132,54 +132,84 @@ P4Info P4RuntimeClient::GetP4Info() {
   return p4Info;
 }
 
-// TODO: finalise, then validate
-Status P4RuntimeClient::WriteInternal(WriteRequest* request) {
-  request->set_device_id(deviceId_);
-  request->mutable_election_id()->set_high(electionId_->high());
-  request->mutable_election_id()->set_low(electionId_->low());
+Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool update) {
+  ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
+  std::list<P4TableEntry*>::iterator it;
+  std::list<P4Parameter>::iterator param_it;
+  P4TableEntry * entry;
+  int iteration=0;
+
+  if (update) {
+    request.add_updates()->set_type(::P4_NAMESPACE_ID::Update::MODIFY);
+  } else {
+    request.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
+  }
+
+  for (it=entries.begin(); it!=entries.end(); ++it) {
+    entry = *it;
+
+    ::P4_NAMESPACE_ID::Entity * p4Entity = new ::P4_NAMESPACE_ID::Entity();
+    p4Entity->mutable_table_entry()->set_table_id(entry->table_id);
+    ::P4_NAMESPACE_ID::TableAction * p4EntityTableAction = new ::P4_NAMESPACE_ID::TableAction();
+    ::P4_NAMESPACE_ID::Action * p4EntityAction = new ::P4_NAMESPACE_ID::Action();
+    p4EntityAction->set_action_id(entry->action.action_id);
+    
+    for (param_it=entry->action.parameters.begin(); param_it!=entry->action.parameters.end(); ++param_it) {
+      p4EntityAction->add_params()->set_param_id(param_it->id);
+      p4EntityAction->mutable_params(param_it->id - 1)->set_value(param_it->value);
+    }
+
+    p4EntityTableAction->set_allocated_action(p4EntityAction);
+    p4Entity->mutable_table_entry()->set_allocated_action(p4EntityTableAction);
+    request.mutable_updates(iteration)->set_allocated_entity(p4Entity);
+    iteration++;
+  }
+
+  request.set_device_id(deviceId_);
+  request.mutable_election_id()->set_high(electionId_->high());
+  request.mutable_election_id()->set_low(electionId_->low());
 
   WriteResponse response = WriteResponse();
   ClientContext context;
-  const std::string errorMessage = "Cannot issue the Write command";
-  Status status = stub_->Write(&context, *request, &response);
+  const std::string errorMessage = "Error executing Write command";
+  Status status = stub_->Write(&context, request, &response);
   HandleStatus(status, errorMessage.c_str());
   return status;
 }
 
-// See reference/p4runtime-shell-python/p4runtime.py#write
-Status P4RuntimeClient::Write(WriteRequest* request) {
-  std::cout << "\n" << "Submitting write request" << std::endl;
-  return WriteInternal(request);
-}
-
-// See reference/p4runtime-shell-python/p4runtime.py#write_update
-// TODO: validate
-Status P4RuntimeClient::WriteUpdate(WriteRequest* update) {
-  std::cout << "\n" << "Submitting write-update request" << std::endl;
-  WriteRequest* request = WriteRequest().New();
-  // Extend request.updates with the new update object provided
-  for (Update singleUpdate : *(update->mutable_updates())) {
-    // Note: add already allocated objects in memory. Might use "Add" instead
-    request->mutable_updates()->AddAllocated(&singleUpdate);
-  }
-  return WriteInternal(request);
-}
-
-// See reference/p4runtime-shell-python/p4runtime.py#read_one
-// TODO: validate
-ReadResponse P4RuntimeClient::ReadOne(ReadRequest* request) {
-  std::cout << "\n" << "Submitting single read request" << std::endl;
-  request->set_device_id(deviceId_);
-  for (Entity singleEntity : *request->mutable_entities()) {
-    // Note: add already allocated objects in memory. Might use "Add" instead
-    request->mutable_entities()->AddAllocated(&singleEntity);
-  }
+std::list<P4TableEntry*> P4RuntimeClient::Read(std::list<P4TableEntry*> filter) {
+  std::list<P4TableEntry*>::iterator it;
+  std::list<P4TableEntry*> result;
+  P4TableEntry * entry;
+  ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
   ClientContext context;
+ 
+  request.set_device_id(deviceId_); 
+  for(it=filter.begin(); it!=filter.end(); ++it){
+    entry = *it;
+
+    ::P4_NAMESPACE_ID::Action *p4EntityAction = new ::P4_NAMESPACE_ID::Action();
+    p4EntityAction->set_action_id(entry->action.action_id);
+    ::P4_NAMESPACE_ID::TableAction * p4EntityTableAction = new ::P4_NAMESPACE_ID::TableAction();
+    p4EntityTableAction->set_allocated_action(p4EntityAction);
+    ::P4_NAMESPACE_ID::TableEntry * p4EntityTableEntry = new ::P4_NAMESPACE_ID::TableEntry();
+    p4EntityTableEntry->set_table_id(entry->table_id);
+    p4EntityTableEntry->mutable_action()->set_allocated_action(p4EntityAction);
+    request.add_entities()->set_allocated_table_entry(p4EntityTableEntry);
+  }
+
   ReadResponse response = ReadResponse();
-  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, *request);
+  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
   clientReader->Read(&response);
   clientReader->Finish();
-  return response;
+
+  for(int i=0; i<response.entities_size(); i++) {
+    entry = new P4TableEntry();
+    entry->table_id = response.entities().Get(i).table_entry().table_id();
+    result.push_back(entry);
+  }
+
+  return result;  
 }
 
 // See reference/p4runtime-shell-python/p4runtime.py#api_version

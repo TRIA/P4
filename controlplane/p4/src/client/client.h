@@ -11,6 +11,21 @@
 // Import declarations after any other
 #include "../common/ns_def.inc"
 
+struct P4Parameter {
+  int id;
+  std::string value;
+};
+
+struct P4Action {
+  uint action_id;
+  std::list<P4Parameter> parameters;
+};
+
+struct P4TableEntry {
+  uint table_id;
+  P4Action action;
+}; 
+
 class P4RuntimeClient {
 
   public:
@@ -23,9 +38,8 @@ class P4RuntimeClient {
     // RPC methods
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
-    ::GRPC_NAMESPACE_ID::Status Write(::P4_NAMESPACE_ID::WriteRequest* request);
-    ::GRPC_NAMESPACE_ID::Status WriteUpdate(::P4_NAMESPACE_ID::WriteRequest* update);
-    ::P4_NAMESPACE_ID::ReadResponse ReadOne(::P4_NAMESPACE_ID::ReadRequest* request);
+    ::GRPC_NAMESPACE_ID::Status Write(std::list<P4TableEntry*> entries, bool update);
+    std::list<P4TableEntry*> Read(std::list<P4TableEntry*> query);
     std::string APIVersion();
 
     // Ancillary methods

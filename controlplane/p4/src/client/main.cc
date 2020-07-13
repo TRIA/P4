@@ -108,67 +108,37 @@ int main(int argc, char** argv) {
   p4RuntimeClient.GetP4Info();
 
   std::cout << "\n-------------- Write --------------" << std::endl;
-  ::P4_NAMESPACE_ID::WriteRequest writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
-  writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
-  ::P4_NAMESPACE_ID::Entity p4Entity = ::P4_NAMESPACE_ID::Entity();
-  ::PROTOBUF_NAMESPACE_ID::uint32 idTableIpV4Lpm = 33574068;
-  ::PROTOBUF_NAMESPACE_ID::uint32 idActionNoDrop = 16805608;
-  ::PROTOBUF_NAMESPACE_ID::uint32 idActionIpV4Forward = 16799317;
-  p4Entity.mutable_table_entry()->set_table_id(idTableIpV4Lpm);
-  ::P4_NAMESPACE_ID::Action p4EntityAction = ::P4_NAMESPACE_ID::Action();
-  ::P4_NAMESPACE_ID::TableAction p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
+  std::list<P4TableEntry *> entries;
+  P4TableEntry entry;
+  P4Parameter param;
+
   // Step 1: insert a new entry with action "MyIngress.NoDrop"
-  p4EntityAction.set_action_id(idActionNoDrop);
-  p4EntityTableAction.set_allocated_action(&p4EntityAction);
-  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
-  writeRequest.mutable_updates(0)->set_allocated_entity(&p4Entity);
-  status = p4RuntimeClient.Write(&writeRequest);
+  entry.table_id = 33574068;
+  entry.action.action_id = 16805608;
+  entries.push_back(&entry);
+  status = p4RuntimeClient.Write(entries, false);
   handle_status(status);
+
   // Step 2: insert a new entry with action "MyIngress.ipv4_forward"
-  p4EntityAction = ::P4_NAMESPACE_ID::Action();
-  p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
-  p4EntityAction.set_action_id(idActionIpV4Forward);
-  p4EntityAction.add_params()->set_param_id(1);
-  p4EntityAction.mutable_params(0)->set_value("00:00:00:00:00:02");
-  p4EntityAction.add_params()->set_param_id(2);
-  // p4EntityAction.mutable_params(1)->set_value("000000001");
-  p4EntityAction.mutable_params(1)->set_value("000000002");
-  // FIXME: double free error affects the rest
-  p4EntityTableAction.set_allocated_action(&p4EntityAction);
-  p4Entity = ::P4_NAMESPACE_ID::Entity();
-  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
-  writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
-  writeRequest.mutable_updates(0)->set_allocated_entity(&p4Entity);
-  status = p4RuntimeClient.Write(&writeRequest);
+  entry.action.action_id = 16799317;
+  param.id = 1;
+  param.value = "00:00:00:00:00:02";
+  entry.action.parameters.push_back(param);
+  status = p4RuntimeClient.Write(entries, false);
   handle_status(status);
-
+  
   std::cout << "\n-------------- WriteUpdate --------------" << std::endl;
-  // writeRequest = ::P4_NAMESPACE_ID::WriteRequest();
-  writeRequest.add_updates()->set_type(::P4_NAMESPACE_ID::Update::MODIFY);
-  writeRequest.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-    mutable_action()->mutable_params(1)->set_value("000000001");
-  status = p4RuntimeClient.WriteUpdate(&writeRequest);
+  entry.action.parameters.clear();
+  param.id = 1;
+  param.value = "00:00:00:00:00:01";
+  entry.action.parameters.push_back(param);
+  status = p4RuntimeClient.Write(entries, true);
   handle_status(status);
 
-  std::cout << "\n-------------- ReadOne --------------" << std::endl;
-  ::P4_NAMESPACE_ID::ReadRequest readRequest = ::P4_NAMESPACE_ID::ReadRequest();
-  // p4Entity = ::P4_NAMESPACE_ID::Entity();
-  readRequest.add_entities()->mutable_table_entry()->set_table_id(idTableIpV4Lpm);
-  // TODO: readRequest is missing a correct entity type. How to add?
-  p4EntityAction = ::P4_NAMESPACE_ID::Action();
-  p4EntityTableAction = ::P4_NAMESPACE_ID::TableAction();
-  p4EntityAction.set_action_id(idActionNoDrop);
-  p4EntityTableAction.set_allocated_action(&p4EntityAction);
-  ::P4_NAMESPACE_ID::TableEntry p4EntityTableEntry = ::P4_NAMESPACE_ID::TableEntry();
-  p4EntityTableEntry.mutable_action()->set_allocated_action(&p4EntityAction);
-  p4EntityTableEntry.set_table_id(idTableIpV4Lpm);
-  // // FIXME: invalid pointer error affects the rest
-  p4EntityTableEntry.set_allocated_action(&p4EntityTableAction);
-  p4Entity.mutable_table_entry()->set_allocated_action(&p4EntityTableAction);
-  readRequest.mutable_entities(0)->set_allocated_table_entry(&p4EntityTableEntry);
-  ::P4_NAMESPACE_ID::ReadResponse readResponse = p4RuntimeClient.ReadOne(&readRequest);
-  if (readResponse.entities_size() > 0) {
-    std::cout << "Success: retrieved entry for table id=" << readResponse.entities().Get(0).table_entry().table_id() << std::endl;
+  std::cout << "\n-------------- Read --------------" << std::endl;
+  std::list<P4TableEntry *> result = p4RuntimeClient.Read(entries);
+  if (result.size() > 0) {
+    std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
   } else {
     std::cerr << "Warning: no entry retrieved" << std::endl;
   }
