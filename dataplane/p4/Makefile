@@ -51,9 +51,10 @@ efcp-build: model/efcp.p4
 		model/efcp.p4
 	@echo "*** P4 program compiled successfully! Output files are in model/build"
 
-mn-single-start: docker_net_create
+mn-start: docker_net_create
 	docker run --privileged --rm -it -v /tmp/${MN_STR_NAME}:/tmp -p50001-50030:50001-50030 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} opennetworking/${MN_STR_NAME}
+#	-xhost +si:localuser:root
 
-mn-single-stop:
-	docker rm -f ${MN_STR_NAME}
+mn-stop:
+	docker rm -f ${MN_STR_NAME} || true
 	@make docker_net_rm

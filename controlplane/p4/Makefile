@@ -197,11 +197,11 @@ edf-cp-test-mock: edf-cp-client-build edf-cp-docker-net-create
 	sudo chown ${USER}:${USER} -R ${GRPC_BUILDDIR}
 	make edf-cp-docker-net-rm
 
-edf-cp-mininet-start: edf-cp-docker-net-create
-	cd ${EDF_DATA_PATH} && make mn-single-start && cd ${CURRENT}
+edf-dp-mininet-start: edf-cp-docker-net-create
+	cd ${EDF_DATA_PATH} && make mn-start && cd ${CURRENT}
 
-edf-cp-mininet-stop:
-	cd ${EDF_DATA_PATH} && make mn-single-stop && cd ${CURRENT}
+edf-dp-mininet-stop:
+	cd ${EDF_DATA_PATH} && make mn-stop && cd ${CURRENT}
 
 # Automated test with the Stratum-enabled bmv2 server
 edf-cp-test-stratum: edf-cp-client-build

@@ -137,7 +137,6 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool update) {
   std::list<P4TableEntry*>::iterator it;
   std::list<P4Parameter>::iterator param_it;
   P4TableEntry * entry;
-  int iteration=0;
 
   if (update) {
     request.add_updates()->set_type(::P4_NAMESPACE_ID::Update::MODIFY);
@@ -145,23 +144,79 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool update) {
     request.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
   }
 
-  for (it=entries.begin(); it!=entries.end(); ++it) {
+  int iteration = 0;
+  for (it = entries.begin(); it != entries.end(); ++it) {
     entry = *it;
 
-    ::P4_NAMESPACE_ID::Entity * p4Entity = new ::P4_NAMESPACE_ID::Entity();
-    p4Entity->mutable_table_entry()->set_table_id(entry->table_id);
-    ::P4_NAMESPACE_ID::TableAction * p4EntityTableAction = new ::P4_NAMESPACE_ID::TableAction();
-    ::P4_NAMESPACE_ID::Action * p4EntityAction = new ::P4_NAMESPACE_ID::Action();
-    p4EntityAction->set_action_id(entry->action.action_id);
+    ::P4_NAMESPACE_ID::Entity * entity = new ::P4_NAMESPACE_ID::Entity();
+    ::P4_NAMESPACE_ID::TableAction * entity_table_action = new ::P4_NAMESPACE_ID::TableAction();
+    ::P4_NAMESPACE_ID::Action * entity_action = new ::P4_NAMESPACE_ID::Action();
+    ::P4_NAMESPACE_ID::FieldMatch_Exact field_match_exact = ::P4_NAMESPACE_ID::FieldMatch_Exact();
+    ::P4_NAMESPACE_ID::FieldMatch_Ternary field_match_ternary = ::P4_NAMESPACE_ID::FieldMatch_Ternary();
+    ::P4_NAMESPACE_ID::FieldMatch_LPM field_match_lpm = ::P4_NAMESPACE_ID::FieldMatch_LPM();
+    ::P4_NAMESPACE_ID::FieldMatch_Range field_match_range = ::P4_NAMESPACE_ID::FieldMatch_Range();
+
+    // Define table and action ID
+    entity->mutable_table_entry()->set_table_id(entry->table_id);
+    entity_action->set_action_id(entry->action.action_id);
     
-    for (param_it=entry->action.parameters.begin(); param_it!=entry->action.parameters.end(); ++param_it) {
-      p4EntityAction->add_params()->set_param_id(param_it->id);
-      p4EntityAction->mutable_params(param_it->id - 1)->set_value(param_it->value);
+    // Insert action parameters
+    for (param_it = entry->action.parameters.begin(); param_it != entry->action.parameters.end(); ++param_it) {
+      entity_action->add_params()->set_param_id(param_it->id);
+      entity_action->mutable_params(param_it->id - 1)->set_value(param_it->value);
     }
 
-    p4EntityTableAction->set_allocated_action(p4EntityAction);
-    p4Entity->mutable_table_entry()->set_allocated_action(p4EntityTableAction);
-    request.mutable_updates(iteration)->set_allocated_entity(p4Entity);
+    // Insert action
+    entity_table_action->set_allocated_action(entity_action);
+    entity->mutable_table_entry()->set_allocated_action(entity_table_action);
+
+    // Insert match (if any). Note: this assumes just one match, but > 1 could be possible
+    if (entry->match.type > 0) {
+      ::P4_NAMESPACE_ID::FieldMatch * entity_table_action_match = entity->mutable_table_entry()->add_match();
+      entity_table_action_match->set_field_id(entry->match.field_id);
+      switch (entry->match.type) {
+        case P4MatchType::exact : {
+          field_match_exact = ::P4_NAMESPACE_ID::FieldMatch_Exact();
+          field_match_exact.set_value(entry->match.value);
+          // p4_entity_table_action_match->set_allocated_exact(&field_match_exact);
+          entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
+          entity->mutable_table_entry()->mutable_match(0)->set_allocated_exact(&field_match_exact);
+          break;
+        }
+        case P4MatchType::ternary : {
+          field_match_ternary = ::P4_NAMESPACE_ID::FieldMatch_Ternary();
+          field_match_ternary.set_value(entry->match.value);
+          field_match_ternary.set_mask(entry->match.ternary_mask);
+          entity_table_action_match->set_allocated_ternary(&field_match_ternary);
+          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
+          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_ternary(&field_match_ternary);
+          break;
+        }
+        case P4MatchType::lpm : {
+          field_match_lpm = ::P4_NAMESPACE_ID::FieldMatch_LPM();
+          field_match_lpm.set_value(entry->match.value);
+          field_match_lpm.set_prefix_len(entry->match.lpm_prefix);
+          entity_table_action_match->set_allocated_lpm(&field_match_lpm);
+          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
+          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_lpm(&field_match_lpm);
+          break;
+        }
+        case P4MatchType::range : {
+          field_match_range = ::P4_NAMESPACE_ID::FieldMatch_Range();
+          field_match_range.set_high(entry->match.range_high);
+          field_match_range.set_high(entry->match.range_low);
+          entity_table_action_match->set_allocated_range(&field_match_range);
+          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
+          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_range(&field_match_range);
+          break;
+        }
+        default:
+          std::cout << "Provided match is not expected" << std::endl;
+      }
+    }
+
+    request.mutable_updates(iteration)->set_allocated_entity(entity);
+
     iteration++;
   }
 
@@ -185,7 +240,7 @@ std::list<P4TableEntry*> P4RuntimeClient::Read(std::list<P4TableEntry*> filter) 
   ClientContext context;
  
   request.set_device_id(deviceId_); 
-  for(it=filter.begin(); it!=filter.end(); ++it){
+  for (it = filter.begin(); it != filter.end(); ++it) {
     entry = *it;
 
     ::P4_NAMESPACE_ID::Action *p4EntityAction = new ::P4_NAMESPACE_ID::Action();
@@ -203,7 +258,7 @@ std::list<P4TableEntry*> P4RuntimeClient::Read(std::list<P4TableEntry*> filter) 
   clientReader->Read(&response);
   clientReader->Finish();
 
-  for(int i=0; i<response.entities_size(); i++) {
+  for (int i = 0; i < response.entities_size(); i++) {
     entry = new P4TableEntry();
     entry->table_id = response.entities().Get(i).table_entry().table_id();
     result.push_back(entry);
@@ -480,6 +535,32 @@ void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
       }
     }
   }
+}
+
+::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4TableIdFromName(
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_, std::string tableName) {
+  for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
+    if (tableName == table.preamble().name()) {
+      return table.preamble().id();
+    }
+  }
+  return -1L;
+}
+
+::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4ActionIdFromName(
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_, std::string tableName, std::string actionName) {
+  for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
+    if (tableName == table.preamble().name()) {
+      for (::P4_CONFIG_NAMESPACE_ID::ActionRef actionRef : table.action_refs()) {
+        for (::P4_CONFIG_NAMESPACE_ID::Action action : p4Info_.actions()) {
+          if (actionName == action.preamble().name()) {
+            return action.preamble().id();
+          }
+        }
+      }
+    }
+  }
+  return -1L;
 }
 
 void P4RuntimeClient::HandleException(const char* errorMessage) {
