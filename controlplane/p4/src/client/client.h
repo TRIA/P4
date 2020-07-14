@@ -22,10 +22,33 @@ struct P4Action {
   std::list<P4Parameter> parameters;
 };
 
+enum P4MatchType {
+  exact = 1,
+  ternary = 2,
+  lpm = 3,
+  range = 4
+};
+
+struct P4Match {
+  uint field_id;
+  P4MatchType type;
+  // Note: bitsring with the minimum size to express the value
+  std::string value;
+  // Only required for LPM
+  // ::PROTOBUF_NAMESPACE_ID::int32 lpm_prefix;
+  int32_t lpm_prefix;
+  // Only required for Ternary
+  std::string ternary_mask;
+  // Required for Range
+  std::string range_low;
+  std::string range_high;
+};
+
 struct P4TableEntry {
   uint table_id;
+  P4Match match;
   P4Action action;
-}; 
+};
 
 class P4RuntimeClient {
 
@@ -47,6 +70,12 @@ class P4RuntimeClient {
     void SetUpStream();
     void TearDown();
 
+    // P4-related methods
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4TableIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
+        std::string tableName);
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4ActionIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
+        std::string tableName, std::string actionName);
+
   private:
 
     // Client definition
@@ -56,9 +85,6 @@ class P4RuntimeClient {
     std::string binaryCfgPath_;
     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId_;
     ::P4_NAMESPACE_ID::Uint128* electionId_;
-
-    // Ancillary for RPC
-    ::GRPC_NAMESPACE_ID::Status WriteInternal(::P4_NAMESPACE_ID::WriteRequest* request);
 
     // Ancillary
     typedef ::GRPC_NAMESPACE_ID::ClientReaderWriter<
@@ -77,9 +103,12 @@ class P4RuntimeClient {
     std::thread streamOutgoingThread_;
     bool outThreadStop_;
 
+    // Ancillary methods
     void Handshake();
     void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);
     void SetElectionId(std::string electionId);
+    void HandleException(const char* errorMessage);
+    void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 
     ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(int expectedType, long timeout);
     void CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse* response);
@@ -88,9 +117,8 @@ class P4RuntimeClient {
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
 
+    // P4-related methods
     void PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
-    void HandleException(const char* errorMessage);
-    void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
 
 };
 
