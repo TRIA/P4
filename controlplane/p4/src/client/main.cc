@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 
   // Instantiate the client. It uses a non-authenticated channel, which models a connection to an endpoint
   // (as specified by the "--target" argument). The actual RPCs are created out of this channel.
-  P4RuntimeClient p4RuntimeClient = P4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
+  P4RuntimeClient p4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
   Status status;
 
   std::cout << "\n-------------- GetP4Info (before pushing pipeline) --------------" << std::endl;

@@ -3,6 +3,7 @@
 
 #include <queue>
 #include <thread>
+#include <mutex>
 
 #include "../common/grpc_out/p4/config/v1/p4info.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
@@ -65,12 +66,16 @@ class P4RuntimeClient {
     typedef ::GRPC_NAMESPACE_ID::ClientAsyncReaderWriter<
       ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamAsyncType_;
 
-    std::deque<::P4_NAMESPACE_ID::StreamMessageResponse*> streamQueueIn_;
-    std::deque<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
+    std::queue<::P4_NAMESPACE_ID::StreamMessageResponse*> streamQueueIn_;
+    std::mutex qInMtx_;
+    std::mutex qOutMtx_;
+    std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
     std::unique_ptr<streamType_> stream_;
     std::unique_ptr<streamAsyncType_> streamAsync_;
     std::thread streamIncomingThread_;
+    bool inThreadStop_;
     std::thread streamOutgoingThread_;
+    bool outThreadStop_;
 
     void Handshake();
     void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);

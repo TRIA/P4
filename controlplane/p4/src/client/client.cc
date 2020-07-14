@@ -235,11 +235,10 @@ std::string P4RuntimeClient::APIVersion() {
 // 3) https://github.com/p4lang/p4runtime/blob/16c55eebd887c949b59d6997bb2d841a59c6bb32/docs/v1/P4Runtime-Spec.mdk#L673 (edited) 
 void P4RuntimeClient::SetUpStream() {
   ClientContext context;
-  // Setup queues
-  std::deque<streamType_> streamQueueIn_();
-  std::deque<streamType_> streamQueueOut_();
   std::cout << "SetUpStream. Setting up stream from channel" << std::endl;
   stream_ = stub_->StreamChannel(&context);
+  inThreadStop_ = false;
+  outThreadStop_ = false;
   // Setup first the never-ending loops that listen to outgoing and incoming messages
   ReadOutgoingMessagesFromQueueInBg();
   ReadIncomingMessagesFromStreamInBg();
@@ -251,8 +250,13 @@ void P4RuntimeClient::SetUpStream() {
 void P4RuntimeClient::TearDown() {
   std::cout << "TearDown. Cleaning up stream, queues, threads and channel" << std::endl;
   // Appending NULL to the queues as an indication to determine that queues operations should finalise
-  streamQueueOut_.push_back(NULL);
-  streamQueueIn_.push_back(NULL);
+  qOutMtx_.lock();
+  outThreadStop_ = true;
+  qOutMtx_.unlock();
+  qInMtx_.lock();
+  inThreadStop_ = true;
+  qInMtx_.unlock();
+
   streamOutgoingThread_.join();
   stream_->Finish();
   streamIncomingThread_.join();
@@ -271,65 +275,68 @@ StreamMessageResponse* P4RuntimeClient::GetStreamPacket(int expectedType=-1, lon
       if (remaining < std::chrono::seconds{0}) {
         break;
       }
-
+      
+      qInMtx_.lock();
       if (!streamQueueIn_.empty()) {
         std::cout << "GetStreamPacket. BEFORE - Size for queueIN = " << streamQueueIn_.size() << std::endl;
         response = streamQueueIn_.front();
+        streamQueueIn_.pop();
+        qInMtx_.unlock();
 
-        if (response != NULL) {
-          responseType = response->update_case();
-          // Get out if an unexpected packet is retrieved
-          // Details in p4runtime.pb.h:
-          //   kArbitration = 1, kPacket = 2, kDigestAck = 3, kOther = 4, UPDATE_NOT_SET = 0
-          // Note: -1 to indicate that we do not care about the type of packet (if that ever happens)
-          if (expectedType != -1 && responseType != expectedType) {
-            std::cout << "GetStreamPacket. Returning due to unexpected type obtained (received = " << responseType << ", expected = " << expectedType << ")" << std::endl;
-            break;
-          }
-          // DEBUG
-          CheckResponseType(response);
-          // DEBUG - END
-
-          streamQueueIn_.pop_front();
-          std::cout << "GetStreamPacket. AFTER - Size for queueIN = " << streamQueueIn_.size() << std::endl;
-        } else {
+        if (response == NULL) {
           std::cout << "GetStreamPacket. Returning due to NULL response" << std::endl;
           break;
         }
+
+        responseType = response->update_case();
+        // Get out if an unexpected packet is retrieved
+        // Details in p4runtime.pb.h:
+        //   kArbitration = 1, kPacket = 2, kDigestAck = 3, kOther = 4, UPDATE_NOT_SET = 0
+        // Note: -1 to indicate that we do not care about the type of packet (if that ever happens)
+        if (expectedType != -1 && responseType != expectedType) {
+          std::cout << "GetStreamPacket. Returning due to unexpected type obtained (received = " << responseType << ", expected = " << expectedType << ")" << std::endl;
+          return response;
+        }
+
+        // DEBUG
+        CheckResponseType(response);
+        // DEBUG - END
+        std::cout << "GetStreamPacket. Returning with proper response" << std::endl;
+        return response;
+      } else {
+        qInMtx_.unlock();
       }
     }
-    return response;
+
+    return NULL;
 }
 
 void P4RuntimeClient::ReadIncomingMessagesFromStream() {
-  // It only works initialising the response. Do not assign to NULL
-  StreamMessageResponse* response = StreamMessageResponse().New();
+  StreamMessageResponse* response;
 
   while (true) {
-    // DEBUG
-    if (!streamQueueIn_.empty()) {
-      response = streamQueueIn_.front();
-      if (response == NULL) {
-        std::cout << "ReadIncomingMessagesFromStream. Reading NULL message not possible. Exiting thread" << std::endl;
-        break;
+    qInMtx_.lock();
+    if (inThreadStop_) {
+      qInMtx_.unlock();
+      std::cout << "ReadIncomingMessagesFromStream. Exiting thread, I must stop" << std::endl;
+      break;
+    }
+
+    qInMtx_.unlock();
+    try {
+      if (stream_ == NULL || ::grpc_connectivity_state::GRPC_CHANNEL_READY != channel_->GetState(false)) {
+        continue;
       }
-      // DEBUG
-      CheckResponseType(response);
-      // DEBUG - END
-      // FIXME: Do something about this, do not just ignore the message and pop
-      streamQueueIn_.pop_front();
-    } else {
-      try {
-        // FIXME: This, and other operations with stream_, may be related to some segfaults
-        // if (stream_ != NULL && stream_->Read(response)) {
-        if (stream_ != NULL
-          && ::grpc_connectivity_state::GRPC_CHANNEL_READY == channel_->GetState(false)
-          && stream_->Read(response)) {
-          std::cout << "ReadIncomingMessagesFromStream. Reading from stream" << std::endl;
-          streamQueueIn_.push_back(response);
-        }
-      } catch (...) {
+      response = StreamMessageResponse().New();
+      if (stream_->Read(response)) {
+        std::cout << "ReadIncomingMessagesFromStream. Reading from stream" << std::endl;
+        qInMtx_.lock();
+        streamQueueIn_.push(response);
+        qInMtx_.unlock();
+      } else {
+        delete response;
       }
+    } catch (...) {
     }
   }
 }
@@ -339,38 +346,47 @@ void P4RuntimeClient::ReadIncomingMessagesFromStreamInBg() {
     streamIncomingThread_ = std::thread(&P4RuntimeClient::ReadIncomingMessagesFromStream, this);
   } catch (...) {
     std::cerr << "ReadIncomingMessagesFromStreamInBg. StreamChannel error. Closing stream" << std::endl;
-    streamQueueIn_.push_back(NULL);
+    qInMtx_.lock();
+    inThreadStop_ = true;
+    qInMtx_.unlock();
   }
 }
 
 void P4RuntimeClient::ReadOutgoingMessagesFromQueue() {
   StreamMessageRequest* request;
   while (true) {
-    if (!streamQueueOut_.empty()) {
+    qOutMtx_.lock();
+    if (outThreadStop_) {
+      qOutMtx_.unlock();
+      std::cout << "ReadOutgoingMessagesFromQueue. Exiting thread I must stop" << std::endl;
+      break;
+    }
+
+    if (!streamQueueOut_.empty() && stream_ != NULL && ::grpc_connectivity_state::GRPC_CHANNEL_READY == channel_->GetState(false)) {
       std::cout << "ReadOutgoingMessagesFromQueue. BEFORE - Size for queueOUT = " << streamQueueOut_.size() << "." << std::endl;
       request = streamQueueOut_.front();
-      if (request != NULL) {
-        if (request->has_arbitration()) {
-          std::cout << "ReadOutgoingMessagesFromQueue. Reading request. Arbitration for device ID = " << request->mutable_arbitration()->device_id() << "." << std::endl;
-        }
+      streamQueueOut_.pop();
+      qOutMtx_.unlock();
+      
+      if (request == NULL) {
+        std::cout << "Ignoring NULL request" << std::endl;
+        continue;
+      } 
 
-        const StreamMessageRequest* requestConst = request;
-        bool messageSent = false;
-        // if (stream_ != NULL) {
-        if (stream_ != NULL && ::grpc_connectivity_state::GRPC_CHANNEL_READY == channel_->GetState(false)) {
-          messageSent = stream_->Write(*requestConst);
-        }
-
-        if (messageSent) {
-          std::cout << "ReadOutgoingMessagesFromQueue. Sent Write request to server" << std::endl;
-          streamQueueOut_.pop_front();
-          std::cout << "ReadOutgoingMessagesFromQueue. AFTER - Size for queueOUT = " << streamQueueOut_.size() << "." << std::endl;
-        }
-      } else {
-        std::cout << "ReadOutgoingMessagesFromQueue. Writing NULL message not possible. Exiting thread" << std::endl;
-        // std::terminate();
-        break;
+      if (request->has_arbitration()) {
+        std::cout << "ReadOutgoingMessagesFromQueue. Reading request. Arbitration for device ID = " << request->mutable_arbitration()->device_id() << "." << std::endl;
       }
+
+      const StreamMessageRequest* requestConst = request;
+      bool messageSent = stream_->Write(*requestConst);
+
+      if (messageSent) {
+        std::cout << "ReadOutgoingMessagesFromQueue. Sent Write request to server" << std::endl;
+      } else {
+        std::cout << "ReadOutgoingMessageFromQueue. Could not sent message to server" << std::endl;
+      } 
+    } else {
+      qOutMtx_.unlock();
     }
   }
 }
@@ -380,7 +396,9 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueueInBg() {
     streamOutgoingThread_ = std::thread(&P4RuntimeClient::ReadOutgoingMessagesFromQueue, this);
   } catch (...) {
     std::cerr << "ReadOutgoingMessagesFromQueueInBg. StreamChannel error. Closing stream" << std::endl;
-    streamQueueOut_.push_back(NULL);
+    qOutMtx_.lock();
+    outThreadStop_ = true;
+    qOutMtx_.unlock();
   }
 }
 
@@ -392,7 +410,9 @@ void P4RuntimeClient::Handshake() {
   requestOut->mutable_arbitration()->set_device_id(deviceId_);
   requestOut->mutable_arbitration()->mutable_election_id()->set_high(electionId_->high());
   requestOut->mutable_arbitration()->mutable_election_id()->set_low(electionId_->low());
-  streamQueueOut_.push_back(requestOut);
+  qOutMtx_.lock();
+  streamQueueOut_.push(requestOut);
+  qOutMtx_.unlock();
   std::cout << "Handshake. Pushing arbitration request to QueueOUT" << std::endl;
 
   StreamMessageResponse* reply = GetStreamPacket(::P4_NAMESPACE_ID::StreamMessageRequest::kArbitration, 2);
