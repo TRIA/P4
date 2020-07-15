@@ -1,14 +1,6 @@
-// #include <chrono>
-#include <ctime>
-#include <fcntl.h>
 #include <fstream>
 #include <grpcpp/grpcpp.h>
-#include <queue>
 #include <sstream>
-#include <unistd.h>
-
-// TEST
-#include "absl/numeric/int128.h"
 
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
@@ -149,65 +141,91 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool update) {
     entry = *it;
 
     ::P4_NAMESPACE_ID::Entity * entity = new ::P4_NAMESPACE_ID::Entity();
+    ::P4_NAMESPACE_ID::TableEntry * entity_table_entry = entity->mutable_table_entry();
     ::P4_NAMESPACE_ID::TableAction * entity_table_action = new ::P4_NAMESPACE_ID::TableAction();
     ::P4_NAMESPACE_ID::Action * entity_action = new ::P4_NAMESPACE_ID::Action();
-    ::P4_NAMESPACE_ID::FieldMatch_Exact field_match_exact = ::P4_NAMESPACE_ID::FieldMatch_Exact();
-    ::P4_NAMESPACE_ID::FieldMatch_Ternary field_match_ternary = ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-    ::P4_NAMESPACE_ID::FieldMatch_LPM field_match_lpm = ::P4_NAMESPACE_ID::FieldMatch_LPM();
-    ::P4_NAMESPACE_ID::FieldMatch_Range field_match_range = ::P4_NAMESPACE_ID::FieldMatch_Range();
+    ::P4_NAMESPACE_ID::FieldMatch * field_match;
+    ::P4_NAMESPACE_ID::FieldMatch_Exact * field_match_exact;
+    ::P4_NAMESPACE_ID::FieldMatch_Ternary * field_match_ternary;
+    ::P4_NAMESPACE_ID::FieldMatch_LPM * field_match_lpm;
+    ::P4_NAMESPACE_ID::FieldMatch_Range * field_match_range;
+    ::P4_NAMESPACE_ID::FieldMatch_Optional * field_match_optional;
+    ::PROTOBUF_NAMESPACE_ID::Any * field_match_other;
 
     // Define table and action ID
-    entity->mutable_table_entry()->set_table_id(entry->table_id);
-    entity_action->set_action_id(entry->action.action_id);
-    
+    entity_table_entry->set_table_id(entry->table_id);
+    std::cout << "Write . Setting table id = " << entity->table_entry().table_id() << std::endl;
+
     // Insert action parameters
     for (param_it = entry->action.parameters.begin(); param_it != entry->action.parameters.end(); ++param_it) {
+      // Perform any expected conversion to bytestring at this point
+      // param_it->value = std::stoi(param_it->value, 0, 16);
       entity_action->add_params()->set_param_id(param_it->id);
       entity_action->mutable_params(param_it->id - 1)->set_value(param_it->value);
+      std::cout << "Write . Setting param number = " << param_it->id << ", value = " << 
+        static_cast<std::string>(entity_action->params(param_it->id - 1).value()) << std::endl;
     }
 
     // Insert action
+    entity_action->set_action_id(entry->action.action_id);
+    std::cout << "Write . Setting action id = " << entity_action->action_id() << std::endl;
     entity_table_action->set_allocated_action(entity_action);
-    entity->mutable_table_entry()->set_allocated_action(entity_table_action);
+    entity_table_entry->set_allocated_action(entity_table_action);
 
-    // Insert match (if any). Note: this assumes just one match, but > 1 could be possible
-    if (entry->match.type > 0) {
-      ::P4_NAMESPACE_ID::FieldMatch * entity_table_action_match = entity->mutable_table_entry()->add_match();
-      entity_table_action_match->set_field_id(entry->match.field_id);
+    // TTL for entry, in nanoseconds (0 is infinite)
+    if (entry->action.default_action) {
+      entity_table_entry->set_idle_timeout_ns(0);
+    } else {
+      entity_table_entry->set_idle_timeout_ns(entry->timeout_ns);
+    }
+
+    // Insert match (if any). Note: this assumes 1 match, but N could be possible
+    if (entry->match.type > 0 && entry->match.value.size() > 0) {
+      // Perform any expected conversion to bytestring at this point
+      // entry->match.value = std::stoi(entry->match.value, 0, 16);
+      std::cout << "Write . Setting match type = " << entry->match.type << ", value = " 
+        << static_cast<std::string>(entry->match.value) << std::endl;
+      field_match = entity_table_entry->add_match();
+      field_match->set_field_id(entry->match.field_id);
       switch (entry->match.type) {
         case P4MatchType::exact : {
-          field_match_exact = ::P4_NAMESPACE_ID::FieldMatch_Exact();
-          field_match_exact.set_value(entry->match.value);
-          // p4_entity_table_action_match->set_allocated_exact(&field_match_exact);
-          entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
-          entity->mutable_table_entry()->mutable_match(0)->set_allocated_exact(&field_match_exact);
+          field_match_exact = new ::P4_NAMESPACE_ID::FieldMatch_Exact();
+          field_match_exact->set_value(entry->match.value);
+          field_match->set_allocated_exact(field_match_exact);
           break;
         }
         case P4MatchType::ternary : {
-          field_match_ternary = ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-          field_match_ternary.set_value(entry->match.value);
-          field_match_ternary.set_mask(entry->match.ternary_mask);
-          entity_table_action_match->set_allocated_ternary(&field_match_ternary);
-          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
-          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_ternary(&field_match_ternary);
+          field_match_ternary = new ::P4_NAMESPACE_ID::FieldMatch_Ternary();
+          field_match_ternary->set_value(entry->match.value);
+          field_match_ternary->set_mask(entry->match.ternary_mask);
+          field_match->set_allocated_ternary(field_match_ternary);
+          entity_table_entry->set_priority(entry->priority);
           break;
         }
         case P4MatchType::lpm : {
-          field_match_lpm = ::P4_NAMESPACE_ID::FieldMatch_LPM();
-          field_match_lpm.set_value(entry->match.value);
-          field_match_lpm.set_prefix_len(entry->match.lpm_prefix);
-          entity_table_action_match->set_allocated_lpm(&field_match_lpm);
-          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
-          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_lpm(&field_match_lpm);
+          field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
+          field_match_lpm->set_value(entry->match.value);
+          field_match_lpm->set_prefix_len(entry->match.lpm_prefix);
+          field_match->set_allocated_lpm(field_match_lpm);
           break;
         }
         case P4MatchType::range : {
-          field_match_range = ::P4_NAMESPACE_ID::FieldMatch_Range();
-          field_match_range.set_high(entry->match.range_high);
-          field_match_range.set_high(entry->match.range_low);
-          entity_table_action_match->set_allocated_range(&field_match_range);
-          // entity->mutable_table_entry()->add_match()->set_field_id(entry->match.field_id);
-          // entity->mutable_table_entry()->mutable_match(0)->set_allocated_range(&field_match_range);
+          field_match_range = new ::P4_NAMESPACE_ID::FieldMatch_Range();
+          field_match_range->set_high(entry->match.range_high);
+          field_match_range->set_high(entry->match.range_low);
+          field_match->set_allocated_range(field_match_range);
+          entity_table_entry->set_priority(entry->priority);
+          break;
+        }
+        case P4MatchType::optional : {
+          field_match_optional = new ::P4_NAMESPACE_ID::FieldMatch_Optional();
+          field_match->set_allocated_optional(field_match_optional);
+          entity_table_entry->set_priority(entry->priority);
+          break;
+        }
+        case P4MatchType::other : {
+          field_match_other = new ::PROTOBUF_NAMESPACE_ID::Any();
+          field_match->set_allocated_other(field_match_other);
           break;
         }
         default:
@@ -438,7 +456,7 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueue() {
       if (messageSent) {
         std::cout << "ReadOutgoingMessagesFromQueue. Sent Write request to server" << std::endl;
       } else {
-        std::cout << "ReadOutgoingMessageFromQueue. Could not sent message to server" << std::endl;
+        std::cout << "ReadOutgoingMessageFromQueue. Could not send message to server" << std::endl;
       } 
     } else {
       qOutMtx_.unlock();

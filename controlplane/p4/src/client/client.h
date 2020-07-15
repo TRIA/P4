@@ -19,20 +19,25 @@ struct P4Parameter {
 
 struct P4Action {
   uint action_id;
+  // Flag to indicate whether the action is the default choice for a table
+  bool default_action;
   std::list<P4Parameter> parameters;
 };
 
+// Using same IDs as in spec
 enum P4MatchType {
-  exact = 1,
-  ternary = 2,
-  lpm = 3,
-  range = 4
+  exact = 2,
+  ternary = 3,
+  lpm = 4,
+  range = 6,
+  optional = 7,
+  other = 100
 };
 
 struct P4Match {
   uint field_id;
   P4MatchType type;
-  // Note: bitsring with the minimum size to express the value
+  // Note: bitstring with the minimum size to express the value
   std::string value;
   // Only required for LPM
   // ::PROTOBUF_NAMESPACE_ID::int32 lpm_prefix;
@@ -48,6 +53,10 @@ struct P4TableEntry {
   uint table_id;
   P4Match match;
   P4Action action;
+  // Only available for Ternary, Range or Optional matches
+  int32_t priority;
+  // Only available for non-default Actions. Use nanoseconds
+  int64_t timeout_ns;
 };
 
 class P4RuntimeClient {
@@ -81,23 +90,21 @@ class P4RuntimeClient {
     // Client definition
     std::shared_ptr<::GRPC_NAMESPACE_ID::Channel> channel_;
     std::unique_ptr<::P4_NAMESPACE_ID::P4Runtime::Stub> stub_;
+
+    // Parameters
     std::string p4InfoPath_;
     std::string binaryCfgPath_;
     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId_;
     ::P4_NAMESPACE_ID::Uint128* electionId_;
 
-    // Ancillary
+    // Stream (synchronous), queues and threads
     typedef ::GRPC_NAMESPACE_ID::ClientReaderWriter<
       ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamType_;
-    typedef ::GRPC_NAMESPACE_ID::ClientAsyncReaderWriter<
-      ::P4_NAMESPACE_ID::StreamMessageRequest, ::P4_NAMESPACE_ID::StreamMessageResponse> streamAsyncType_;
-
+    std::unique_ptr<streamType_> stream_;
     std::queue<::P4_NAMESPACE_ID::StreamMessageResponse*> streamQueueIn_;
     std::mutex qInMtx_;
-    std::mutex qOutMtx_;
     std::queue<::P4_NAMESPACE_ID::StreamMessageRequest*> streamQueueOut_;
-    std::unique_ptr<streamType_> stream_;
-    std::unique_ptr<streamAsyncType_> streamAsync_;
+    std::mutex qOutMtx_;
     std::thread streamIncomingThread_;
     bool inThreadStop_;
     std::thread streamOutgoingThread_;
@@ -117,7 +124,7 @@ class P4RuntimeClient {
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
 
-    // P4-related methods
+    // P4-info related methods
     void PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
 
 };
