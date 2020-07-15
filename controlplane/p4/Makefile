@@ -140,7 +140,7 @@ edf-cp-client-restart: edf-cp-client-stop edf-cp-client-start
 
 edf-dp-server-build: edf-cp-setup
 	@echo "Cloning Stratum if not there"
-	if [ ! -d ${EDF_SERVER_SRC_PATH}/stratum ]; then git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/ ; fi
+	if [ ! -d ${EDF_SERVER_SRC_PATH}/stratum ]; then git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/stratum ; fi
 	@echo "Building and tagging image ${EDF_DATA_S_NAME}:${GRPC_RELEASE}"
 	cd ${EDF_SERVER_SRC_PATH}/stratum && \
 	docker build -t stratum-dev --build-arg USER_NAME="${USER}" --build-arg USER_ID="1000" -f Dockerfile.dev .
