@@ -1,9 +1,10 @@
 #ifndef P4RUNTIME_CLIENT_H
 #define P4RUNTIME_CLIENT_H
 
-#include <queue>
-#include <thread>
 #include <mutex>
+#include <queue>
+#include <math.h>
+#include <thread>
 
 #include "../common/grpc_out/p4/config/v1/p4info.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
@@ -13,12 +14,12 @@
 #include "../common/ns_def.inc"
 
 struct P4Parameter {
-  int id;
+  uint32_t id;
   std::string value;
 };
 
 struct P4Action {
-  uint action_id;
+  uint32_t action_id;
   // Flag to indicate whether the action is the default choice for a table
   bool default_action;
   std::list<P4Parameter> parameters;
@@ -26,16 +27,16 @@ struct P4Action {
 
 // Using same IDs as in spec
 enum P4MatchType {
-  exact = 2,
-  ternary = 3,
-  lpm = 4,
-  range = 6,
-  optional = 7,
-  other = 100
+  exact = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kExact,
+  ternary = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kTernary,
+  lpm = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kLpm,
+  range = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kRange,
+  optional = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOptional,
+  other = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOther
 };
 
 struct P4Match {
-  uint field_id;
+  uint32_t field_id;
   P4MatchType type;
   // Note: bitstring with the minimum size to express the value
   std::string value;
@@ -50,7 +51,7 @@ struct P4Match {
 };
 
 struct P4TableEntry {
-  uint table_id;
+  uint32_t table_id;
   P4Match match;
   P4Action action;
   // Only available for Ternary, Range or Optional matches
@@ -71,7 +72,7 @@ class P4RuntimeClient {
     // RPC methods
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
-    ::GRPC_NAMESPACE_ID::Status Write(std::list<P4TableEntry*> entries, bool update);
+    ::GRPC_NAMESPACE_ID::Status Write(std::list<P4TableEntry*> entries, bool modify_entry);
     std::list<P4TableEntry*> Read(std::list<P4TableEntry*> query);
     std::string APIVersion();
 
@@ -83,7 +84,7 @@ class P4RuntimeClient {
     ::PROTOBUF_NAMESPACE_ID::uint32 GetP4TableIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
         std::string tableName);
     ::PROTOBUF_NAMESPACE_ID::uint32 GetP4ActionIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
-        std::string tableName, std::string actionName);
+        std::string actionName);
 
   private:
 
