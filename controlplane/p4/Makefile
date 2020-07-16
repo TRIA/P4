@@ -125,7 +125,6 @@ edf-cp-client-start: edf-cp-client-build edf-cp-docker-net-create
 	${EDF_CONTROL_C_EXISTS} && docker rm -f ${EDF_CONTROL_C_NAME} || true
 	docker run -it -v ${PWD}:${EDF_CLIENT_R_PATH}/p4 --network=${EDF_C_NET} \
 	--entrypoint ${EDF_CLIENT_R_PATH}/docker-entrypoint.sh --name ${EDF_CONTROL_C_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
-	#-v ${PWD}/docker-entrypoint.sh:${EDF_CLIENT_R_PATH}/docker-entrypoint.sh 
 
 edf-cp-client-attach:
 	@echo "Attaching to container ${EDF_CONTROL_C_NAME}"
@@ -165,6 +164,9 @@ edf-dp-server-attach:
 edf-dp-server-stop:
 	docker stop ${EDF_DATA_S_NAME} || true
 
+edf-dp-server-log:
+	docker exec -it ${EDF_DATA_S_NAME} tail -1000f $(shell docker exec -it ${EDF_DATA_S_NAME} find /tmp -name *stratum_bmv2*ERROR*)
+
 edf-dp-server-clean:
 	docker rm -f ${EDF_DATA_S_NAME} || true
 
@@ -173,6 +175,7 @@ edf-dp-server-clean:
 
 # Manual test with bmv2's P4 virtual switches running in Mininet (mn-stratum)
 # Note: Dockerfile for mn-stratum in https://github.com/stratum/stratum/blob/master/tools/mininet/Dockerfile
+## FIXME: NOT WORKING ("edf-cp-client-start" not starting). Either run all containers as daemons or use docker-compose
 edf-cp-test-mininet: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
@@ -203,7 +206,11 @@ edf-dp-mininet-start: edf-cp-docker-net-create
 edf-dp-mininet-stop:
 	cd ${EDF_DATA_PATH} && make mn-stop && cd ${CURRENT}
 
+edf-dp-mininet-log:
+	cd ${EDF_DATA_PATH} && make mn-log && cd ${CURRENT}
+
 # Automated test with the Stratum-enabled bmv2 server
+## FIXME: NOT WORKING ("edf-dp-server-start" not starting in remote). Check permissions there
 edf-cp-test-stratum: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"

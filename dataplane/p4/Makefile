@@ -45,6 +45,7 @@ mn-log:
 
 mn-bmv2-log:
 	if [ -f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log ]; then tail -1000f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log; fi
+#	docker exec -it ${MN_STR_NAME} tail -1000f /tmp/s1/stratum_bmv2.log
 
 mn-bmv2-sniff-eth1:
 	$(info "Capturing one packet in ${MN_STR_NAME}:s1-eth1 and showing contents afterwards")

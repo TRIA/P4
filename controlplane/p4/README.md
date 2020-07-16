@@ -17,14 +17,6 @@ make efcp-build
 cd $current
 ```
 
-### Control plane environment
-
-Now, spin up a container with the environment for running the control plane. This will take plenty of time, as this installs all the dependencies like protbufs, gRPC and other libraries. Wait for it to finish before running the control plane client (or the mocked gRPC server).
-
-```bash
-make edf-cp-client-start
-```
-
 ### Data plane server
 
 #### Option 1: virtual target in Mininet
@@ -35,6 +27,11 @@ In the typical scenario you will run a container with a Mininet instance that ru
 make edf-dp-mininet-start
 ```
 
+To attach to the logs, type the following in a new terminal:
+```bash
+make edf-dp-mininet-log
+```
+
 ### Option 2: single bmv2 switch model
 
 Similar to option 1, but the bmv2 model runs directly from the Stratum source. The process will run on address `0.0.0.0:28000`.
@@ -43,7 +40,12 @@ Similar to option 1, but the bmv2 model runs directly from the Stratum source. T
 make edf-dp-server-start
 ```
 
-#### Option 3: mocked server
+To attach to the logs, type the following in a new terminal:
+```bash
+make edf-dp-server-log
+```
+
+#### Option 3: mocked server (deprecated)
 
 This option is quicker to quickly verify the proper working of the RPC methods. The process will run on address `0.0.0.0:50051`.
 Run the following in a new terminal to attach to the container created in "Control plane environment".
@@ -57,8 +59,13 @@ make edf-dp-server-mock
 
 ### Control plane client
 
-At this point, the control plane client can be compiled.
-Run the following in a new terminal to attach to the container created in "Control plane environment".
+Now, spin up a container with the environment for running the control plane. This will take plenty of time, as this installs all the dependencies like protobufs, gRPC and other libraries. Wait for it to finish before running the control plane client (or the mocked gRPC server).
+
+```bash
+make edf-cp-client-start
+```
+
+Once finished, the control plane client can be compiled. Run the following in a new terminal to attach to the container created before.
 
 The client will be the entry point to interact the RPC methods exposed by P4Runtime.
 Run the program, providing any suitable argument. If none is provided, defaults will be taken and printed.
@@ -71,7 +78,7 @@ make edf-cp-client
 ./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 # Option 2 for data plane server
 ./bin/edf-cp-client --grpc-addr=edf-dp-server:28000 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
-# Option 3 for data plane server
+# Option 3 for data plane server (deprecated)
 ./bin/edf-cp-client --grpc-addr=localhost:50051 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
 ```
 
@@ -82,8 +89,8 @@ The following will compile and run the control plane client, so that it interact
 ```bash
 # Use mininet for manual testing (option #1)
 make edf-cp-test-mininet
-# Use mocked server as an automated test (option #2)
-make edf-cp-test-mock
-# Use Stratum-enabled bmv2 server as an automated test (option #3)
+# Use Stratum-enabled bmv2 server as an automated test (option #2, run locally)
 make edf-cp-test-stratum
+# Use mocked server as an automated test (option #3, deprecated)
+make edf-cp-test-mock
 ```

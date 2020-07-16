@@ -8,8 +8,9 @@ cp -R grpc_out ${SRC_PATH}/
 # Infinite loop to temporarily provide a working environment. TODO: remove
 echo ""
 echo ""
+echo "Infinite loop. This will be kept on hold until the container is stopped"
+echo "Use a new terminal to attach (\"make edf-cp-client-attach\") or stop (\"make edf-cp-client-stop\") the client"
+echo ""
 while true; do
-    echo ""
-    echo "Infinite loop. Use a new terminal to attach (\"make edf-cp-client-attach\") or stop (\"make edf-cp-client-stop\") the client"
     sleep 60
 done
