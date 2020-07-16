@@ -430,7 +430,6 @@ void P4RuntimeClient::SetUpStream() {
 // TODO: complete. Check reference/p4runtime-shell-python/p4runtime.py#tear_down
 void P4RuntimeClient::TearDown() {
   std::cout << "TearDown. Cleaning up stream, queues, threads and channel" << std::endl;
-  // Appending NULL to the queues as an indication to determine that queues operations should finalise
   qOutMtx_.lock();
   outThreadStop_ = true;
   qOutMtx_.unlock();
@@ -439,10 +438,8 @@ void P4RuntimeClient::TearDown() {
   qInMtx_.unlock();
 
   streamOutgoingThread_.join();
-  stream_->Finish();
-  // ERROR here, after finishing the stream
   streamIncomingThread_.join();
-  channel_.reset();
+  stream_->Finish();
 }
 
 // TODO: complete and check if this works. Check reference/p4runtime-shell-python/p4runtime.py#get_stream_packet
@@ -541,6 +538,9 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueue() {
     if (outThreadStop_) {
       qOutMtx_.unlock();
       std::cout << "ReadOutgoingMessagesFromQueue. Exiting thread I must stop" << std::endl;
+      if (stream_ != NULL) {
+        stream_->WritesDone();
+     }
       break;
     }
 

@@ -25,7 +25,7 @@ EDF_CP_CLIENT_BIN := edf-cp-client
 EDF_DP_SERVER_BIN := edf-dp-server
 EDF_DP_SERVER_MOCK_BIN := ${EDF_DP_SERVER_BIN}-mock
 CXX := g++
-CXXFLAGS += -std=c++17
+CXXFLAGS += -std=c++17 -g -O0
 LDFLAGS += -L/usr/local/lib $(shell pkg-config --libs protobuf grpc++) -pthread
 ifeq (${SYSTEM},Darwin)
 	LDFLAGS += -lgrpc++_reflection
