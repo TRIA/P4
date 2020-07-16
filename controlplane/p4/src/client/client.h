@@ -52,8 +52,8 @@ struct P4Match {
 
 struct P4TableEntry {
   uint32_t table_id;
-  P4Match match;
   P4Action action;
+  std::list<P4Match> matches;
   // Only available for Ternary, Range or Optional matches
   int32_t priority;
   // Only available for non-default Actions. Use nanoseconds
@@ -72,8 +72,10 @@ class P4RuntimeClient {
     // RPC methods
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
-    ::GRPC_NAMESPACE_ID::Status Write(std::list<P4TableEntry*> entries, bool modify_entry);
-    std::list<P4TableEntry*> Read(std::list<P4TableEntry*> query);
+    ::GRPC_NAMESPACE_ID::Status InsertEntry(std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status ModifyEntry(std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status DeleteEntry(std::list<P4TableEntry*> entries);
+    std::list<P4TableEntry*> ReadEntry(std::list<P4TableEntry*> query);
     std::string APIVersion();
 
     // Ancillary methods
@@ -110,6 +112,10 @@ class P4RuntimeClient {
     bool inThreadStop_;
     std::thread streamOutgoingThread_;
     bool outThreadStop_;
+
+    // RPC methods
+    ::GRPC_NAMESPACE_ID::Status WriteEntry(std::list<P4TableEntry*> entries,
+      ::P4_NAMESPACE_ID::Update::Type updateType);
 
     // Ancillary methods
     void Handshake();

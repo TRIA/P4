@@ -124,7 +124,24 @@ P4Info P4RuntimeClient::GetP4Info() {
   return p4Info;
 }
 
-Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entry) {
+Status P4RuntimeClient::InsertEntry(std::list<P4TableEntry*> entries) {
+  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::INSERT);
+}
+
+Status P4RuntimeClient::ModifyEntry(std::list<P4TableEntry*> entries) {
+  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::MODIFY);
+}
+
+Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
+  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
+}
+
+// Interesting classes to look at for debugging (from root):
+// ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
+// ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
+// ./controlplane/p4/src/server/stratum/stratum/hal/lib/pi/pi_node.cc
+::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteEntry(std::list<P4TableEntry*> entries,
+    ::P4_NAMESPACE_ID::Update::Type updateType) {
   ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
   // Note: update is coupled with "modify_entry" (1:1) anyway; it can be handled outside main loop
   request.add_updates();
@@ -136,13 +153,14 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entr
   ::P4_NAMESPACE_ID::FieldMatch_LPM * field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
   std::list<P4TableEntry*>::iterator it;
   std::list<P4Parameter>::iterator param_it;
+  std::list<P4Match>::iterator match_it;
   P4TableEntry * entry;
 
   // Default timeout is infinite
   int64_t default_timeout_ns = 0;
 
   // // Initial checks (segfault here)
-  // if (entry->action.default_action && !modify_entry) {
+  // if (entry->action.default_action && ::P4_NAMESPACE_ID::Update::INSERT == updateType) {
   //   // The proper error would be FAILED_PRECONDITION (9) or so:
   //   // Default actions cannot be INSERTED in tables
   //   const std::string errorMessage = "Cannot INSERT entry for default action";
@@ -152,11 +170,7 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entr
   // }
 
   // Level1. Update
-  if (modify_entry) {
-    update->set_type(::P4_NAMESPACE_ID::Update::MODIFY);
-  } else {
-    update->set_type(::P4_NAMESPACE_ID::Update::INSERT);
-  }
+  update->set_type(updateType);
   update->set_allocated_entity(entity);
   std::cout << "Write . Setting entity type = " << update->type() << std::endl;
 
@@ -208,8 +222,8 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entr
     }
     std::cout << "Write . Setting timeout = " << entity_table_entry->idle_timeout_ns() << " ns" << std::endl;
 
-    // Insert match (if any). Note: this assumes 1 match, but N could be possible
-    if (entry->match.type > 0 && entry->match.value.size() > 0) {
+    // Insert match (if any)
+    for (match_it = entry->matches.begin(); match_it != entry->matches.end(); ++match_it) {
 
       ::P4_NAMESPACE_ID::FieldMatch * field_match;
       ::P4_NAMESPACE_ID::FieldMatch_Exact * field_match_exact;
@@ -223,39 +237,39 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entr
       entity_table_entry->add_match();
 
       // Perform any expected conversion to bytestring at this point
-      // entry->match.value = std::stoi(entry->match.value, 0, 16);
-      std::cout << "Write . Setting match type = " << entry->match.type << ", value = " 
-        << static_cast<std::string>(entry->match.value) << std::endl;
+      // match->value = std::stoi(match->value, 0, 16);
+      std::cout << "Write . Setting match type = " << match_it->type << ", value = " 
+        << static_cast<std::string>(match_it->value) << std::endl;
       field_match = entity_table_entry->mutable_match(0);
-      field_match->set_field_id(entry->match.field_id);
+      field_match->set_field_id(match_it->field_id);
 
       // Level4. FieldMatch
-      switch (entry->match.type) {
+      switch (match_it->type) {
         case P4MatchType::exact : {
           field_match_exact = new ::P4_NAMESPACE_ID::FieldMatch_Exact();
-          field_match_exact->set_value(entry->match.value);
+          field_match_exact->set_value(match_it->value);
           field_match->set_allocated_exact(field_match_exact);
           break;
         }
         case P4MatchType::ternary : {
           field_match_ternary = new ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-          field_match_ternary->set_value(entry->match.value);
-          field_match_ternary->set_mask(entry->match.ternary_mask);
+          field_match_ternary->set_value(match_it->value);
+          field_match_ternary->set_mask(match_it->ternary_mask);
           field_match->set_allocated_ternary(field_match_ternary);
           entity_table_entry->set_priority(entry->priority);
           break;
         }
         case P4MatchType::lpm : {
           field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
-          field_match_lpm->set_value(entry->match.value);
-          field_match_lpm->set_prefix_len(entry->match.lpm_prefix);
+          field_match_lpm->set_value(match_it->value);
+          field_match_lpm->set_prefix_len(match_it->lpm_prefix);
           field_match->set_allocated_lpm(field_match_lpm);
           break;
         }
         case P4MatchType::range : {
           field_match_range = new ::P4_NAMESPACE_ID::FieldMatch_Range();
-          field_match_range->set_high(entry->match.range_high);
-          field_match_range->set_high(entry->match.range_low);
+          field_match_range->set_high(match_it->range_high);
+          field_match_range->set_high(match_it->range_low);
           field_match->set_allocated_range(field_match_range);
           entity_table_entry->set_priority(entry->priority);
           break;
@@ -292,99 +306,12 @@ Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entr
   return status;
 }
 
-// SOMEHOW WORKS (NO ERROR ON THE SERVER SIDE)
-// Status P4RuntimeClient::Write(std::list<P4TableEntry*> entries, bool modify_entry) {
-//   std::cout << "Write . 0a" << std::endl;
-//   ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
-//   ::P4_NAMESPACE_ID::Entity * entity = new ::P4_NAMESPACE_ID::Entity();
-//   std::cout << "Write . 0a1" << std::endl;
-//   // ::P4_NAMESPACE_ID::TableEntry * entity_table_entry = entity->mutable_table_entry();
-//   ::P4_NAMESPACE_ID::TableEntry * entity_table_entry = new ::P4_NAMESPACE_ID::TableEntry();
-//   std::cout << "Write . 0a2" << std::endl;
-//   ::P4_NAMESPACE_ID::TableAction * entity_table_action = new ::P4_NAMESPACE_ID::TableAction();
-//   ::P4_NAMESPACE_ID::Action * entity_action = new ::P4_NAMESPACE_ID::Action();
-//   ::P4_NAMESPACE_ID::FieldMatch_LPM * field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
-//   std::cout << "Write . 0a3" << std::endl;
-
-//   // 1. Update
-//   request.add_updates()->set_type(::P4_NAMESPACE_ID::Update::INSERT);
-//   request.mutable_updates(0)->set_allocated_entity(entity);
-//   std::cout << "Write . 0a4" << std::endl;
-//   // 2. Entity
-//   request.mutable_updates(0)->mutable_entity()->set_allocated_table_entry(entity_table_entry);
-//   std::cout << "Write . 0a5" << std::endl;
-//   // 3. TableEntry
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->set_table_id(33574068);
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->set_allocated_action(entity_table_action);
-//   std::cout << "Write . 0a6" << std::endl;
-//   // 4.1. TableAction
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     set_allocated_action(entity_action);
-//   std::cout << "Write . 0a7" << std::endl;
-//   // 4.1.1. Action
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->set_action_id(16805608);
-//   std::cout << "Write . 0a8" << std::endl;
-//   // 4.1.2. Param
-//   // -- Param 1
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->add_params();
-//   std::cout << "Write . 0a8_1" << std::endl;
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->mutable_params(0)->set_param_id(1);
-//   std::cout << "Write . 0a8_2" << std::endl;
-//   std::string param_value1 = "2";
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->mutable_params(0)->set_allocated_value(&param_value1);
-//   std::cout << "Write . 0a9" << std::endl;
-//   // -- Param 2
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->add_params();
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->mutable_params(1)->set_param_id(2);
-//   std::string param_value2 = "2";
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_action()->
-//     mutable_action()->mutable_params(1)->set_allocated_value(&param_value2);
-//   std::cout << "Write . 0a10" << std::endl;
-//   // 4.2. FieldMatch
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->add_match();
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_match(0)->
-//     set_field_id(1);
-//   request.mutable_updates(0)->mutable_entity()->mutable_table_entry()->mutable_match(0)->
-//     set_allocated_lpm(field_match_lpm);
-//   std::cout << "Write . 0a11" << std::endl;
-//   // -- Match 1
-//   std::string match_value1 = "0002";
-//   field_match_lpm->set_allocated_value(&match_value1);
-//   field_match_lpm->set_prefix_len(32);
-//   std::cout << "Write . 0a11" << std::endl;
-
-//   std::cout << "Write . 2" << std::endl;
-//   request.set_device_id(deviceId_);
-//   request.mutable_election_id()->set_high(electionId_->high());
-//   request.mutable_election_id()->set_low(electionId_->low());
-//   std::cout << "Write . 3" << std::endl;
-
-//   // std::cout << "Write . Entity type = " << request.updates(0).type() << std::endl;
-//   if (request.updates_size() > 0) {
-//     std::cout << "Write . Entity type = " << request.updates(0).type() << std::endl;
-//     std::cout << "Write . Entity table ID = " << request.updates(0).entity().table_entry().table_id() << std::endl;
-//   }
-
-//   WriteResponse response = WriteResponse();
-//   ClientContext context;
-//   const std::string errorMessage = "Error executing Write command";
-//   Status status = stub_->Write(&context, request, &response);
-//   std::cout << "Write . 4" << std::endl;
-//   HandleStatus(status, errorMessage.c_str());
-//   return status;
-// }
-
 // TODO: investigate how to read all available table entries (e.g., no filter defined)
-std::list<P4TableEntry*> P4RuntimeClient::Read(std::list<P4TableEntry*> filter) {
+std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> filter) {
   std::list<P4TableEntry*>::iterator it;
   std::list<P4TableEntry*> result;
   P4TableEntry * entry;
+  P4Match * match;
   P4Parameter * param;
   ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
   ClientContext context;
@@ -427,34 +354,34 @@ std::list<P4TableEntry*> P4RuntimeClient::Read(std::list<P4TableEntry*> filter) 
     std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
 
     for (int m = 0; m < response.entities().Get(i).table_entry().match_size(); m++) {
-      entry->match.field_id = response.entities().Get(i).table_entry().match(m).field_id();
+      match->field_id = response.entities().Get(i).table_entry().match(m).field_id();
       if (response.entities().Get(i).table_entry().match(m).has_exact()) {
-        entry->match.type = P4MatchType::exact;
-        entry->match.value = response.entities().Get(i).table_entry().match(m).exact().value();
+        match->type = P4MatchType::exact;
+        match->value = response.entities().Get(i).table_entry().match(m).exact().value();
       } else if (response.entities().Get(i).table_entry().match(m).has_ternary()) {
-        entry->match.type = P4MatchType::ternary;
-        entry->match.value = response.entities().Get(i).table_entry().match(m).ternary().value();
-        entry->match.ternary_mask = response.entities().Get(i).table_entry().match(m).ternary().mask();
+        match->type = P4MatchType::ternary;
+        match->value = response.entities().Get(i).table_entry().match(m).ternary().value();
+        match->ternary_mask = response.entities().Get(i).table_entry().match(m).ternary().mask();
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_lpm()) {
-        entry->match.type = P4MatchType::lpm;
-        entry->match.value = response.entities().Get(i).table_entry().match(m).lpm().value();
-        entry->match.lpm_prefix = response.entities().Get(i).table_entry().match(m).lpm().prefix_len();
+        match->type = P4MatchType::lpm;
+        match->value = response.entities().Get(i).table_entry().match(m).lpm().value();
+        match->lpm_prefix = response.entities().Get(i).table_entry().match(m).lpm().prefix_len();
       } else if (response.entities().Get(i).table_entry().match(m).has_range()) {
-        entry->match.type = P4MatchType::range;
-        entry->match.range_low = response.entities().Get(i).table_entry().match(m).range().low();
-        entry->match.range_high = response.entities().Get(i).table_entry().match(m).range().high();
+        match->type = P4MatchType::range;
+        match->range_low = response.entities().Get(i).table_entry().match(m).range().low();
+        match->range_high = response.entities().Get(i).table_entry().match(m).range().high();
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_optional()) {
-        entry->match.type = P4MatchType::optional;
-        entry->match.value = response.entities().Get(i).table_entry().match(m).optional().value();
+        match->type = P4MatchType::optional;
+        match->value = response.entities().Get(i).table_entry().match(m).optional().value();
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_other()) {
-        entry->match.type = P4MatchType::other;
+        match->type = P4MatchType::other;
       }
-      std::cout << "Read . Fetching match type = " << entry->match.type << ", value = " <<
+      std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
         param->value << std::endl;
-      entry->action.parameters.push_back(*param);
+      entry->matches.push_back(*match);
     }
 
     entry->timeout_ns = response.entities().Get(i).table_entry().match_size();
@@ -513,6 +440,7 @@ void P4RuntimeClient::TearDown() {
 
   streamOutgoingThread_.join();
   stream_->Finish();
+  // ERROR here, after finishing the stream
   streamIncomingThread_.join();
   channel_.reset();
 }
