@@ -85,7 +85,7 @@ header vlan_t {
  */
 const bit<16> EFCP_ETYPE = 0xD1F;
 header efcp_t {
-    bit<8>  vers;
+    bit<8>  ver;
     bit<16> dstAddr;
     bit<16> srcAddr;
     bit<8>  qosID;
@@ -93,7 +93,7 @@ header efcp_t {
     bit<16> srcCEPID;
     bit<8> pduType;
     bit<8> flags;
-    bit<16> length;
+    bit<16> len;
     bit<32> seqnum;
     bit<16> hdrChecksum;
 }
@@ -215,20 +215,19 @@ packet begins ingress processing.
 control MyVerifyChecksum(inout headers hdr,
                         inout metadata meta) {
     apply {
-
 /*
 * Verify checksum for EFCP packets
 */
             verify_checksum(hdr.efcp.isValid(),
-            { hdr.efcp.vers,
-	          hdr.efcp.dstAddr,
+            { hdr.efcp.ver,
+	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,
               hdr.efcp.dstCEPID,
               hdr.efcp.srcCEPID,
               hdr.efcp.pduType,
               hdr.efcp.flags,
-              hdr.efcp.length,
+              hdr.efcp.len,
               hdr.efcp.seqnum },
             hdr.efcp.hdrChecksum,
             HashAlgorithm.csum16);
@@ -238,7 +237,7 @@ control MyVerifyChecksum(inout headers hdr,
 */
             verify_checksum(hdr.ipv4.isValid(),
             { hdr.ipv4.version,
-	          hdr.ipv4.ihl,
+              hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
               hdr.ipv4.totalLen,
               hdr.ipv4.identification,
@@ -251,7 +250,6 @@ control MyVerifyChecksum(inout headers hdr,
               },
             hdr.ipv4.hdrChecksum,
             HashAlgorithm.csum16);
-
     }
 }
 
@@ -278,9 +276,7 @@ the packet buffer, nor sent to egress processing.
  * EFCP forwarding action
  */
     action efcp_forward(bit<12> vlan_id, macAddr_t dstAddr, egressSpec_t port) {
-
         hdr.vlan.vlan_id = vlan_id;
-
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
@@ -296,11 +292,10 @@ the packet buffer, nor sent to egress processing.
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
-
 /*
  * EFCP exact table
  */
-    table efcp_lpm{
+    table efcp_lpm {
         key = {
             hdr.efcp.dstAddr: exact;
         }
@@ -329,29 +324,21 @@ the packet buffer, nor sent to egress processing.
         default_action = drop();
     }
 
-
     apply {
-
-        if((hdr.efcp.isValid()) &&
-            !(standard_metadata.checksum_error == 0) &&
-            (standard_metadata.parser_error == error.NoError)) {
-
-                if(hdr.efcp.pduType == LAYER_MANAGEMENT)
+        if (hdr.efcp.isValid() &&
+            standard_metadata.checksum_error == 0 &&
+            standard_metadata.parser_error == error.NoError) {
+                if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
                     standard_metadata.egress_spec = CPU_PORT;
-
-                else
+                } else {
                     efcp_lpm.apply();
-
-        }
-
-        else if ((hdr.ipv4.isValid()) &&
-            (standard_metadata.checksum_error == 0)) {
+                }
+        } else if (hdr.ipv4.isValid() &&
+            standard_metadata.checksum_error == 0) {
                 ipv4_lpm.apply();
-        }
-
-        else
+        } else {
             drop();
-
+        }
     }
 }
 /*************************************************************************
@@ -367,12 +354,13 @@ control MyEgress(inout headers hdr,
     }
 
     apply {
-        if (standard_metadata.enq_qdepth >= ECN_THRESHOLD){
+        if (standard_metadata.enq_qdepth >= ECN_THRESHOLD) {
             mark_ecn();
         }
 
-        if(hdr.vlan.vlan_id == 0)
+        if (hdr.vlan.vlan_id == 0) {
             hdr.vlan.setInvalid();
+        }
     }
 }
 
@@ -382,13 +370,12 @@ control MyEgress(inout headers hdr,
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
     apply {
-
 /*
 * Compute checksum for EFCP packets
 */
 	update_checksum(
 	    hdr.efcp.isValid(),
-            { hdr.efcp.vers,
+            { hdr.efcp.ver,
 	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,
@@ -396,7 +383,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
               hdr.efcp.srcCEPID,
               hdr.efcp.pduType,
               hdr.efcp.flags,
-              hdr.efcp.length,
+              hdr.efcp.len,
               hdr.efcp.seqnum },
             hdr.efcp.hdrChecksum,
             HashAlgorithm.csum16);
@@ -419,7 +406,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
               hdr.ipv4.dstAddr },
             hdr.ipv4.hdrChecksum,
             HashAlgorithm.csum16);
-     }
+   }
 }
 
 /*************************************************************************
