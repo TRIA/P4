@@ -73,7 +73,7 @@ efcp-build: model/efcp.p4
 	@echo "*** P4 program compiled successfully! Output files are in model/build"
 
 mn-start: docker_net_create
-	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet -v ../common/tests:/root/tests -v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp -v ../common/tests/pdu_types.py:/root/pdu_types.py -v ../common/tests/send_efcp_h1.py:/root/send_efcp_h1.py -v ../common/tests/send_efcp_h2.py:/root/send_efcp_h2.py -p50001:50001 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} sergiogimenez/mininet-mod:latest
+	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet -v ${PWD}/../common/tests:/root/tests -v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp -v ${PWD}/../common/tests/pdu_types.py:/root/pdu_types.py -v ${PWD}/../common/tests/send_efcp_h1.py:/root/send_efcp_h1.py -v ${PWD}/../common/tests/send_efcp_h2.py:/root/send_efcp_h2.py -p50001:50001 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} sergiogimenez/mininet-mod:latest
 #	current=${PWD} && \
 #		cd env/mininet && \
 #		docker build -t edf-dp-mn-stratum:latest . && \
@@ -87,6 +87,3 @@ mn-start: docker_net_create
 mn-stop:
 	docker rm -f ${MN_STR_NAME} || true
 	@make docker_net_rm
-
-edf-dp-test-stratum: docker_net_create efcp-build
-	cd env && docker-compose up --build -d && cd ..
