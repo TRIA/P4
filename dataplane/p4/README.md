@@ -7,9 +7,9 @@ The _model_ folder contains the data plane code for the P4 target.
 
 ## Usage
 
-### Verify EFCP and IPv4 transmission
-
-```
+# Verify EFCP and IPv4 transmission
+make edf-dp-test-stratum
+ 
 # From your host: spin up the containers
 make env-start
 
