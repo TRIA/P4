@@ -88,40 +88,41 @@ mn-stop:
 	docker rm -f ${MN_STR_NAME} || true
 	@make docker_net_rm
 
-edf-dp-test-stratum:
-	@echo "Starting test 1"
-	@make eth1-send-efcp
-	@make eth1-send-ipv4
-	@test -s env/mininet/tests/stratum_bmv2_test_eth1.log
-	@echo "Test 1 passed" || echo "Test 1 not passed"
-	@echo "Starting test 2"
-	@make eth2-send-efcp
-	@make eth2-send-ipv4
-	@test -s env/mininet/tests/stratum_bmv2_test_eth2.log
-	@echo "Test 2 passed" || echo "Test 2 not passed" && echo "Test completed!"
+edf-dp-test-stratum: env-restart
+	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
+	@echo "Starting test for host1"
+	@touch ${PWD}/test/stratum_bmv2_test_h1.log
+	make eth1-send-efcp
+	make eth1-send-ipv4
+	@test -s ${PWD}/test/stratum_bmv2_test_h1.log && echo "Test for host1 passed" || echo "Test for host1 did not pass"
+	@echo "Starting test for host2"
+	@touch ${PWD}/test/stratum_bmv2_test_h2.log
+	make eth2-send-efcp
+	make eth2-send-ipv4
+	@test -s ${PWD}/test/stratum_bmv2_test_h2.log && echo "Test for host2 passed" || echo "Test for host2 did not pass"
+	make env-stop
 
 eth1-send-efcp:
-	@docker exec -it -d ${MN_STR_NAME} tcpdump -i s1-eth1 -c 1 -w output_eth1
+	@docker exec -it -d ${MN_STR_NAME} tshark -i s1-eth1 -c 1 -w output_eth1
 	@docker exec -it ${MN_STR_NAME} m h1 python scripts/h2_send_efcp_h1.py
-	@sleep 2
-	@docker exec -it ${MN_STR_NAME} tcpdump -r output_eth1 > env/mininet/tests/stratum_bmv2_test_eth1.log
+	@echo "EFCP test" >> ${PWD}/test/stratum_bmv2_test_h1.log
+	#@docker exec -it ${MN_STR_NAME} tshark -r output_eth1 -E separator=" " -R "data" -T fields -e frame.number -e frame.protocols -e frame.time -e ip.src -e ip.dst -e data.data -2 >> ${PWD}/test/stratum_bmv2_test_h1.log
+	@docker exec -it ${MN_STR_NAME} tshark -x -r output_eth1 >> ${PWD}/test/stratum_bmv2_test_h1.log
 	
 eth1-send-ipv4:
-	@docker exec -it -d ${MN_STR_NAME} tcpdump -i s1-eth1 -c 1 -w output_eth1
+	@docker exec -it -d ${MN_STR_NAME} tshark -i s1-eth1 -c 1 -w output_eth1
 	@docker exec -it ${MN_STR_NAME} m h1 python scripts/h2_send_ipv4_h1.py
-	@sleep 2
-	@docker exec -it ${MN_STR_NAME} tcpdump -r output_eth1 >> env/mininet/tests/stratum_bmv2_test_eth1.log
+	@echo "IP test" >> ${PWD}/test/stratum_bmv2_test_h1.log
+	@docker exec -it ${MN_STR_NAME} tshark -x -r output_eth1 >> ${PWD}/test/stratum_bmv2_test_h1.log
 
 eth2-send-efcp:
-	@docker exec -it -d ${MN_STR_NAME} tcpdump -i s1-eth2 -c 1 -w output_eth2
+	@docker exec -it -d ${MN_STR_NAME} tshark -i s1-eth2 -c 1 -w output_eth2
 	@docker exec -it ${MN_STR_NAME} m h1 python scripts/h1_send_efcp_h2.py
-	@sleep 2
-	@docker exec -it ${MN_STR_NAME} tcpdump -r output_eth2 > env/mininet/tests/stratum_bmv2_test_eth2.log
+	@echo "EFCP test" >> ${PWD}/test/stratum_bmv2_test_h2.log
+	@docker exec -it ${MN_STR_NAME} tshark -x -r output_eth2 >> ${PWD}/test/stratum_bmv2_test_h2.log
 	
 eth2-send-ipv4:
 	@docker exec -it -d ${MN_STR_NAME} tcpdump -i s1-eth2 -c 1 -w output_eth2
 	@docker exec -it ${MN_STR_NAME} m h1 python scripts/h1_send_ipv4_h2.py
-	@sleep 2	
-	@docker exec -it ${MN_STR_NAME} tcpdump -r output_eth2 >> env/mininet/tests/stratum_bmv2_test_eth2.log
-
-
+	@echo "IP test" >> ${PWD}/test/stratum_bmv2_test_h2.log
+	@docker exec -it ${MN_STR_NAME} tshark -x -r output_eth2 >> ${PWD}/test/stratum_bmv2_test_h2.log
