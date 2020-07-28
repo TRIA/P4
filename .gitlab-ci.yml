@@ -9,14 +9,14 @@ job_efcp_build:
   stage: build
   tags: [npl_bmodel]
 
-#job_dp_test:
-#  script:
-#    - sudo -S su 
-#    - cd dataplane/p4 
-#    - make edf-dp-test-stratum
-#    - cat test/stratum_bmv2_test_h1.log
-#    - cat test/stratum_bmv2_test_h2.log
-#  dependencies:
-#    - job_efcp_build
-#  stage: test
-#  tags: [npl_bmodel]
+job_dp_test:
+  script:
+    - sudo -S su 
+    - cd dataplane/p4 
+    - make edf-dp-test-stratum
+    - cat test/stratum_bmv2_test_h1.log
+    - cat test/stratum_bmv2_test_h2.log
+  dependencies:
+    - job_efcp_build
+  stage: test
+  tags: [npl_bmodel]
