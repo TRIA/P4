@@ -108,7 +108,6 @@ edf-dp-test-stratum-send-pdu:
 
 edf-dp-test-stratum-send-pdu-type:
 	@docker exec -it -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c 1 -w output_${iface}
-	# The name will be provided after the target's action
 	@docker exec -it ${MN_STR_NAME} m ${src_host} python scripts/${src_host}_send_${pdu}_${dst_host}.py
 	@sleep .5
 	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
