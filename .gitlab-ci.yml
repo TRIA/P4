@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - clean
 
 job_efcp_build:
   script:
@@ -11,12 +12,21 @@ job_efcp_build:
 
 job_dp_test:
   script:
-    - sudo -S su 
-    - cd dataplane/p4 
+    - sudo -S su
+    - cd dataplane/p4
     - make edf-dp-test-stratum
     - cat test/stratum_bmv2_test_h1.log
     - cat test/stratum_bmv2_test_h2.log
   dependencies:
     - job_efcp_build
   stage: test
+  tags: [npl_bmodel]
+
+job_cleanup:
+  script:
+    - sudo -S su
+    - rm -rf dataplane/p4/env/mininet/tmp
+  dependencies:
+    - job_dp_test
+  stage: clean
   tags: [npl_bmodel]
