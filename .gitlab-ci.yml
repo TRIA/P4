@@ -1,7 +1,6 @@
 stages:
   - build
   - test
-  - clean
 
 job_efcp_build:
   script:
@@ -19,12 +18,4 @@ job_dp_test:
   dependencies:
     - job_efcp_build
   stage: test
-  tags: [npl_bmodel]
-
-job_cleanup:
-  script:
-    - sudo rm -rf dataplane/p4/env/mininet/tmp
-  dependencies:
-    - job_dp_test
-  stage: clean
   tags: [npl_bmodel]
