@@ -48,14 +48,16 @@ mn-log:
 mn-bmv2-log:
 	if [ -f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log ]; then tail -1000f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log; fi
 
+mn-bmv2-sniff-eth:
+	$(info "Capturing one packet in ${MN_STR_NAME}:s1-${iface} and showing contents afterwards")
+	-@docker exec -it ${MN_STR_NAME} tshark -i s1-${iface} -c 1 -w output_${iface}
+	-@docker exec -it ${MN_STR_NAME} tshark -x -r output_${iface} || true
+
 mn-bmv2-sniff-eth1:
-	$(info "Capturing one packet in ${MN_STR_NAME}:s1-eth1 and showing contents afterwards")
-	-@docker exec -it ${MN_STR_NAME} tshark -i s1-eth1 -c 1 -w output_eth1
+	make mn-bmv2-sniff-eth iface="eth1"
 
 mn-bmv2-sniff-eth2:
-	$(info "Capturing one packet in ${MN_STR_NAME}:s1-eth2 and showing contents afterwards")
-	-@docker exec -it ${MN_STR_NAME} tshark -i s1-eth2 -c 1 -w output_eth2
-	-@docker exec -it ${MN_STR_NAME} cat output_eth2 || true
+	make mn-bmv2-sniff-eth iface="eth2"
 
 p4runtime-log:
 	docker logs -f ${P4R_STR_NAME}
