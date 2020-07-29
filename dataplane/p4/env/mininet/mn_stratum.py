@@ -214,8 +214,9 @@ nodes {{
             '-local_stratum_url=localhost:%d' % pickUnusedPort(),
             '-max_num_controllers_per_node=%d' % MAX_CONTROLLERS_PER_NODE,
             '-write_req_log_file=%s/write-reqs.txt' % self.tmpDir,
+            '-logtosyslog=true',
             '-logtostderr=true',
-            '-bmv2_log_level=%s' % self.loglevel,
+            '-bmv2_log_level trace',
         ]
 
         cmd_string = " ".join(args)
