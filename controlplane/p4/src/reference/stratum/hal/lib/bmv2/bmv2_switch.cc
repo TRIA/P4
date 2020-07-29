@@ -136,7 +136,7 @@ Bmv2Switch::~Bmv2Switch() {}
   // END
   ASSIGN_OR_RETURN(auto* pi_node, GetPINodeFromNodeId(req.device_id()));
   // BEGIN
-  std::cout << "WriteForwardingEntries -> after pi_node" << std::endl;
+  std::cout << "WriteForwardingEntries -> before WriteForwardingEntries" << std::endl;
   // END
   return pi_node->WriteForwardingEntries(req, results);
 }

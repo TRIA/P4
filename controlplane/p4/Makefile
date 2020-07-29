@@ -152,6 +152,10 @@ edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	-v ${EDF_SERVER_SRC_PATH}/docker-entrypoint.sh:/docker-entrypoint.sh \
 	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/common/p4_service.cc:/p4_service.cc \
 	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/bmv2/bmv2_switch.cc:/bmv2_switch.cc \
+	-v ${EDF_REFERENCE_SRC_PATH}/stratum/bazel/deps.bzl:/deps.bzl \
+	-v ${EDF_REFERENCE_SRC_PATH}/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp:/device_mgr.cpp \
+	-v ${EDF_REFERENCE_SRC_PATH}/external/com_github_p4lang_PI/proto/frontend/src/action_helpers.cpp:/action_helpers.cpp \
+	-v ${EDF_REFERENCE_SRC_PATH}/external/com_github_p4lang_PI/proto/frontend/src/common.cpp:/common.cpp \
 	-e NP4_INSTALL=/usr -p 28000:28000 -p 9339:9339 -w /stratum \
 	--network=${EDF_C_NET} \
 	--entrypoint /docker-entrypoint.sh \

@@ -276,6 +276,9 @@ void LogWriteRequest(uint64 node_id, const ::p4::v1::WriteRequest& req,
 
   std::vector<::util::Status> results = {};
   absl::Time timestamp = absl::Now();
+  // BEGIN
+  std::cout << "Write -> before calling WriteForwardingEntries" << std::endl;
+  // END
   ::util::Status status =
       switch_interface_->WriteForwardingEntries(*req, &results);
   // BEGIN
