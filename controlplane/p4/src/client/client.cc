@@ -136,6 +136,33 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
   return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
 }
 
+std::string P4RuntimeClient::EncodeParamValue(uint16_t value) {
+  char hi, lo;
+  std::string res;
+
+  lo = value & 0xFF;
+  hi = value >> 8;
+
+  res[0] = lo;
+  if (hi != 0) {
+    res[1] = hi;
+  }
+
+  return res;
+}
+
+uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
+  uint16_t res;
+
+  res = str[0];
+  if (str.length() > 1) {
+    res = res | uint16_t(str[1]) << 8;
+  }
+
+  return res;
+}
+
+
 // Interesting classes to look at for debugging (from root):
 // ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
 // ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
@@ -203,7 +230,7 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
       // Level6. Action_Param
       ::P4_NAMESPACE_ID::Action_Param * entity_table_action_param = entity_action->mutable_params(param_it->id - 1);
       entity_table_action_param->set_param_id(param_it->id);
-      entity_table_action_param->set_value(param_it->value);
+      entity_table_action_param->set_value(EncodeParamValue(param_it->value));
       std::cout << "Write . Setting param number = " << entity_table_action_param->param_id() << ", value = " << 
         static_cast<std::string>(entity_table_action_param->value()) << std::endl;
     }
@@ -346,7 +373,7 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
     std::cout << "Read . Fetching action id = " << entry->action.action_id << std::endl;
     for (int p = 0; p < response.entities().Get(i).table_entry().action().action().params_size(); p++) {
       param->id = response.entities().Get(i).table_entry().action().action().params(p).param_id();
-      param->value = response.entities().Get(i).table_entry().action().action().params(p).value();
+      param->value = DecodeParamValue(response.entities().Get(i).table_entry().action().action().params(p).value());
       std::cout << "Read . Fetching param id = " << param->id << ", value = " << param->value << std::endl;
       entry->action.parameters.push_back(*param);
     }

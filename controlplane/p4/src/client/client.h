@@ -15,7 +15,7 @@
 
 struct P4Parameter {
   uint32_t id;
-  std::string value;
+  uint16_t value;
 };
 
 struct P4Action {
@@ -130,6 +130,8 @@ class P4RuntimeClient {
     void ReadOutgoingMessagesFromQueueInBg();
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
+    std::string EncodeParamValue(uint16_t value);
+    uint16_t DecodeParamValue(const std::string str);
 
     // P4-info related methods
     void PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);

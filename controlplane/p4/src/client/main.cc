@@ -149,12 +149,12 @@ int main(int argc, char** argv) {
   param.id = 1;
   // param.value = "00:00:00:00:00:02";
   // 48 bits / 6 bytes
-  param.value = "000002";
+  param.value = 2;
   entry.action.parameters.push_back(param);
   param.id = 2;
   // param.value = "000000002";
   // 9 bits / 2 bytes?
-  param.value = "02";
+  param.value = 2;
   // param.value = "0x02";
   // param.value = "\x00\x02";
   entry.action.parameters.push_back(param);
