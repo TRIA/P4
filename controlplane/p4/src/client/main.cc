@@ -234,18 +234,19 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  // std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
-  // // Delete entry in ipv4_lpm, action "NoAction"
-  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
+  // Delete entry in ipv4_lpm, action "NoAction"
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
-  // entry.action.default_action = false;
-  // entry.timeout_ns = 0;
-  // entries.push_back(&entry);
-  // status = p4RuntimeClient.DeleteEntry(entries);
-  // handle_status(status);
-  // entries.clear();
-  // entry.matches.clear();
-  // entry.action.parameters.clear();
+  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
+  entry.action.default_action = false;
+  entry.timeout_ns = 0;
+  entries.push_back(&entry);
+  status = p4RuntimeClient.DeleteEntry(entries);
+  handle_status(status);
+  entries.clear();
+  entry.matches.clear();
+  entry.action.parameters.clear();
 
   // std::cout << "\n-------------- ReadEntry --------------" << std::endl;
   // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");

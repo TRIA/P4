@@ -183,10 +183,14 @@ std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
 uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
   uint16_t res;
 
+  std::cout << "DecodeParamValue . Result before = " << str << std::endl;
+  std::cout << "DecodeParamValue . Result size before = " << str.size() << std::endl;
   res = str[0];
   if (str.length() > 1) {
     res = res | uint16_t(str[1]) << 8;
   }
+  std::cout << "DecodeParamValue . Result after = " << res << std::endl;
+  std::cout << "DecodeParamValue . Result size after = " << size_t(res) << std::endl;
 
   return res;
 }
@@ -400,15 +404,39 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
     entry->action.action_id = response.entities().Get(i).table_entry().action().action().action_id();
     std::cout << "Read . Fetching action id = " << entry->action.action_id << std::endl;
     for (int p = 0; p < response.entities().Get(i).table_entry().action().action().params_size(); p++) {
-      param->id = response.entities().Get(i).table_entry().action().action().params(p).param_id();
-      param->value = DecodeParamValue(response.entities().Get(i).table_entry().action().action().params(p).value());
-      std::cout << "Read . Fetching param id = " << param->id << ", value = " << param->value << std::endl;
+      std::cout << "Read . Before fetching parameters" << std::endl;
+      if (response.entities().Get(i).table_entry().action().action().params().size() > 0) {
+        std::cout << "Read . Number of params = " 
+          << response.entities().Get(i).table_entry().action().action().params().size() << std::endl;
+        // assert check
+        // response.entities().Get(i).table_entry().action().action().params(p).CheckInitialized();
+        // param = {};
+        // std::cout << "Read . Param is initialised = " << std::endl;
+        // std::cout << response.entities().Get(i).table_entry().action().action().params(p).IsInitialized() << std::endl;
+        // bool space_used_more_than_zero = response.entities().Get(i).table_entry().action().action().params(p).SpaceUsed() > 0;
+        // std::cout << space_used_more_than_zero << std::endl;
+        // response.entities().Get(i).table_entry().action().action().params(p).param_id();
+        std::cout << "Read . Before fetching param id" << std::endl;
+        // FIXME: okay before assigning to the value
+        param->id = response.entities().Get(i).table_entry().action().action().params(p).param_id();
+        std::cout << "Read . Fetching param id after 1" << std::endl;
+        std::cout << "Read . Fetching param id = " << param->id << std::endl;
+        std::cout << "Read . Fetching param id after 2" << std::endl;
+        response.entities().Get(i).table_entry().action().action().params(p).value();
+        std::cout << "Read . Fetching param value above " << std::endl;
+        if (!response.entities().Get(i).table_entry().action().action().params(p).value().empty()) {
+          param->value = DecodeParamValue(response.entities().Get(i).table_entry().action().action().params(p).value());
+          std::cout << "Read . Fetching param value = " << param->value << std::endl;
+        }
+      }
       entry->action.parameters.push_back(*param);
     }
     entry->timeout_ns = response.entities().Get(i).table_entry().idle_timeout_ns();
     std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
 
+    std::cout << "Read . Match size = " << response.entities().Get(i).table_entry().match_size() << std::endl;
     for (int m = 0; m < response.entities().Get(i).table_entry().match_size(); m++) {
+      std::cout << "Read . Match inside" << std::endl;
       match->field_id = response.entities().Get(i).table_entry().match(m).field_id();
       if (response.entities().Get(i).table_entry().match(m).has_exact()) {
         match->type = P4MatchType::exact;
@@ -436,14 +464,16 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
       }
       std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
         param->value << std::endl;
+      std::cout << "Read . Before pushing back (most inner loop)" << std::endl;
       entry->matches.push_back(*match);
+      std::cout << "Read . After pushing back (most inner loop)" << std::endl;
     }
 
-    entry->timeout_ns = response.entities().Get(i).table_entry().match_size();
-    std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
-
+    std::cout << "Read . Out of inner loop" << std::endl;
     result.push_back(entry);
+    std::cout << "Read . After pushing back (inner loop)" << std::endl;
   }
+  std::cout << "Read . Out of outer loop" << std::endl;
 
   return result;  
 }
