@@ -16,6 +16,7 @@
 struct P4Parameter {
   uint32_t id;
   uint16_t value;
+  size_t bitwidth;
 };
 
 struct P4Action {
@@ -40,6 +41,7 @@ struct P4Match {
   P4MatchType type;
   // Note: bitstring with the minimum size to express the value
   uint16_t value;
+  size_t bitwidth;
   // Only required for LPM
   // ::PROTOBUF_NAMESPACE_ID::int32 lpm_prefix;
   int32_t lpm_prefix;
@@ -130,7 +132,7 @@ class P4RuntimeClient {
     void ReadOutgoingMessagesFromQueueInBg();
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
-    std::string EncodeParamValue(uint16_t value);
+    std::string EncodeParamValue(uint16_t value, size_t bitwidth);
     uint16_t DecodeParamValue(const std::string str);
 
     // P4-info related methods

@@ -136,17 +136,46 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
   return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
 }
 
-std::string P4RuntimeClient::EncodeParamValue(uint16_t value) {
+std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
   char hi, lo;
   std::string res;
 
+  // 00000010
+  // lo = 00000010 & 11111111 = 00000010
+  // hi = 00000010 * 2^8      = 00000010 00000000
+  // res = 00000010
+  // res = 00000010 00000010 00000000
   lo = value & 0xFF;
   hi = value >> 8;
-
-  res[0] = lo;
+  res.push_back(lo);
   if (hi != 0) {
-    res[1] = hi;
+    res.push_back(hi);
   }
+
+  // Fill in the remaining bytes with leading zeros in order to fit the full bitwidth
+  std::cout << "EncodeParamValue . Result before = " << res << std::endl;
+  std::cout << "EncodeParamValue . Result size before = " << res.size() << std::endl;
+  size_t nbytes = (bitwidth + 7) / 8;
+  std::cout << "EncodeParamValue . nbytes = " << nbytes << std::endl;
+  size_t res_size = res.size();
+  std::cout << "EncodeParamValue . res_size = " << res_size << std::endl;
+  int remaining_zeros = nbytes - res_size;
+  std::string leading_zeros = "";
+  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
+  std::string res_byte = "";
+  while (remaining_zeros > 0) {
+    lo = 0 & 0xFF;
+    hi = 0 >> 8;
+    res_byte.push_back(lo);
+    leading_zeros.append(res_byte);
+    res_byte = "";
+    remaining_zeros--;
+  }
+  res = leading_zeros.append(res);
+  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
+  std::cout << "EncodeParamValue . Leading zeros = " << leading_zeros << std::endl;
+  std::cout << "EncodeParamValue . Result after = " << res << std::endl;
+  std::cout << "EncodeParamValue . Result size after = " << res.size() << std::endl;
 
   return res;
 }
@@ -161,7 +190,6 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
 
   return res;
 }
-
 
 // Interesting classes to look at for debugging (from root):
 // ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
@@ -230,7 +258,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
       // Level6. Action_Param
       ::P4_NAMESPACE_ID::Action_Param * entity_table_action_param = entity_action->mutable_params(param_it->id - 1);
       entity_table_action_param->set_param_id(param_it->id);
-      entity_table_action_param->set_value(EncodeParamValue(param_it->value));
+      entity_table_action_param->set_value(EncodeParamValue(param_it->value, param_it->bitwidth));
       std::cout << "Write . Setting param number = " << entity_table_action_param->param_id() << ", value = " << 
         static_cast<std::string>(entity_table_action_param->value()) << std::endl;
     }
@@ -274,13 +302,13 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
       switch (match_it->type) {
         case P4MatchType::exact : {
           field_match_exact = new ::P4_NAMESPACE_ID::FieldMatch_Exact();
-          field_match_exact->set_value(EncodeParamValue(match_it->value));
+          field_match_exact->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match->set_allocated_exact(field_match_exact);
           break;
         }
         case P4MatchType::ternary : {
           field_match_ternary = new ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-          field_match_ternary->set_value(EncodeParamValue(match_it->value));
+          field_match_ternary->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match_ternary->set_mask(match_it->ternary_mask);
           field_match->set_allocated_ternary(field_match_ternary);
           entity_table_entry->set_priority(entry->priority);
@@ -288,7 +316,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
         }
         case P4MatchType::lpm : {
           field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
-          field_match_lpm->set_value(EncodeParamValue(match_it->value));
+          field_match_lpm->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match_lpm->set_prefix_len(match_it->lpm_prefix);
           field_match->set_allocated_lpm(field_match_lpm);
           break;

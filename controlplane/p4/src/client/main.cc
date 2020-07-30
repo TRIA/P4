@@ -144,17 +144,20 @@ int main(int argc, char** argv) {
   // entry.match.value = "\x0a\x00\x00\x02";
   // 32 bits / 4 bytes
   match.value = 2;
+  match.bitwidth = 32;
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
   param.id = 1;
   // param.value = "00:00:00:00:00:02";
   // 48 bits / 6 bytes
   param.value = 2;
+  param.bitwidth = 48;
   entry.action.parameters.push_back(param);
   param.id = 2;
   // param.value = "000000002";
   // 9 bits / 2 bytes?
   param.value = 2;
+  param.bitwidth = 9;
   // param.value = "0x02";
   // param.value = "\x00\x02";
   entry.action.parameters.push_back(param);
@@ -217,19 +220,19 @@ int main(int argc, char** argv) {
   // entry.matches.clear();
   // entry.action.parameters.clear();
 
-  // std::cout << "\n-------------- ReadEntry --------------" << std::endl;
-  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
-  // entries.push_back(&entry);
-  // std::list<P4TableEntry *> result = p4RuntimeClient.ReadEntry(entries);
-  // if (result.size() > 0) {
-  //   std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
-  // } else {
-  //   std::cerr << "Warning: no entry retrieved" << std::endl;
-  // }
-  // entries.clear();
-  // entry.matches.clear();
-  // entry.action.parameters.clear();
+  std::cout << "\n-------------- ReadEntry --------------" << std::endl;
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
+  entries.push_back(&entry);
+  std::list<P4TableEntry *> result = p4RuntimeClient.ReadEntry(entries);
+  if (result.size() > 0) {
+    std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
+  } else {
+    std::cerr << "Warning: no entry retrieved" << std::endl;
+  }
+  entries.clear();
+  entry.matches.clear();
+  entry.action.parameters.clear();
 
   // std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
   // // Delete entry in ipv4_lpm, action "NoAction"
