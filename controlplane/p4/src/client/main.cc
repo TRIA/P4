@@ -118,40 +118,45 @@ int main(int argc, char** argv) {
   P4Match match;
   P4Parameter param;
 
-  // Step 1: insert a new entry with action "NoAction" (not the default action;
-  // otherwise table would no longer supporting it)
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
-  entry.action.default_action = false;
-  // Setting 1 second (in nanoseconds)
-  entry.timeout_ns = 0;
-  entries.push_back(&entry);
-  status = p4RuntimeClient.InsertEntry(entries);
-  handle_status(status);
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // // Step 1: insert a new entry with action "NoAction" (not the default action;
+  // // otherwise table would no longer supporting it)
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
+  // entry.action.default_action = false;
+  // // Setting 1 second (in nanoseconds)
+  // entry.timeout_ns = 0;
+  // entries.push_back(&entry);
+  // status = p4RuntimeClient.InsertEntry(entries);
+  // handle_status(status);
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
   // Step 2: insert a new entry with action "MyIngress.ipv4_forward"
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
   entry.action.default_action = false;
   // Setting 1 second (in nanoseconds)
-  entry.timeout_ns = pow(10, 9);
+  entry.timeout_ns = 0; //pow(10, 9);
   match.field_id = 1;
   match.type = P4MatchType::lpm;
   // Invalid bytestring
   // entry.match.value = "\x0a\x00\x00\x02";
+  // 32 bits / 4 bytes
   match.value = "0002";
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
   param.id = 1;
   // param.value = "00:00:00:00:00:02";
-  param.value = "2";
+  // 48 bits / 6 bytes
+  param.value = "000002";
   entry.action.parameters.push_back(param);
   param.id = 2;
   // param.value = "000000002";
-  param.value = "2";
+  // 9 bits / 2 bytes?
+  param.value = "02";
+  // param.value = "0x02";
+  // param.value = "\x00\x02";
   entry.action.parameters.push_back(param);
   entries.push_back(&entry);
   status = p4RuntimeClient.InsertEntry(entries);
@@ -160,106 +165,106 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  // Step 3: insert a new entry with action "MyIngress.efcp_forward"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.efcp_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.efcp_forward");
-  entry.action.default_action = false;
-  // Setting 1 second (in nanoseconds)
-  entry.timeout_ns = pow(10, 9);
-  match.field_id = 1;
-  match.type = P4MatchType::exact;
-  match.value = "02";
-  entry.matches.push_back(match);
-  param.id = 1;
-  param.value = "0";
-  entry.action.parameters.push_back(param);
-  param.id = 2;
-  // param.value = "00:00:00:00:00:02";
-  param.value = "2";
-  entry.action.parameters.push_back(param);
-  param.id = 3;
-  param.value = "2";
-  entry.action.parameters.push_back(param);
-  entries.push_back(&entry);
-  status = p4RuntimeClient.InsertEntry(entries);
-  handle_status(status);
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // // Step 3: insert a new entry with action "MyIngress.efcp_forward"
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.efcp_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.efcp_forward");
+  // entry.action.default_action = false;
+  // // Setting 1 second (in nanoseconds)
+  // entry.timeout_ns = 0; //pow(10, 9);
+  // match.field_id = 1;
+  // match.type = P4MatchType::exact;
+  // match.value = "02";
+  // entry.matches.push_back(match);
+  // param.id = 1;
+  // param.value = "0";
+  // entry.action.parameters.push_back(param);
+  // param.id = 2;
+  // // param.value = "00:00:00:00:00:02";
+  // param.value = "2";
+  // entry.action.parameters.push_back(param);
+  // param.id = 3;
+  // param.value = "2";
+  // entry.action.parameters.push_back(param);
+  // entries.push_back(&entry);
+  // status = p4RuntimeClient.InsertEntry(entries);
+  // handle_status(status);
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ModifyEntry --------------" << std::endl;
-  // Update entry in ipv4_lpm, swapping h2 by h1
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
-  entry.action.default_action = false;
-  match.field_id = 1;
-  match.type = P4MatchType::lpm;
-  match.value = "0001";
-  match.lpm_prefix = 32;
-  entry.matches.push_back(match);
-  param.id = 1;
-  // param.value = "00:00:00:00:00:01";
-  param.value = "1";
-  entry.action.parameters.push_back(param);
-  param.id = 2;
-  // param.value = "000000001";
-  param.value = "1";
-  entry.action.parameters.push_back(param);
-  entries.push_back(&entry);
-  status = p4RuntimeClient.ModifyEntry(entries);
-  handle_status(status);
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // std::cout << "\n-------------- ModifyEntry --------------" << std::endl;
+  // // Update entry in ipv4_lpm, swapping h2 by h1
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
+  // entry.action.default_action = false;
+  // match.field_id = 1;
+  // match.type = P4MatchType::lpm;
+  // match.value = "0001";
+  // match.lpm_prefix = 32;
+  // entry.matches.push_back(match);
+  // param.id = 1;
+  // // param.value = "00:00:00:00:00:01";
+  // param.value = "1";
+  // entry.action.parameters.push_back(param);
+  // param.id = 2;
+  // // param.value = "000000001";
+  // param.value = "1";
+  // entry.action.parameters.push_back(param);
+  // entries.push_back(&entry);
+  // status = p4RuntimeClient.ModifyEntry(entries);
+  // handle_status(status);
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ReadEntry --------------" << std::endl;
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
-  entries.push_back(&entry);
-  std::list<P4TableEntry *> result = p4RuntimeClient.ReadEntry(entries);
-  if (result.size() > 0) {
-    std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
-  } else {
-    std::cerr << "Warning: no entry retrieved" << std::endl;
-  }
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // std::cout << "\n-------------- ReadEntry --------------" << std::endl;
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
+  // entries.push_back(&entry);
+  // std::list<P4TableEntry *> result = p4RuntimeClient.ReadEntry(entries);
+  // if (result.size() > 0) {
+  //   std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
+  // } else {
+  //   std::cerr << "Warning: no entry retrieved" << std::endl;
+  // }
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
-  std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
-  // Delete entry in ipv4_lpm, action "NoAction"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
-  entry.action.default_action = false;
-  entry.timeout_ns = 0;
-  entries.push_back(&entry);
-  status = p4RuntimeClient.DeleteEntry(entries);
-  handle_status(status);
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
+  // // Delete entry in ipv4_lpm, action "NoAction"
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
+  // entry.action.default_action = false;
+  // entry.timeout_ns = 0;
+  // entries.push_back(&entry);
+  // status = p4RuntimeClient.DeleteEntry(entries);
+  // handle_status(status);
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ReadEntry --------------" << std::endl;
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
-  entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
-  entries.push_back(&entry);
-  result = p4RuntimeClient.ReadEntry(entries);
-  if (result.size() > 0) {
-    std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
-  } else {
-    std::cerr << "Warning: no entry retrieved" << std::endl;
-  }
-  entries.clear();
-  entry.matches.clear();
-  entry.action.parameters.clear();
+  // std::cout << "\n-------------- ReadEntry --------------" << std::endl;
+  // entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
+  // entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
+  // entries.push_back(&entry);
+  // result = p4RuntimeClient.ReadEntry(entries);
+  // if (result.size() > 0) {
+  //   std::cout << "Success: retrieved entry for table id = " << result.front()->table_id << std::endl;
+  // } else {
+  //   std::cerr << "Warning: no entry retrieved" << std::endl;
+  // }
+  // entries.clear();
+  // entry.matches.clear();
+  // entry.action.parameters.clear();
 
-  std::cout << "\n-------------- APIVersion --------------" << std::endl;
-  std::string version = p4RuntimeClient.APIVersion();
-  if (version.length() > 0) {
-    std::cout << "Success: obtained API version=" << version << std::endl;
-  } else {
-    std::cerr << "Warning: no API version obtained" << std::endl;
-  }
+  // std::cout << "\n-------------- APIVersion --------------" << std::endl;
+  // std::string version = p4RuntimeClient.APIVersion();
+  // if (version.length() > 0) {
+  //   std::cout << "Success: obtained API version=" << version << std::endl;
+  // } else {
+  //   std::cerr << "Warning: no API version obtained" << std::endl;
+  // }
 
   p4RuntimeClient.TearDown();
 

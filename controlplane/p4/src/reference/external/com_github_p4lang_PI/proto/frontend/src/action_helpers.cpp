@@ -78,10 +78,14 @@ Status validate_action_data(const pi_p4info_t *p4info,
       status.set_code(Code::INVALID_ARGUMENT);
       return status;
     }
+    // BEGIN
+    std::cout << "action_helpers::validate_action_data -> about to call check_proto_bytestring with params = "
+    << " p.value() = " << p.value() << ", bitwidth = " << bitwidth << std::endl;
+    // END
     if ((code = check_proto_bytestring(p.value(), bitwidth)) != Code::OK) {
       // BEGIN
       std::cout << "action_helpers::validate_action_data -> check proto bytestring invalid. ERROR! "
-        << " status of = " << code << std::endl;
+        << " status = " << code << std::endl;
       // END
       status.set_code(code);
       return status;
