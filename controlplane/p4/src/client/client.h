@@ -39,7 +39,7 @@ struct P4Match {
   uint32_t field_id;
   P4MatchType type;
   // Note: bitstring with the minimum size to express the value
-  std::string value;
+  uint16_t value;
   // Only required for LPM
   // ::PROTOBUF_NAMESPACE_ID::int32 lpm_prefix;
   int32_t lpm_prefix;

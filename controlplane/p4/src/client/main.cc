@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
   // Invalid bytestring
   // entry.match.value = "\x0a\x00\x00\x02";
   // 32 bits / 4 bytes
-  match.value = "0002";
+  match.value = 2;
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
   param.id = 1;

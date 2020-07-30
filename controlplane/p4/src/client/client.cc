@@ -266,7 +266,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
       // Perform any expected conversion to bytestring at this point
       // match->value = std::stoi(match->value, 0, 16);
       std::cout << "Write . Setting match type = " << match_it->type << ", value = " 
-        << static_cast<std::string>(match_it->value) << std::endl;
+        << match_it->value << std::endl;
       field_match = entity_table_entry->mutable_match(0);
       field_match->set_field_id(match_it->field_id);
 
@@ -274,13 +274,13 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
       switch (match_it->type) {
         case P4MatchType::exact : {
           field_match_exact = new ::P4_NAMESPACE_ID::FieldMatch_Exact();
-          field_match_exact->set_value(match_it->value);
+          field_match_exact->set_value(EncodeParamValue(match_it->value));
           field_match->set_allocated_exact(field_match_exact);
           break;
         }
         case P4MatchType::ternary : {
           field_match_ternary = new ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-          field_match_ternary->set_value(match_it->value);
+          field_match_ternary->set_value(EncodeParamValue(match_it->value));
           field_match_ternary->set_mask(match_it->ternary_mask);
           field_match->set_allocated_ternary(field_match_ternary);
           entity_table_entry->set_priority(entry->priority);
@@ -288,7 +288,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
         }
         case P4MatchType::lpm : {
           field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
-          field_match_lpm->set_value(match_it->value);
+          field_match_lpm->set_value(EncodeParamValue(match_it->value));
           field_match_lpm->set_prefix_len(match_it->lpm_prefix);
           field_match->set_allocated_lpm(field_match_lpm);
           break;
@@ -384,15 +384,15 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
       match->field_id = response.entities().Get(i).table_entry().match(m).field_id();
       if (response.entities().Get(i).table_entry().match(m).has_exact()) {
         match->type = P4MatchType::exact;
-        match->value = response.entities().Get(i).table_entry().match(m).exact().value();
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).exact().value());
       } else if (response.entities().Get(i).table_entry().match(m).has_ternary()) {
         match->type = P4MatchType::ternary;
-        match->value = response.entities().Get(i).table_entry().match(m).ternary().value();
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).ternary().value());
         match->ternary_mask = response.entities().Get(i).table_entry().match(m).ternary().mask();
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_lpm()) {
         match->type = P4MatchType::lpm;
-        match->value = response.entities().Get(i).table_entry().match(m).lpm().value();
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).lpm().value());
         match->lpm_prefix = response.entities().Get(i).table_entry().match(m).lpm().prefix_len();
       } else if (response.entities().Get(i).table_entry().match(m).has_range()) {
         match->type = P4MatchType::range;
@@ -401,7 +401,7 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_optional()) {
         match->type = P4MatchType::optional;
-        match->value = response.entities().Get(i).table_entry().match(m).optional().value();
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).optional().value());
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_other()) {
         match->type = P4MatchType::other;
