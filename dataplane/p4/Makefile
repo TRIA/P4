@@ -47,6 +47,7 @@ mn-log:
 
 mn-bmv2-log:
 	if [ -f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log ]; then tail -1000f ${PWD}/env/mininet/tmp/s1/stratum_bmv2.log; fi
+#	docker exec -it ${MN_STR_NAME} tail -1000f /tmp/s1/stratum_bmv2.log
 
 mn-bmv2-sniff-eth:
 	$(info "Capturing one packet in ${MN_STR_NAME}:s1-${iface} and showing contents afterwards")
@@ -75,7 +76,12 @@ efcp-build: model/efcp.p4
 	@echo "*** P4 program compiled successfully! Output files are in model/build"
 
 mn-start: docker_net_create
-	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet -v ${PWD}/../common/tests:/root/tests -v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp -v ${PWD}/../common/tests/pdu_types.py:/root/pdu_types.py -v ${PWD}/../common/tests/send_efcp_h1.py:/root/send_efcp_h1.py -v ${PWD}/../common/tests/send_efcp_h2.py:/root/send_efcp_h2.py -p50001:50001 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} sergiogimenez/mininet-mod:latest
+	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
+		-v ${PWD}/../common/tests:/root/tests -v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp \
+		-v ${PWD}/../common/tests/pdu_types.py:/root/pdu_types.py \
+		-v ${PWD}/../common/tests/send_efcp_h1.py:/root/send_efcp_h1.py \
+		-v ${PWD}/../common/tests/send_efcp_h2.py:/root/send_efcp_h2.py -p50001:50001 \
+		--name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} sergiogimenez/mininet-mod:latest
 #	current=${PWD} && \
 #		cd env/mininet && \
 #		docker build -t edf-dp-mn-stratum:latest . && \
