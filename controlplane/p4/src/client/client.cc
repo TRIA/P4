@@ -147,14 +147,14 @@ std::string P4RuntimeClient::EncodeParamValue(uint16_t value) {
   // res = 00000010 00000010 00000000
 
   // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
-  // From least to most significant bits (b{_1}b{_0}, then
-  // retrieve specific octet by shifting as many positions to the right as the most significant it in the octect
-  //   (that is, "b0" will shift 16 bits - 8 bits, "b1" will shift 16 bits - 16 bits)
+  // From most to least significant bits (b1|b0), retrieve specific octet by shifting
+  // as many positions to the right as the most significant it in the octect (that is,
+  // "b1" will shift 16 bits - 8 bits, "b0" will shift 16 bits - 16 bits)
   // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
-  b0 = (value >> 8) & 0xFF;
-  b1 = value & 0xFF;
-  res.push_back(b0);
+  b1 = (value >> 8) & 0xFF;
+  b0 = value & 0xFF;
   res.push_back(b1);
+  res.push_back(b0);
 
   // Fill in the remaining bytes with leading zeros in order to fit the full bitwidth
   //std::cout << "EncodeParamValue . Result before = " << res << std::endl;
@@ -209,19 +209,19 @@ std::string P4RuntimeClient::EncodeMatchValue(uint32_t value) {
   std::string res;
 
   // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
-  // From least to most significant bits (b{_3}b{_2}b{_1}b{_0}, then
-  // retrieve specific octet by shifting as many positions to the right as the most significant it in the octect
-  //   (that is, "b0" will shift 32 bits - 8 bits, "b1" will shift 32 bits - 16 bits, etc)
+  // From most to least significant bits (b3|b2|b1|b0), retrieve specific octet by shifting
+  // as many positions to the right as the most significant it in the octect (that is,
+  // "b3" will shift 32 bits - 8 bits, "b2" will shift 32 bits - 16 bits, and so on)
   // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
-  b0 = (value >> 24) & 0xFF;
-  b1 = (value >> 16) & 0xFF;
-  b2 = (value >> 8) & 0xFF;
-  b3 = value & 0xFF;
+  b3 = (value >> 24) & 0xFF;
+  b2 = (value >> 16) & 0xFF;
+  b1 = (value >> 8) & 0xFF;
+  b0 = value & 0xFF;
 
-  res.push_back(b0);
-  res.push_back(b1);
-  res.push_back(b2);
   res.push_back(b3);
+  res.push_back(b2);
+  res.push_back(b1);
+  res.push_back(b0);
 
   return res;
 }
