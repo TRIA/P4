@@ -10,57 +10,10 @@
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.pb.h"
 
-// Import declarations after any other
+// Import P4-related declarations after any other
 #include "../common/ns_def.inc"
 
-struct P4Parameter {
-  uint32_t id;
-  // Bitstring with enough capacity to express strings with variable sizes
-  uint64_t value;
-  size_t bitwidth;
-};
-
-struct P4Action {
-  uint32_t action_id;
-  // Flag to indicate whether the action is the default choice for a table
-  bool default_action;
-  std::list<P4Parameter> parameters;
-};
-
-// Using same IDs as in spec
-enum P4MatchType {
-  exact = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kExact,
-  ternary = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kTernary,
-  lpm = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kLpm,
-  range = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kRange,
-  optional = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOptional,
-  other = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOther
-};
-
-struct P4Match {
-  uint32_t field_id;
-  P4MatchType type;
-  // Bitstring with enough capacity to express strings with variable sizes
-  uint64_t value;
-  size_t bitwidth;
-  // Only required for LPM
-  int32_t lpm_prefix;
-  // Only required for Ternary
-  std::string ternary_mask;
-  // Required for Range
-  std::string range_low;
-  std::string range_high;
-};
-
-struct P4TableEntry {
-  uint32_t table_id;
-  P4Action action;
-  std::list<P4Match> matches;
-  // Only available for Ternary, Range or Optional matches
-  int32_t priority;
-  // Only available for non-default Actions. Use nanoseconds
-  int64_t timeout_ns;
-};
+#include "p4_structs.h"
 
 class P4RuntimeClient {
 
@@ -71,13 +24,18 @@ class P4RuntimeClient {
                     ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
                     std::string electionId);
 
-    // RPC methods
+    // RPC methods: configuration
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
-    ::GRPC_NAMESPACE_ID::Status InsertEntry(std::list<P4TableEntry*> entries);
-    ::GRPC_NAMESPACE_ID::Status ModifyEntry(std::list<P4TableEntry*> entries);
-    ::GRPC_NAMESPACE_ID::Status DeleteEntry(std::list<P4TableEntry*> entries);
-    std::list<P4TableEntry*> ReadEntry(std::list<P4TableEntry*> query);
+    // RPC methods: tables
+    ::GRPC_NAMESPACE_ID::Status InsertTableEntry(std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status ModifyTableEntry(std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status DeleteTableEntry(std::list<P4TableEntry*> entries);
+    std::list<P4TableEntry*> ReadTableEntry(std::list<P4TableEntry*> query);
+    // RPC methods: counters
+    std::list<P4DirectCounterEntry*> ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> query);
+    std::list<P4CounterEntry*> ReadIndirectCounterEntry(std::list<P4CounterEntry*> query);
+    // RPC methods: others
     std::string APIVersion();
 
     // Ancillary methods
@@ -116,7 +74,7 @@ class P4RuntimeClient {
     bool outThreadStop_;
 
     // RPC methods
-    ::GRPC_NAMESPACE_ID::Status WriteEntry(std::list<P4TableEntry*> entries,
+    ::GRPC_NAMESPACE_ID::Status WriteTableEntry(std::list<P4TableEntry*> entries,
       ::P4_NAMESPACE_ID::Update::Type updateType);
 
     // Ancillary methods
