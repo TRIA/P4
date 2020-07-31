@@ -137,45 +137,31 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
 }
 
 std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
-  char hi, lo;
+  char lsb, msb;
   std::string res;
 
-  // 00000010
-  // lo = 00000010 & 11111111 = 00000010
-  // hi = 00000010 * 2^8      = 00000010 00000000
-  // res = 00000010
-  // res = 00000010 00000010 00000000
-  lo = value & 0xFF;
-  hi = value >> 8;
-  res.push_back(lo);
-  if (hi != 0) {
-    res.push_back(hi);
+  // From most to least significant bits (msb|lsb), retrieve specific octet by shifting
+  // as many positions to the right as the most significant it in the octect
+  // (that is, shift(bitwidth - most_significant_bit_position); e.g.,
+  // "msb" will shift 16 bits - 16 bits, "lsb" will shift 16 bits - 8 bits)
+  msb = value & 0xFF;
+  lsb = value >> 8;
+  res.push_back(msb);
+  if (lsb != 0) {
+    res.push_back(lsb);
   }
 
-  // Fill in the remaining bytes with leading zeros in order to fit the full bitwidth
-  std::cout << "EncodeParamValue . Result before = " << res << std::endl;
-  std::cout << "EncodeParamValue . Result size before = " << res.size() << std::endl;
+  // Fill in the remaining bytes (computed as the expected "nbytes" - sizeof generated string)
+  // with leading zeros in order to fit the full bitwidth expected per value
   size_t nbytes = (bitwidth + 7) / 8;
-  std::cout << "EncodeParamValue . nbytes = " << nbytes << std::endl;
-  size_t res_size = res.size();
-  std::cout << "EncodeParamValue . res_size = " << res_size << std::endl;
-  int remaining_zeros = nbytes - res_size;
-  std::string leading_zeros = "";
-  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
+  int remaining_zeros = nbytes - res.size();
   std::string res_byte = "";
-  while (remaining_zeros > 0) {
-    lo = 0 & 0xFF;
-    hi = 0 >> 8;
-    res_byte.push_back(lo);
-    leading_zeros.append(res_byte);
+  while (remaining_zeros-- > 0) {
+    msb = 0 & 0xFF;
+    res_byte.push_back(msb);
+    res = res_byte + res;
     res_byte = "";
-    remaining_zeros--;
   }
-  res = leading_zeros.append(res);
-  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
-  std::cout << "EncodeParamValue . Leading zeros = " << leading_zeros << std::endl;
-  std::cout << "EncodeParamValue . Result after = " << res << std::endl;
-  std::cout << "EncodeParamValue . Result size after = " << res.size() << std::endl;
 
   return res;
 }
@@ -195,14 +181,12 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
   return res;
 }
 
-// Interesting classes to look at for debugging (from root):
-// ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
-// ./controlplane/p4/src/server/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
-// ./controlplane/p4/src/server/stratum/stratum/hal/lib/pi/pi_node.cc
+// Write will call, among others, the next classes:
+// ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
+// ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
 ::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteEntry(std::list<P4TableEntry*> entries,
     ::P4_NAMESPACE_ID::Update::Type updateType) {
   ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
-  // Note: update is coupled with "modify_entry" (1:1) anyway; it can be handled outside main loop
   request.add_updates();
   ::P4_NAMESPACE_ID::Update * update = request.mutable_updates(0);
   ::P4_NAMESPACE_ID::Entity * entity = new ::P4_NAMESPACE_ID::Entity();
@@ -270,6 +254,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
     // Level3. TableEntry
     // Set default action and TTL for entry (in nanoseconds, 0 is infinite)
     entity_table_entry->set_is_default_action(entry->action.default_action);
+    // NOTE: currently ide_timeout is always set to 0, as "pow(10, 9)" for a second is rejected
     if (entry->action.default_action) {
       entity_table_entry->set_idle_timeout_ns(0);
     } else {
@@ -417,11 +402,9 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
         // std::cout << space_used_more_than_zero << std::endl;
         // response.entities().Get(i).table_entry().action().action().params(p).param_id();
         std::cout << "Read . Before fetching param id" << std::endl;
-        // FIXME: okay before assigning to the value
+        // FIXME: fails when assigning to the struct field
         param->id = response.entities().Get(i).table_entry().action().action().params(p).param_id();
-        std::cout << "Read . Fetching param id after 1" << std::endl;
         std::cout << "Read . Fetching param id = " << param->id << std::endl;
-        std::cout << "Read . Fetching param id after 2" << std::endl;
         response.entities().Get(i).table_entry().action().action().params(p).value();
         std::cout << "Read . Fetching param value above " << std::endl;
         if (!response.entities().Get(i).table_entry().action().action().params(p).value().empty()) {
@@ -464,21 +447,20 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
       }
       std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
         param->value << std::endl;
-      std::cout << "Read . Before pushing back (most inner loop)" << std::endl;
+      std::cout << "Read . Match . Before pushing back (inner loop)" << std::endl;
       entry->matches.push_back(*match);
-      std::cout << "Read . After pushing back (most inner loop)" << std::endl;
+      std::cout << "Read . Match . After pushing back (inner loop)" << std::endl;
     }
 
-    std::cout << "Read . Out of inner loop" << std::endl;
+    std::cout << "Read . Outer loop" << std::endl;
     result.push_back(entry);
-    std::cout << "Read . After pushing back (inner loop)" << std::endl;
+    std::cout << "Read . After pushing back (outer loop)" << std::endl;
   }
   std::cout << "Read . Out of outer loop" << std::endl;
 
   return result;  
 }
 
-// See reference/p4runtime-shell-python/p4runtime.py#api_version
 std::string P4RuntimeClient::APIVersion() {
   std::cout << "\n" << "Fetching version of the API" << std::endl;
 
@@ -750,8 +732,8 @@ void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
     for (::P4_CONFIG_NAMESPACE_ID::MatchField matchField : table.match_fields()) {
       std::cout << "    Match id: " << matchField.id() << std::endl;
       std::cout << "    Match name: " << matchField.name() << std::endl;
+      std::cout << "    Match bitwidth: " << matchField.bitwidth() << std::endl;
       std::cout << "    Match type: " << matchField.match_type() << std::endl;
-      std::cout << "    Match case: " << matchField.match_case() << std::endl;
     }
     for (::P4_CONFIG_NAMESPACE_ID::ActionRef actionRef : table.action_refs()) {
       for (::P4_CONFIG_NAMESPACE_ID::Action action : p4Info_.actions()) {

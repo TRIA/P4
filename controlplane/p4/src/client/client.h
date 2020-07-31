@@ -15,7 +15,8 @@
 
 struct P4Parameter {
   uint32_t id;
-  uint16_t value;
+  // Bitstring with enough capacity to express strings with variable sizes
+  uint64_t value;
   size_t bitwidth;
 };
 
@@ -39,11 +40,10 @@ enum P4MatchType {
 struct P4Match {
   uint32_t field_id;
   P4MatchType type;
-  // Note: bitstring with the minimum size to express the value
-  uint16_t value;
+  // Bitstring with enough capacity to express strings with variable sizes
+  uint64_t value;
   size_t bitwidth;
   // Only required for LPM
-  // ::PROTOBUF_NAMESPACE_ID::int32 lpm_prefix;
   int32_t lpm_prefix;
   // Only required for Ternary
   std::string ternary_mask;
