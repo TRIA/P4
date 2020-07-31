@@ -42,6 +42,7 @@ make edf-dp-server-start
 
 To attach to the logs, type the following in a new terminal:
 ```bash
+make edf-dp-server-log-docker
 make edf-dp-server-log
 ```
 

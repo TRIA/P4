@@ -109,7 +109,7 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
 
 // See reference/p4runtime-shell-python/p4runtime.py#get_p4info
 P4Info P4RuntimeClient::GetP4Info() {
-  std::cout << "\n" << "Retrieving P4Info file" << std::endl;
+  std::cout << "Retrieving P4Info file" << std::endl;
   GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
   request.set_device_id(deviceId_);
   request.set_response_type(request.P4INFO_AND_COOKIE);
@@ -169,14 +169,10 @@ std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
 uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
   uint16_t res;
 
-  std::cout << "DecodeParamValue . Result before = " << str << std::endl;
-  std::cout << "DecodeParamValue . Result size before = " << str.size() << std::endl;
   res = str[0];
   if (str.length() > 1) {
     res = res | uint16_t(str[1]) << 8;
   }
-  std::cout << "DecodeParamValue . Result after = " << res << std::endl;
-  std::cout << "DecodeParamValue . Result size after = " << size_t(res) << std::endl;
 
   return res;
 }
@@ -354,24 +350,24 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
 std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> filter) {
   std::list<P4TableEntry*>::iterator it;
   std::list<P4TableEntry*> result;
+  P4TableEntry * filter_entry;
   P4TableEntry * entry;
   P4Match * match;
   P4Parameter * param;
   ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
   ClientContext context;
  
-  request.set_device_id(deviceId_); 
+  request.set_device_id(deviceId_);
   for (it = filter.begin(); it != filter.end(); ++it) {
-    entry = *it;
-
+    filter_entry = *it;
     ::P4_NAMESPACE_ID::Action *p4EntityAction = new ::P4_NAMESPACE_ID::Action();
-    p4EntityAction->set_action_id(entry->action.action_id);
+    p4EntityAction->set_action_id(filter_entry->action.action_id);
     ::P4_NAMESPACE_ID::TableAction * p4EntityTableAction = new ::P4_NAMESPACE_ID::TableAction();
     p4EntityTableAction->set_allocated_action(p4EntityAction);
     ::P4_NAMESPACE_ID::TableEntry * p4EntityTableEntry = new ::P4_NAMESPACE_ID::TableEntry();
-    p4EntityTableEntry->set_table_id(entry->table_id);
-    std::cout << "Read . Requested table id = " << entry->table_id << std::endl;
-    std::cout << "Read . Requested action id = " << entry->action.action_id << std::endl;
+    p4EntityTableEntry->set_table_id(filter_entry->table_id);
+    std::cout << "Read . Requested table id = " << filter_entry->table_id << std::endl;
+    std::cout << "Read . Requested action id = " << filter_entry->action.action_id << std::endl;
     p4EntityTableEntry->mutable_action()->set_allocated_action(p4EntityAction);
     request.add_entities()->set_allocated_table_entry(p4EntityTableEntry);
   }
@@ -380,48 +376,46 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
   std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
   clientReader->Read(&response);
   clientReader->Finish();
+  bool read_entry_matches_filter = false;
 
   std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
   for (int i = 0; i < response.entities_size(); i++) {
     const p4::v1::TableEntry rentry = response.entities().Get(i).table_entry();
+
+    // Check returned entries against those that were sent in the filter
+    for (it = filter.begin(); it != filter.end(); ++it) {
+      filter_entry = *it;
+      if ((filter_entry->table_id == rentry.table_id()) &&
+        (filter_entry->action.action_id == rentry.action().action().action_id())) {
+          read_entry_matches_filter = true;
+        }
+    }
+    // If there is no match, skip the current iteration (i.e., do not output entries that were not requested)
+    if (!read_entry_matches_filter) {
+      continue;
+    }
+
     entry = new P4TableEntry();
     entry->table_id = rentry.table_id();
     std::cout << "Read . Fetching table id = " << entry->table_id << std::endl;
     entry->action.action_id = rentry.action().action().action_id();
     std::cout << "Read . Fetching action id = " << entry->action.action_id << std::endl;
+    std::cout << "Read . Fetching param size = " << rentry.action().action().params().size() << std::endl;
     for (int p = 0; p < rentry.action().action().params_size(); p++) {
       param = new P4Parameter();
-      std::cout << "Read . Before fetching parameters" << std::endl;
       if (rentry.action().action().params().size() > 0) {
-        std::cout << "Read . Number of params = " << rentry.action().action().params().size() << std::endl;
-        // assert check
-        // response.entities().Get(i).table_entry().action().action().params(p).CheckInitialized();
-        // param = {};
-        // std::cout << "Read . Param is initialised = " << std::endl;
-        // std::cout << response.entities().Get(i).table_entry().action().action().params(p).IsInitialized() << std::endl;
-        // bool space_used_more_than_zero = response.entities().Get(i).table_entry().action().action().params(p).SpaceUsed() > 0;
-        // std::cout << space_used_more_than_zero << std::endl;
-        // response.entities().Get(i).table_entry().action().action().params(p).param_id();
-        std::cout << "Read . Before fetching param id" << std::endl;
-        // FIXME: fails when assigning to the struct field
         param->id = rentry.action().action().params(p).param_id();
-        std::cout << "Read . Fetching param id = " << param->id << std::endl;
-        rentry.action().action().params(p).value();
-        std::cout << "Read . Fetching param value above " << std::endl;
-        if (!rentry.action().action().params(p).value().empty()) {
-          param->value = DecodeParamValue(rentry.action().action().params(p).value());
-          std::cout << "Read . Fetching param value = " << param->value << std::endl;
-        }
+        param->value = DecodeParamValue(rentry.action().action().params(p).value());
+        std::cout << "Read . Fetching param id = " << param->id << ", value = " << param->value << std::endl;
       }
       entry->action.parameters.push_back(*param);
     }
     entry->timeout_ns = rentry.idle_timeout_ns();
     std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
 
-    std::cout << "Read . Match size = " << rentry.match_size() << std::endl;
+    std::cout << "Read . Fetching match size = " << rentry.match_size() << std::endl;
     for (int m = 0; m < rentry.match_size(); m++) {
       match = new P4Match();
-      std::cout << "Read . Match inside" << std::endl;
       match->field_id = rentry.match(m).field_id();
       if (rentry.match(m).has_exact()) {
         match->type = P4MatchType::exact;
@@ -448,23 +442,18 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
         match->type = P4MatchType::other;
       }
       std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
-        param->value << std::endl;
-      std::cout << "Read . Match . Before pushing back (inner loop)" << std::endl;
+        match->value << std::endl;
       entry->matches.push_back(*match);
-      std::cout << "Read . Match . After pushing back (inner loop)" << std::endl;
     }
 
-    std::cout << "Read . Outer loop" << std::endl;
     result.push_back(entry);
-    std::cout << "Read . After pushing back (outer loop)" << std::endl;
   }
-  std::cout << "Read . Out of outer loop" << std::endl;
 
   return result;  
 }
 
 std::string P4RuntimeClient::APIVersion() {
-  std::cout << "\n" << "Fetching version of the API" << std::endl;
+  std::cout << "Fetching version of the API" << std::endl;
 
   CapabilitiesRequest request = CapabilitiesRequest();
   CapabilitiesResponse response = CapabilitiesResponse();

@@ -94,13 +94,13 @@ int main(int argc, char** argv) {
   P4RuntimeClient p4RuntimeClient(grpc_server_addr, config_paths, deviceId, election_id);
   Status status;
 
-  std::cout << "\n-------------- GetP4Info (before pushing pipeline) --------------" << std::endl;
+  std::cout << "\n-------------- GetP4Info (before pushing pipeline) --------------\n" << std::endl;
   P4Info p4Info = p4RuntimeClient.GetP4Info();
   if (p4Info.tables_size() == 0) {
     std::cout << "Warning: forwarding pipeline configuration should be pushed before calling this" << std::endl;
   }
 
-  std::cout << "\n-------------- SetFwdPipeConfig --------------" << std::endl;
+  std::cout << "\n-------------- SetFwdPipeConfig --------------\n" << std::endl;
   if (p4Info.tables_size() == 0) {
     status = p4RuntimeClient.SetFwdPipeConfig();
     handle_status(status);
@@ -108,10 +108,10 @@ int main(int argc, char** argv) {
     std::cout << "Warning: forwarding pipeline configuration already pushed" << std::endl;
   }
 
-  std::cout << "\n-------------- GetP4Info (after pushing pipeline) --------------" << std::endl;
+  std::cout << "\n-------------- GetP4Info (after pushing pipeline) --------------\n" << std::endl;
   p4Info = p4RuntimeClient.GetP4Info();
 
-  std::cout << "\n-------------- InsertEntry --------------" << std::endl;
+  std::cout << "\n-------------- InsertEntry --------------\n" << std::endl;
   std::list<P4TableEntry *> entries;
   P4TableEntry entry;
   P4Match match;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ModifyEntry --------------" << std::endl;
+  std::cout << "\n-------------- ModifyEntry --------------\n" << std::endl;
   // Update entry in ipv4_lpm with a given match, just changing 1st param to MAC for h1
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ReadEntry --------------" << std::endl;
+  std::cout << "\n-------------- ReadEntry --------------\n" << std::endl;
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "MyIngress.ipv4_forward");
   entries.push_back(&entry);
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  std::cout << "\n-------------- DeleteEntry --------------" << std::endl;
+  std::cout << "\n-------------- DeleteEntry --------------\n" << std::endl;
   // Step 1: delete entry with action "NoAction"
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  std::cout << "\n-------------- ReadEntry --------------" << std::endl;
+  std::cout << "\n-------------- ReadEntry --------------\n" << std::endl;
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "NoAction");
   entries.push_back(&entry);
@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  std::cout << "\n-------------- APIVersion --------------" << std::endl;
+  std::cout << "\n-------------- APIVersion --------------\n" << std::endl;
   std::string version = p4RuntimeClient.APIVersion();
   if (version.length() > 0) {
     std::cout << "Success: obtained API version=" << version << std::endl;
