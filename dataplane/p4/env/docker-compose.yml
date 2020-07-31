@@ -15,7 +15,7 @@ services:
 #      - ${MN_STRATUM_TMP_DIR}:/tmp
       - ./mininet/tmp:/tmp
       - ./mininet:/mininet
-      - ./mininet/scripts:/root/scripts
+      - ../../common/tests:/root/scripts
     ports:
       - "50001:50001"
 #      - "50001-50030:50001-50030"
