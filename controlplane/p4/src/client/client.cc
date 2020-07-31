@@ -136,108 +136,61 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
   return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
 }
 
-std::string P4RuntimeClient::EncodeParamValue(uint16_t value) {
-  char b0, b1;
+std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
+  char hi, lo;
   std::string res;
 
-  // value = 00000010
+  // 00000010
   // lo = 00000010 & 11111111 = 00000010
   // hi = 00000010 * 2^8      = 00000010 00000000
   // res = 00000010
   // res = 00000010 00000010 00000000
-
-  // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
-  // From most to least significant bits (b1|b0), retrieve specific octet by shifting
-  // as many positions to the right as the most significant it in the octect (that is,
-  // "b1" will shift 16 bits - 8 bits, "b0" will shift 16 bits - 16 bits)
-  // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
-  b1 = (value >> 8) & 0xFF;
-  b0 = value & 0xFF;
-  res.push_back(b1);
-  res.push_back(b0);
+  lo = value & 0xFF;
+  hi = value >> 8;
+  res.push_back(lo);
+  if (hi != 0) {
+    res.push_back(hi);
+  }
 
   // Fill in the remaining bytes with leading zeros in order to fit the full bitwidth
-  //std::cout << "EncodeParamValue . Result before = " << res << std::endl;
-  //std::cout << "EncodeParamValue . Result size before = " << res.size() << std::endl;
-  //size_t nbytes = (bitwidth + 7) / 8;
-  //std::cout << "EncodeParamValue . nbytes = " << nbytes << std::endl;
-  //size_t res_size = res.size();
-  //std::cout << "EncodeParamValue . res_size = " << res_size << std::endl;
-  //int remaining_zeros = nbytes - res_size;
-  //std::string leading_zeros = "";
-  //std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
-  //std::string res_byte = "";
-  //while (remaining_zeros > 0) {
-  //  lo = 0 & 0xFF;
-  //  hi = 0 >> 8;
-  //  res_byte.push_back(lo);
-  //  leading_zeros.append(res_byte);
-  //  res_byte = "";
-  //  remaining_zeros--;
-  //}
-  //res = leading_zeros.append(res);
-  //std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
-  //std::cout << "EncodeParamValue . Leading zeros = " << leading_zeros << std::endl;
-  //std::cout << "EncodeParamValue . Result after = " << res << std::endl;
-  //std::cout << "EncodeParamValue . Result size after = " << res.size() << std::endl;
+  std::cout << "EncodeParamValue . Result before = " << res << std::endl;
+  std::cout << "EncodeParamValue . Result size before = " << res.size() << std::endl;
+  size_t nbytes = (bitwidth + 7) / 8;
+  std::cout << "EncodeParamValue . nbytes = " << nbytes << std::endl;
+  size_t res_size = res.size();
+  std::cout << "EncodeParamValue . res_size = " << res_size << std::endl;
+  int remaining_zeros = nbytes - res_size;
+  std::string leading_zeros = "";
+  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
+  std::string res_byte = "";
+  while (remaining_zeros > 0) {
+    lo = 0 & 0xFF;
+    hi = 0 >> 8;
+    res_byte.push_back(lo);
+    leading_zeros.append(res_byte);
+    res_byte = "";
+    remaining_zeros--;
+  }
+  res = leading_zeros.append(res);
+  std::cout << "EncodeParamValue . Remaining zeros = " << remaining_zeros << std::endl;
+  std::cout << "EncodeParamValue . Leading zeros = " << leading_zeros << std::endl;
+  std::cout << "EncodeParamValue . Result after = " << res << std::endl;
+  std::cout << "EncodeParamValue . Result size after = " << res.size() << std::endl;
 
   return res;
 }
 
-uint16_t P4RuntimeClient::DecodeParamValue(const std::string& str) {
+uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
   uint16_t res;
 
-  //std::cout << "DecodeParamValue . Result before = " << str << std::endl;
-  //std::cout << "DecodeParamValue . Result size before = " << str.size() << std::endl;
-  
-  if (str.size() < 2) {
-    return 0; 
+  std::cout << "DecodeParamValue . Result before = " << str << std::endl;
+  std::cout << "DecodeParamValue . Result size before = " << str.size() << std::endl;
+  res = str[0];
+  if (str.length() > 1) {
+    res = res | uint16_t(str[1]) << 8;
   }
-  
-  // Assumes a 16-bit integer was encoded in a previous step
-  res = str[1];
-  res = res | uint16_t(str[0]) << 8;
-  
-  //std::cout << "DecodeParamValue . Result after = " << res << std::endl;
-  //std::cout << "DecodeParamValue . Result size after = " << size_t(res) << std::endl;
-
-  return res;
-}
-
-std::string P4RuntimeClient::EncodeMatchValue(uint32_t value) {
-  char b0, b1, b2, b3;
-  std::string res;
-
-  // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
-  // From most to least significant bits (b3|b2|b1|b0), retrieve specific octet by shifting
-  // as many positions to the right as the most significant it in the octect (that is,
-  // "b3" will shift 32 bits - 8 bits, "b2" will shift 32 bits - 16 bits, and so on)
-  // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
-  b3 = (value >> 24) & 0xFF;
-  b2 = (value >> 16) & 0xFF;
-  b1 = (value >> 8) & 0xFF;
-  b0 = value & 0xFF;
-
-  res.push_back(b3);
-  res.push_back(b2);
-  res.push_back(b1);
-  res.push_back(b0);
-
-  return res;
-}
-
-uint32_t P4RuntimeClient::DecodeMatchValue(const std::string& str) {
-  uint32_t res;
-
-  if (str.size() < 4) {
-    return 0;
-  }
-
-  // Assumes a 32-bit integer was encoded in a previous step
-  res = str[3];
-  res = res | uint32_t(str[2]) << 8;
-  res = res | uint32_t(str[1]) << 16;
-  res = res | uint32_t(str[0]) << 24;
+  std::cout << "DecodeParamValue . Result after = " << res << std::endl;
+  std::cout << "DecodeParamValue . Result size after = " << size_t(res) << std::endl;
 
   return res;
 }
@@ -309,7 +262,7 @@ uint32_t P4RuntimeClient::DecodeMatchValue(const std::string& str) {
       // Level6. Action_Param
       ::P4_NAMESPACE_ID::Action_Param * entity_table_action_param = entity_action->mutable_params(param_it->id - 1);
       entity_table_action_param->set_param_id(param_it->id);
-      entity_table_action_param->set_value(EncodeParamValue(param_it->value));
+      entity_table_action_param->set_value(EncodeParamValue(param_it->value, param_it->bitwidth));
       std::cout << "Write . Setting param number = " << entity_table_action_param->param_id() << ", value = " << 
         static_cast<std::string>(entity_table_action_param->value()) << std::endl;
     }
@@ -353,13 +306,13 @@ uint32_t P4RuntimeClient::DecodeMatchValue(const std::string& str) {
       switch (match_it->type) {
         case P4MatchType::exact : {
           field_match_exact = new ::P4_NAMESPACE_ID::FieldMatch_Exact();
-          field_match_exact->set_value(EncodeMatchValue(match_it->value));
+          field_match_exact->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match->set_allocated_exact(field_match_exact);
           break;
         }
         case P4MatchType::ternary : {
           field_match_ternary = new ::P4_NAMESPACE_ID::FieldMatch_Ternary();
-          field_match_ternary->set_value(EncodeMatchValue(match_it->value));
+          field_match_ternary->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match_ternary->set_mask(match_it->ternary_mask);
           field_match->set_allocated_ternary(field_match_ternary);
           entity_table_entry->set_priority(entry->priority);
@@ -367,7 +320,7 @@ uint32_t P4RuntimeClient::DecodeMatchValue(const std::string& str) {
         }
         case P4MatchType::lpm : {
           field_match_lpm = new ::P4_NAMESPACE_ID::FieldMatch_LPM();
-          field_match_lpm->set_value(EncodeMatchValue(match_it->value));
+          field_match_lpm->set_value(EncodeParamValue(match_it->value, match_it->bitwidth));
           field_match_lpm->set_prefix_len(match_it->lpm_prefix);
           field_match->set_allocated_lpm(field_match_lpm);
           break;
@@ -487,15 +440,15 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
       match->field_id = response.entities().Get(i).table_entry().match(m).field_id();
       if (response.entities().Get(i).table_entry().match(m).has_exact()) {
         match->type = P4MatchType::exact;
-        match->value = DecodeMatchValue(response.entities().Get(i).table_entry().match(m).exact().value());
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).exact().value());
       } else if (response.entities().Get(i).table_entry().match(m).has_ternary()) {
         match->type = P4MatchType::ternary;
-        match->value = DecodeMatchValue(response.entities().Get(i).table_entry().match(m).ternary().value());
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).ternary().value());
         match->ternary_mask = response.entities().Get(i).table_entry().match(m).ternary().mask();
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_lpm()) {
         match->type = P4MatchType::lpm;
-        match->value = DecodeMatchValue(response.entities().Get(i).table_entry().match(m).lpm().value());
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).lpm().value());
         match->lpm_prefix = response.entities().Get(i).table_entry().match(m).lpm().prefix_len();
       } else if (response.entities().Get(i).table_entry().match(m).has_range()) {
         match->type = P4MatchType::range;
@@ -504,7 +457,7 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_optional()) {
         match->type = P4MatchType::optional;
-        match->value = DecodeMatchValue(response.entities().Get(i).table_entry().match(m).optional().value());
+        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).optional().value());
         entry->priority = response.entities().Get(i).table_entry().priority();
       } else if (response.entities().Get(i).table_entry().match(m).has_other()) {
         match->type = P4MatchType::other;

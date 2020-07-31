@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
   // entry.action.default_action = false;
   // match.field_id = 1;
   // match.type = P4MatchType::lpm;
-  // match.value = "0002";
+  // match.value = "0001";
   // match.lpm_prefix = 32;
   // entry.matches.push_back(match);
   // param.id = 1;
