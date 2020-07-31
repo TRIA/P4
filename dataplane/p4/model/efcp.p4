@@ -260,6 +260,24 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
+/* 
+ * Direct counters
+ */
+     counter(64, CounterType.packets) count_efcp;
+     counter(64, CounterType.packets) count_ipv4;
+
+/*
+ * Actions of direct counters
+ */
+     action tally_count_efcp() {
+	count_efcp.count((bit<32>) standard_metadata.ingress_port);
+     }
+
+     action tally_count_ipv4() {
+	count_ipv4.count((bit<32>) standard_metadata.ingress_port);
+     }
+/*
+ *
 /*
 Primitive action mark_to_drop, have the side effect of assigning an
 implementation specific value DROP_PORT to this field (511 decimal for
@@ -309,6 +327,22 @@ the packet buffer, nor sent to egress processing.
     }
 
 /*
+ * EFCP counter exact table
+ */
+    table efcp_count_lpm {
+        key = {
+            hdr.efcp.dstAddr: exact;
+        }
+        actions = {
+            tally_count_efcp;
+            drop;
+            NoAction;
+        }
+        size = 1024;
+        default_action = NoAction();
+    }
+
+/*
  * IPv4 long prefix match table
  */
     table ipv4_lpm {
@@ -324,6 +358,19 @@ the packet buffer, nor sent to egress processing.
         default_action = drop();
     }
 
+    table ipv4_count_lpm {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            tally_count_ipv4;
+            drop;
+            NoAction;
+        }
+        size = 1024;
+        default_action = drop();
+    }
+
     apply {
         if (hdr.efcp.isValid() &&
             standard_metadata.checksum_error == 0 &&
@@ -332,10 +379,12 @@ the packet buffer, nor sent to egress processing.
                     standard_metadata.egress_spec = CPU_PORT;
                 } else {
                     efcp_lpm.apply();
+		    efcp_count_lpm.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             standard_metadata.checksum_error == 0) {
                 ipv4_lpm.apply();
+		ipv4_count_lpm.apply();
         } else {
             drop();
         }
