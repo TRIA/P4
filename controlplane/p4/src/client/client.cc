@@ -137,18 +137,24 @@ Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
 }
 
 std::string P4RuntimeClient::EncodeParamValue(uint16_t value) {
-  char hi, lo;
+  char b0, b1;
   std::string res;
 
-  // 0Matchh0
+  // value = 00000010
   // lo = 00000010 & 11111111 = 00000010
   // hi = 00000010 * 2^8      = 00000010 00000000
   // res = 00000010
   // res = 00000010 00000010 00000000
-  lo = value & 0xFF;
-  hi = value >> 8;
-  res.push_back(hi);
-  res.push_back(lo);
+
+  // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
+  // From least to most significant bits (b{_1}b{_0}, then
+  // retrieve specific octet by shifting as many positions to the right as the most significant it in the octect
+  //   (that is, "b0" will shift 16 bits - 8 bits, "b1" will shift 16 bits - 16 bits)
+  // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
+  b0 = (value >> 8) & 0xFF;
+  b1 = value & 0xFF;
+  res.push_back(b0);
+  res.push_back(b1);
 
   // Fill in the remaining bytes with leading zeros in order to fit the full bitwidth
   //std::cout << "EncodeParamValue . Result before = " << res << std::endl;
@@ -184,8 +190,11 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string& str) {
   //std::cout << "DecodeParamValue . Result before = " << str << std::endl;
   //std::cout << "DecodeParamValue . Result size before = " << str.size() << std::endl;
   
-  if (str.size() < 2) return 0; 
+  if (str.size() < 2) {
+    return 0; 
+  }
   
+  // Assumes a 16-bit integer was encoded in a previous step
   res = str[1];
   res = res | uint16_t(str[0]) << 8;
   
@@ -199,6 +208,11 @@ std::string P4RuntimeClient::EncodeMatchValue(uint32_t value) {
   char b0, b1, b2, b3;
   std::string res;
 
+  // Assuming the big-endian scheme used in P4 bytestrings ("left-to-right reading"):
+  // From least to most significant bits (b{_3}b{_2}b{_1}b{_0}, then
+  // retrieve specific octet by shifting as many positions to the right as the most significant it in the octect
+  //   (that is, "b0" will shift 32 bits - 8 bits, "b1" will shift 32 bits - 16 bits, etc)
+  // and finally, apply mask of 8 bits, all of them set to "1", to retrieve the 8 least significant bits
   b0 = (value >> 24) & 0xFF;
   b1 = (value >> 16) & 0xFF;
   b2 = (value >> 8) & 0xFF;
@@ -215,8 +229,11 @@ std::string P4RuntimeClient::EncodeMatchValue(uint32_t value) {
 uint32_t P4RuntimeClient::DecodeMatchValue(const std::string& str) {
   uint32_t res;
 
-  if (str.size() < 4) return 0;
+  if (str.size() < 4) {
+    return 0;
+  }
 
+  // Assumes a 32-bit integer was encoded in a previous step
   res = str[3];
   res = res | uint32_t(str[2]) << 8;
   res = res | uint32_t(str[1]) << 16;
