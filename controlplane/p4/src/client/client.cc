@@ -383,16 +383,17 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
 
   std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
   for (int i = 0; i < response.entities_size(); i++) {
+    const p4::v1::TableEntry rentry = response.entities().Get(i).table_entry();
     entry = new P4TableEntry();
-    entry->table_id = response.entities().Get(i).table_entry().table_id();
+    entry->table_id = rentry.table_id();
     std::cout << "Read . Fetching table id = " << entry->table_id << std::endl;
-    entry->action.action_id = response.entities().Get(i).table_entry().action().action().action_id();
+    entry->action.action_id = rentry.action().action().action_id();
     std::cout << "Read . Fetching action id = " << entry->action.action_id << std::endl;
-    for (int p = 0; p < response.entities().Get(i).table_entry().action().action().params_size(); p++) {
+    for (int p = 0; p < rentry.action().action().params_size(); p++) {
+      param = new P4Parameter();
       std::cout << "Read . Before fetching parameters" << std::endl;
-      if (response.entities().Get(i).table_entry().action().action().params().size() > 0) {
-        std::cout << "Read . Number of params = " 
-          << response.entities().Get(i).table_entry().action().action().params().size() << std::endl;
+      if (rentry.action().action().params().size() > 0) {
+        std::cout << "Read . Number of params = " << rentry.action().action().params().size() << std::endl;
         // assert check
         // response.entities().Get(i).table_entry().action().action().params(p).CheckInitialized();
         // param = {};
@@ -403,46 +404,47 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
         // response.entities().Get(i).table_entry().action().action().params(p).param_id();
         std::cout << "Read . Before fetching param id" << std::endl;
         // FIXME: fails when assigning to the struct field
-        param->id = response.entities().Get(i).table_entry().action().action().params(p).param_id();
+        param->id = rentry.action().action().params(p).param_id();
         std::cout << "Read . Fetching param id = " << param->id << std::endl;
-        response.entities().Get(i).table_entry().action().action().params(p).value();
+        rentry.action().action().params(p).value();
         std::cout << "Read . Fetching param value above " << std::endl;
-        if (!response.entities().Get(i).table_entry().action().action().params(p).value().empty()) {
-          param->value = DecodeParamValue(response.entities().Get(i).table_entry().action().action().params(p).value());
+        if (!rentry.action().action().params(p).value().empty()) {
+          param->value = DecodeParamValue(rentry.action().action().params(p).value());
           std::cout << "Read . Fetching param value = " << param->value << std::endl;
         }
       }
       entry->action.parameters.push_back(*param);
     }
-    entry->timeout_ns = response.entities().Get(i).table_entry().idle_timeout_ns();
+    entry->timeout_ns = rentry.idle_timeout_ns();
     std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
 
-    std::cout << "Read . Match size = " << response.entities().Get(i).table_entry().match_size() << std::endl;
-    for (int m = 0; m < response.entities().Get(i).table_entry().match_size(); m++) {
+    std::cout << "Read . Match size = " << rentry.match_size() << std::endl;
+    for (int m = 0; m < rentry.match_size(); m++) {
+      match = new P4Match();
       std::cout << "Read . Match inside" << std::endl;
-      match->field_id = response.entities().Get(i).table_entry().match(m).field_id();
-      if (response.entities().Get(i).table_entry().match(m).has_exact()) {
+      match->field_id = rentry.match(m).field_id();
+      if (rentry.match(m).has_exact()) {
         match->type = P4MatchType::exact;
-        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).exact().value());
-      } else if (response.entities().Get(i).table_entry().match(m).has_ternary()) {
+        match->value = DecodeParamValue(rentry.match(m).exact().value());
+      } else if (rentry.match(m).has_ternary()) {
         match->type = P4MatchType::ternary;
-        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).ternary().value());
-        match->ternary_mask = response.entities().Get(i).table_entry().match(m).ternary().mask();
-        entry->priority = response.entities().Get(i).table_entry().priority();
-      } else if (response.entities().Get(i).table_entry().match(m).has_lpm()) {
+        match->value = DecodeParamValue(rentry.match(m).ternary().value());
+        match->ternary_mask = rentry.match(m).ternary().mask();
+        entry->priority = rentry.priority();
+      } else if (rentry.match(m).has_lpm()) {
         match->type = P4MatchType::lpm;
-        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).lpm().value());
-        match->lpm_prefix = response.entities().Get(i).table_entry().match(m).lpm().prefix_len();
-      } else if (response.entities().Get(i).table_entry().match(m).has_range()) {
+        match->value = DecodeParamValue(rentry.match(m).lpm().value());
+        match->lpm_prefix = rentry.match(m).lpm().prefix_len();
+      } else if (rentry.match(m).has_range()) {
         match->type = P4MatchType::range;
-        match->range_low = response.entities().Get(i).table_entry().match(m).range().low();
-        match->range_high = response.entities().Get(i).table_entry().match(m).range().high();
-        entry->priority = response.entities().Get(i).table_entry().priority();
-      } else if (response.entities().Get(i).table_entry().match(m).has_optional()) {
+        match->range_low = rentry.match(m).range().low();
+        match->range_high = rentry.match(m).range().high();
+        entry->priority = rentry.priority();
+      } else if (rentry.match(m).has_optional()) {
         match->type = P4MatchType::optional;
-        match->value = DecodeParamValue(response.entities().Get(i).table_entry().match(m).optional().value());
-        entry->priority = response.entities().Get(i).table_entry().priority();
-      } else if (response.entities().Get(i).table_entry().match(m).has_other()) {
+        match->value = DecodeParamValue(rentry.match(m).optional().value());
+        entry->priority = rentry.priority();
+      } else if (rentry.match(m).has_other()) {
         match->type = P4MatchType::other;
       }
       std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
