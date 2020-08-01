@@ -39,7 +39,7 @@ cint>
 A Python script is provided as an initial means to proxy the C methods to connect to the SDKLT (BCMLT shell).
 It accepts a file (with these C methods for SDKLT) as a parameter. It connects to "BCMLT", then to "cint" and injects every C line in the latter.
 ```
-cd ~/sdklt-testing
+cd src
 python connect_bcmlt.py cint_sdklt_config.c
 ```
 
