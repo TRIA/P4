@@ -1,7 +1,33 @@
-job_npl_bmodel:
+stages:
+  - build
+  - test
+
+job_efcp_build:
+  script:
+    - cd dataplane/p4
+    - make efcp-build
+  stage: build
+  tags: [npl_bmodel]
+
+job_cp_test:
   script:
     - sudo -S su
-    - cd dataplane/bmodel/efcp_router
-    - make build
-    - make test
+    - cd controlplane/p4
+    - make edf-cp-test-stratum
+    - cat test/edf-dp-server.log
+    - cat test/edf-cp-client.log
+  dependencies:
+    - job_efcp_build
+  stage: test
+  tags: [npl_bmodel]
+
+job_dp_test:
+  script:
+    - cd dataplane/p4
+    - make edf-dp-test-stratum
+    - cat test/stratum_bmv2_test_h1.log
+    - cat test/stratum_bmv2_test_h2.log
+  dependencies:
+    - job_efcp_build
+  stage: test
   tags: [npl_bmodel]

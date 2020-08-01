@@ -1,0 +1,46 @@
+version: "3"
+
+services:
+  mininet:
+    container_name: mn-stratum
+    hostname: mininet
+    build:
+      context: ./mininet
+      dockerfile: Dockerfile
+#    image: sergiogimenez/mininet-mod:latest
+    privileged: true
+    tty: true
+    stdin_open: true
+    volumes:
+#      - ${MN_STRATUM_TMP_DIR}:/tmp
+      - ./mininet/tmp:/tmp
+      - ./mininet:/mininet
+      - ../../common/tests:/root/scripts
+    ports:
+      - "50001:50001"
+#      - "50001-50030:50001-50030"
+#    entrypoint: "/mininet/topo.py"
+
+  p4runtime:
+    container_name: p4runtime-sh
+    image: p4lang/p4runtime-sh
+    depends_on:
+      - mininet
+    healthcheck:
+      # P4Runtime only to start after Mininet with bmv2 is working
+      test: "curl --connect-timeout 2 -s -o /dev/null localhost:50001"
+      interval: 15s
+      timeout: 1m
+    volumes:
+      - ./p4runtime/p4runtime-shell-entrypoint.sh:/p4runtime-sh/p4runtime-shell-entrypoint.sh
+      - ./p4runtime/runtime-shell.py:/p4runtime-sh/runtime-shell.py
+      - ../model:/p4runtime-sh/p4src/
+      - ./p4runtime/p4runtime_sh/p4runtime.py:/p4runtime_sh/p4runtime.py
+    entrypoint: "./p4runtime-shell-entrypoint.sh"
+#    networks:
+#      - rinap4controlplane
+
+networks:
+  default:
+    external:
+      name: rina-controlplane
