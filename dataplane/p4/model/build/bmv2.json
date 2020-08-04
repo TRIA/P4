@@ -5,6 +5,8 @@
       "id" : 0,
       "fields" : [
         ["tmp", 1, false],
+        ["tmp_0", 32, false],
+        ["tmp_1", 32, false],
         ["_padding_0", 7, false]
       ]
     },
@@ -587,7 +589,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 416,
+        "line" : 426,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -595,7 +597,32 @@
     }
   ],
   "meter_arrays" : [],
-  "counter_arrays" : [],
+  "counter_arrays" : [
+    {
+      "name" : "MyIngress.count_efcp",
+      "id" : 0,
+      "source_info" : {
+        "filename" : "model/efcp.p4",
+        "line" : 266,
+        "column" : 38,
+        "source_fragment" : "count_efcp"
+      },
+      "size" : 64,
+      "is_direct" : false
+    },
+    {
+      "name" : "MyIngress.count_ipv4",
+      "id" : 1,
+      "source_info" : {
+        "filename" : "model/efcp.p4",
+        "line" : 267,
+        "column" : 38,
+        "source_fragment" : "count_ipv4"
+      },
+      "size" : 64,
+      "is_direct" : false
+    }
+  ],
   "register_arrays" : [],
   "calculations" : [
     {
@@ -603,7 +630,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 376,
+        "line" : 386,
         "column" : 1,
         "source_fragment" : "update_checksum( ..."
       },
@@ -656,7 +683,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 394,
+        "line" : 404,
         "column" : 1,
         "source_fragment" : "update_checksum( ..."
       },
@@ -848,7 +875,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 272,
+            "line" : 280,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -870,7 +897,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 272,
+            "line" : 280,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -892,7 +919,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 272,
+            "line" : 280,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -931,7 +958,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 279,
+            "line" : 287,
             "column" : 8,
             "source_fragment" : "hdr.vlan.vlan_id = vlan_id"
           }
@@ -950,7 +977,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 280,
+            "line" : 288,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -969,7 +996,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 281,
+            "line" : 289,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -988,9 +1015,60 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 282,
+            "line" : 290,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_0"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "field",
+                    "value" : ["standard_metadata", "ingress_port"]
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "model/efcp.p4",
+            "line" : 291,
+            "column" : 18,
+            "source_fragment" : "(bit<32>) standard_metadata.ingress_port"
+          }
+        },
+        {
+          "op" : "count",
+          "parameters" : [
+            {
+              "type" : "counter_array",
+              "value" : "MyIngress.count_efcp"
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_0"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "model/efcp.p4",
+            "line" : 291,
+            "column" : 1,
+            "source_fragment" : "count_efcp.count((bit<32>) standard_metadata.ingress_port)"
           }
         }
       ]
@@ -1023,7 +1101,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 289,
+            "line" : 298,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -1042,7 +1120,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 290,
+            "line" : 299,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -1061,7 +1139,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 291,
+            "line" : 300,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
           }
@@ -1103,9 +1181,60 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 292,
+            "line" : 301,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_1"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "field",
+                    "value" : ["standard_metadata", "ingress_port"]
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "model/efcp.p4",
+            "line" : 302,
+            "column" : 18,
+            "source_fragment" : "(bit<32>) standard_metadata.ingress_port"
+          }
+        },
+        {
+          "op" : "count",
+          "parameters" : [
+            {
+              "type" : "counter_array",
+              "value" : "MyIngress.count_ipv4"
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_1"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "model/efcp.p4",
+            "line" : 302,
+            "column" : 1,
+            "source_fragment" : "count_ipv4.count((bit<32>) standard_metadata.ingress_port)"
           }
         }
       ]
@@ -1129,7 +1258,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 332,
+            "line" : 342,
             "column" : 20,
             "source_fragment" : "standard_metadata.egress_spec = 255"
           }
@@ -1168,7 +1297,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 353,
+            "line" : 363,
             "column" : 8,
             "source_fragment" : "hdr.efcp.flags = hdr.efcp.flags | 0x01"
           }
@@ -1190,7 +1319,7 @@
           ],
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 362,
+            "line" : 372,
             "column" : 12,
             "source_fragment" : "hdr.vlan.setInvalid()"
           }
@@ -1215,7 +1344,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 332,
+            "line" : 342,
             "column" : 50,
             "source_fragment" : "="
           },
@@ -1244,7 +1373,7 @@
           "id" : 1,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 298,
+            "line" : 308,
             "column" : 10,
             "source_fragment" : "efcp_lpm"
           },
@@ -1282,7 +1411,7 @@
           "id" : 2,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 314,
+            "line" : 324,
             "column" : 10,
             "source_fragment" : "ipv4_lpm"
           },
@@ -1320,7 +1449,7 @@
           "id" : 3,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 340,
+            "line" : 350,
             "column" : 12,
             "source_fragment" : "drop()"
           },
@@ -1352,7 +1481,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 328,
+            "line" : 338,
             "column" : 12,
             "source_fragment" : "hdr.efcp.isValid() && ..."
           },
@@ -1415,7 +1544,7 @@
           "id" : 1,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 331,
+            "line" : 341,
             "column" : 20,
             "source_fragment" : "hdr.efcp.pduType == LAYER_MANAGEMENT"
           },
@@ -1441,7 +1570,7 @@
           "id" : 2,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 336,
+            "line" : 346,
             "column" : 19,
             "source_fragment" : "hdr.ipv4.isValid() && ..."
           },
@@ -1486,7 +1615,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 348,
+        "line" : 358,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
@@ -1497,7 +1626,7 @@
           "id" : 4,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 358,
+            "line" : 368,
             "column" : 12,
             "source_fragment" : "mark_ecn()"
           },
@@ -1526,7 +1655,7 @@
           "id" : 5,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 362,
+            "line" : 372,
             "column" : 12,
             "source_fragment" : "hdr.vlan.setInvalid()"
           },
@@ -1558,7 +1687,7 @@
           "id" : 3,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 357,
+            "line" : 367,
             "column" : 12,
             "source_fragment" : "standard_metadata.enq_qdepth >= ECN_THRESHOLD"
           },
@@ -1584,7 +1713,7 @@
           "id" : 4,
           "source_info" : {
             "filename" : "model/efcp.p4",
-            "line" : 361,
+            "line" : 371,
             "column" : 12,
             "source_fragment" : "hdr.vlan.vlan_id == 0"
           },
@@ -1614,7 +1743,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 376,
+        "line" : 386,
         "column" : 1,
         "source_fragment" : "update_checksum( ..."
       },
@@ -1640,7 +1769,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "model/efcp.p4",
-        "line" : 394,
+        "line" : 404,
         "column" : 1,
         "source_fragment" : "update_checksum( ..."
       },

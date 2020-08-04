@@ -39,25 +39,6 @@ te.action['dstAddr'] = '00:00:00:00:00:02'
 te.action['port'] = '2'
 te.insert()
 
-## EFCP Counter
-te = sh.TableEntry('MyIngress.efcp_count_lpm')(action = 'MyIngress.tally_count_efcp')
-te.match['hdr.efcp.dstAddr'] = '1'
-te.insert()
-
-te = sh.TableEntry('MyIngress.efcp_count_lpm')(action = 'MyIngress.tally_count_efcp')
-te.match['hdr.efcp.dstAddr'] = '2'
-te.insert()
-
-## IPv4 Counter
-te = sh.TableEntry('MyIngress.ipv4_count_lpm')(action = 'MyIngress.tally_count_ipv4')
-te.match['hdr.ipv4.dstAddr'] = '10.0.0.1'
-te.insert()
-
-te = sh.TableEntry('MyIngress.ipv4_count_lpm')(action = 'MyIngress.tally_count_ipv4')
-te.match['hdr.ipv4.dstAddr'] = '10.0.0.2'
-te.insert()
-
-
 print("Submitted configuration entries to bmv2")
 
 connection = sh.client

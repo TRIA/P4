@@ -237,7 +237,7 @@ control MyVerifyChecksum(inout headers hdr,
 */
             verify_checksum(hdr.ipv4.isValid(),
             { hdr.ipv4.version,
-              hdr.ipv4.ihl,
+	          hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
               hdr.ipv4.totalLen,
               hdr.ipv4.identification,
@@ -261,21 +261,11 @@ control MyIngress(inout headers hdr,
                   inout standard_metadata_t standard_metadata) {
 
 /* 
- * Direct counters
+ * Counters
  */
      counter(64, CounterType.packets) count_efcp;
      counter(64, CounterType.packets) count_ipv4;
 
-/*
- * Actions of direct counters
- */
-     action tally_count_efcp() {
-	count_efcp.count((bit<32>) standard_metadata.ingress_port);
-     }
-
-     action tally_count_ipv4() {
-	count_ipv4.count((bit<32>) standard_metadata.ingress_port);
-     }
 /*
  *
 /*
@@ -298,6 +288,7 @@ the packet buffer, nor sent to egress processing.
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
+	count_efcp.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
@@ -308,6 +299,7 @@ the packet buffer, nor sent to egress processing.
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+	count_ipv4.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
@@ -319,22 +311,6 @@ the packet buffer, nor sent to egress processing.
         }
         actions = {
             efcp_forward;
-            drop;
-            NoAction;
-        }
-        size = 1024;
-        default_action = NoAction();
-    }
-
-/*
- * EFCP counter exact table
- */
-    table efcp_count_lpm {
-        key = {
-            hdr.efcp.dstAddr: exact;
-        }
-        actions = {
-            tally_count_efcp;
             drop;
             NoAction;
         }
@@ -358,19 +334,6 @@ the packet buffer, nor sent to egress processing.
         default_action = drop();
     }
 
-    table ipv4_count_lpm {
-        key = {
-            hdr.ipv4.dstAddr: lpm;
-        }
-        actions = {
-            tally_count_ipv4;
-            drop;
-            NoAction;
-        }
-        size = 1024;
-        default_action = drop();
-    }
-
     apply {
         if (hdr.efcp.isValid() &&
             standard_metadata.checksum_error == 0 &&
@@ -379,12 +342,10 @@ the packet buffer, nor sent to egress processing.
                     standard_metadata.egress_spec = CPU_PORT;
                 } else {
                     efcp_lpm.apply();
-		    efcp_count_lpm.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             standard_metadata.checksum_error == 0) {
                 ipv4_lpm.apply();
-		ipv4_count_lpm.apply();
         } else {
             drop();
         }

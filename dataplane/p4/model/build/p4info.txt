@@ -107,5 +107,27 @@ actions {
     alias: "mark_ecn"
   }
 }
+counters {
+  preamble {
+    id: 302044594
+    name: "MyIngress.count_efcp"
+    alias: "count_efcp"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 64
+}
+counters {
+  preamble {
+    id: 302001802
+    name: "MyIngress.count_ipv4"
+    alias: "count_ipv4"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 64
+}
 type_info {
 }
