@@ -9,6 +9,18 @@ job_efcp_build:
   stage: build
   tags: [npl_bmodel]
 
+job_cp_test:
+  script:
+    - sudo -S su
+    - cd controlplane/p4
+    - make edf-cp-test-stratum
+    - cat test/edf-dp-server.log
+    - cat test/edf-cp-client.log
+  dependencies:
+    - job_efcp_build
+  stage: test
+  tags: [npl_bmodel]
+
 job_dp_test:
   script:
     - cd dataplane/p4
