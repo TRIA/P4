@@ -34,7 +34,9 @@ class P4RuntimeClient {
     std::list<P4TableEntry*> ReadTableEntry(std::list<P4TableEntry*> query);
     // RPC methods: counters
     std::list<P4DirectCounterEntry*> ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> query);
+    std::list<P4DirectCounterEntry*> ReadDirectCounterEntries();
     std::list<P4CounterEntry*> ReadIndirectCounterEntry(std::list<P4CounterEntry*> query);
+    std::list<P4CounterEntry*> ReadIndirectCounterEntries();
     // RPC methods: others
     std::string APIVersion();
 
@@ -47,6 +49,9 @@ class P4RuntimeClient {
         std::string tableName);
     ::PROTOBUF_NAMESPACE_ID::uint32 GetP4ActionIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
         std::string actionName);
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4IndirectCounterIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
+        std::string counterName);
+    std::list<::PROTOBUF_NAMESPACE_ID::uint32> GetP4IndirectCounterIds(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
 
   private:
 

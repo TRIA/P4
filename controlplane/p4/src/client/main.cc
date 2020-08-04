@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
   const std::string grpc_server_addr = parse_arguments(argc, argv, "--grpc-addr", "localhost:50001");
   const std::string config_paths = parse_arguments(argc, argv, "--config", "../cfg/p4info.txt,../cfg/bmv2.json");
   const std::string election_id = parse_arguments(argc, argv, "--election-id", "0,1");
-  const ::PROTOBUF_NAMESPACE_ID::uint64 deviceId = 1;
+  const uint64_t deviceId = 1;
   std::cout << "\nP4RuntimeClient running with arguments:" << std::endl;
   std::cout << "\t--grpc-addr=" << grpc_server_addr << std::endl;
   std::cout << "\t--config=" << config_paths << std::endl;
@@ -240,19 +240,68 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
-  // FIXME
-  // std::cout << "\n-------------- ReadIndirectCounterEntry --------------\n" << std::endl;
-  // std::list<P4CounterEntry *> counter_entries;
-  // P4CounterEntry counter_entry;
-  // counter_entry.counter_id = 1;
-  // counter_entries.push_back(&counter_entry);
-  // std::list<P4CounterEntry *> result_counter = p4RuntimeClient.ReadIndirectCounterEntry(counter_entries);
-  // if (result.size() > 0) {
-  //   std::cout << "Success: retrieved entry for counter with id = " << result_counter.front()->counter_id << std::endl;
-  // } else {
-  //   std::cerr << "Warning: no entry retrieved" << std::endl;
-  // }
-  // counter_entries.clear();
+  std::cout << "\n-------------- ReadDirectCounterEntry --------------\n" << std::endl;
+  std::list<P4DirectCounterEntry *> direct_counter_entries;
+  P4DirectCounterEntry direct_counter_entry;
+  direct_counter_entry.table_entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "MyIngress.ipv4_lpm");;
+  direct_counter_entries.push_back(&direct_counter_entry);
+  std::list<P4DirectCounterEntry *> result_direct_counter = p4RuntimeClient.ReadDirectCounterEntry(direct_counter_entries);
+  if (result_direct_counter.size() > 0) {
+    std::cout << "Success: retrieved entry for counter with table_id = " << 
+      result_direct_counter.front()->table_entry.table_id << std::endl;
+  } else {
+    std::cerr << "Warning: no entry retrieved" << std::endl;
+  }
+  direct_counter_entries.clear();
+
+  std::cout << "\n-------------- ReadDirectCounterEntries --------------\n" << std::endl;
+  result_direct_counter = p4RuntimeClient.ReadDirectCounterEntries();
+  if (result_direct_counter.size() > 0) {
+    std::cout << "Success: retrieved entry for all (" << result_direct_counter.size() << ") counters" << std::endl;
+  } else {
+    std::cerr << "Warning: no entries retrieved" << std::endl;
+  }
+
+  std::cout << "\n-------------- ReadIndirectCounterEntry --------------\n" << std::endl;
+  std::list<P4CounterEntry *> counter_entries;
+  P4CounterEntry counter_entry;
+
+  // Step 1: index not defined, thus all N indexes of an element will be returned
+  counter_entry.counter_id = p4RuntimeClient.GetP4IndirectCounterIdFromName(p4Info, "MyIngress.count_ipv4");
+  ::P4_NAMESPACE_ID::Index counter_index;
+  counter_index.set_index(-1);
+  counter_entry.index = counter_index;
+  counter_entries.push_back(&counter_entry);
+  std::list<P4CounterEntry *> result_counter = p4RuntimeClient.ReadIndirectCounterEntry(counter_entries);
+  if (result_counter.size() > 0) {
+    std::cout << "Success: retrieved entry for counter with id = " << 
+      result_counter.front()->counter_id << std::endl;
+  } else {
+    std::cerr << "Warning: no entry retrieved" << std::endl;
+  }
+  counter_entries.clear();
+
+  // Step 2: request the last element/index of the counter, our of N indexes (where N is the size of the counter)
+  counter_entry.counter_id = p4RuntimeClient.GetP4IndirectCounterIdFromName(p4Info, "MyIngress.count_efcp");
+  counter_index.set_index(64-1);
+  counter_entry.index = counter_index;
+  counter_entries.push_back(&counter_entry);
+  result_counter = p4RuntimeClient.ReadIndirectCounterEntry(counter_entries);
+  if (result_counter.size() > 0) {
+    std::cout << "Success: retrieved entry for counter with id = " << 
+      result_counter.front()->counter_id << std::endl;
+  } else {
+    std::cerr << "Warning: no entry retrieved" << std::endl;
+  }
+  counter_entries.clear();
+
+  std::cout << "\n-------------- ReadIndirectCounterEntries --------------\n" << std::endl;
+  result_counter = p4RuntimeClient.ReadIndirectCounterEntries();
+  if (result_counter.size() > 0) {
+    std::cout << "Success: retrieved entry for all (" << result_counter.size() << ") counters" << std::endl;
+  } else {
+    std::cerr << "Warning: no entries retrieved" << std::endl;
+  }
 
   std::cout << "\n-------------- DeleteEntry --------------\n" << std::endl;
   // Step 1: delete entry with action "NoAction"

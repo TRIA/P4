@@ -454,11 +454,52 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadTableEntry(std::list<P4TableEntry*
 
 // TODO: implement
 std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> filter) {
+  std::list<P4DirectCounterEntry*>::iterator it;
   std::list<P4DirectCounterEntry*> result;
-  return result;
+  P4DirectCounterEntry * filter_entry;
+  P4DirectCounterEntry * entry;
+  ::P4_NAMESPACE_ID::TableEntry *p4EntiDirectCounterEntryTable = new ::P4_NAMESPACE_ID::TableEntry();
+  ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
+  ClientContext context;
+ 
+  request.set_device_id(deviceId_);
+  for (it = filter.begin(); it != filter.end(); ++it) {
+    filter_entry = *it;
+    ::P4_NAMESPACE_ID::DirectCounterEntry *p4EntityDirectCounterEntry = new ::P4_NAMESPACE_ID::DirectCounterEntry();
+    p4EntiDirectCounterEntryTable->set_table_id(filter_entry->table_entry.table_id);
+    p4EntityDirectCounterEntry->set_allocated_table_entry(p4EntiDirectCounterEntryTable);
+    std::cout << "Read . Requested table id = " << filter_entry->table_entry.table_id << std::endl;
+    request.add_entities()->set_allocated_direct_counter_entry(p4EntityDirectCounterEntry);
+  }
+
+  ReadResponse response = ReadResponse();
+  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
+  clientReader->Read(&response);
+  clientReader->Finish();
+  bool read_entry_matches_filter = false;
+
+  std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
+  for (int i = 0; i < response.entities_size(); i++) {
+    const p4::v1::CounterEntry rentry = response.entities().Get(i).counter_entry();
+    entry = new P4DirectCounterEntry();
+    entry->data = rentry.data();
+    std::cout << "Read . Fetching counter data (byte count) = " << entry->data.byte_count() << std::endl;
+    std::cout << "Read . Fetching counter data (packet count) = " << entry->data.packet_count() << std::endl;
+    result.push_back(entry);
+  }
+
+  return result;  
 }
 
-// TODO: test with proper counter IDs
+std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntries() {
+  std::list<P4DirectCounterEntry *> counter_entries;
+  P4DirectCounterEntry counter_entry;
+  // All counters retrieved by using ID = 0
+  counter_entry.table_entry.table_id = 0;
+  counter_entries.push_back(&counter_entry);
+  return ReadDirectCounterEntry(counter_entries);  
+}
+
 std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P4CounterEntry*> filter) {
   std::list<P4CounterEntry*>::iterator it;
   std::list<P4CounterEntry*> result;
@@ -471,11 +512,16 @@ std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P
   for (it = filter.begin(); it != filter.end(); ++it) {
     filter_entry = *it;
     ::P4_NAMESPACE_ID::CounterEntry *p4EntityIndirectCounterEntry = new ::P4_NAMESPACE_ID::CounterEntry();
+    // Counter == 0: provide all counter cells for all counters (as per P4Runtime spec)
     p4EntityIndirectCounterEntry->set_counter_id(filter_entry->counter_id);
-    // p4EntityIndirectCounterEntry->set_allocated_index(filter_entry->index);
-    // p4EntityIndirectCounterEntry->set_allocated_data(filter_entry->data);
     std::cout << "Read . Requested counter id = " << filter_entry->counter_id << std::endl;
-    // std::cout << "Read . Requested index = " << filter_entry->index.index << std::endl;
+    // No index defined: provide all counter cells (as per P4Runtime spec)
+    if (filter_entry->index.index() >= 0) {
+      ::P4_NAMESPACE_ID::Index *p4EntityIndirectCounterEntryIndex = new ::P4_NAMESPACE_ID::Index();
+      p4EntityIndirectCounterEntryIndex->set_index(filter_entry->index.index());
+      std::cout << "Read . Requested index = " << filter_entry->index.index() << std::endl;
+      p4EntityIndirectCounterEntry->set_allocated_index(p4EntityIndirectCounterEntryIndex);
+    }
     request.add_entities()->set_allocated_counter_entry(p4EntityIndirectCounterEntry);
   }
 
@@ -488,32 +534,27 @@ std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P
   std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
   for (int i = 0; i < response.entities_size(); i++) {
     const p4::v1::CounterEntry rentry = response.entities().Get(i).counter_entry();
-
-    // Check returned entries against those that were sent in the filter
-    for (it = filter.begin(); it != filter.end(); ++it) {
-      filter_entry = *it;
-      if (filter_entry->counter_id == rentry.counter_id()) {
-          read_entry_matches_filter = true;
-        }
-    }
-    // If there is no match, skip the current iteration (i.e., do not output entries that were not requested)
-    if (!read_entry_matches_filter) {
-      continue;
-    }
-
     entry = new P4CounterEntry();
+    entry->counter_id = rentry.counter_id();
     entry->index = rentry.index();
     entry->data = rentry.data();
     std::cout << "Read . Fetching counter id = " << entry->counter_id << std::endl;
     std::cout << "Read . Fetching counter index = " << entry->index.index() << std::endl;
     std::cout << "Read . Fetching counter data (byte count) = " << entry->data.byte_count() << std::endl;
     std::cout << "Read . Fetching counter data (packet count) = " << entry->data.packet_count() << std::endl;
-
     result.push_back(entry);
   }
-  // FIXME: failing here if missing matched entries
 
   return result;  
+}
+
+std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntries() {
+  std::list<P4CounterEntry *> counter_entries;
+  P4CounterEntry counter_entry;
+  // All counters retrieved by using ID = 0
+  counter_entry.counter_id = 0;
+  counter_entries.push_back(&counter_entry);
+  return ReadIndirectCounterEntry(counter_entries);  
 }
 
 std::string P4RuntimeClient::APIVersion() {
@@ -775,12 +816,9 @@ void P4RuntimeClient::CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse
 
 void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
   std::cout << "Printing P4Info\n" << std::endl;
-  int tableSize = p4Info_.tables_size();
-  std::cout << "Number of tables: " << tableSize << std::endl;
-  if (tableSize == 0) {
-    return;
-  }
   std::cout << "Arch: " << p4Info_.pkg_info().arch() << std::endl;
+  int table_size = p4Info_.tables_size();
+  std::cout << "Number of tables: " << table_size << std::endl;
   for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
     std::cout << "  Table id: " << table.preamble().id() << std::endl;
     std::cout << "  Table name: " << table.preamble().name() << std::endl;
@@ -804,6 +842,17 @@ void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
       }
     }
   }
+
+  std::cout << "Number of direct counters: " << p4Info_.direct_counters_size() << std::endl;
+  for (::P4_CONFIG_NAMESPACE_ID::DirectCounter counter : p4Info_.direct_counters()) {
+    std::cout << "  Counter id: " << counter.preamble().id() << std::endl;
+    std::cout << "  Counter table id: " << counter.direct_table_id() << std::endl;
+  }
+
+  std::cout << "Number of indirect counters: " << p4Info_.counters_size() << std::endl;
+  for (::P4_CONFIG_NAMESPACE_ID::Counter counter : p4Info_.counters()) {
+    std::cout << "  Counter id: " << counter.preamble().id() << std::endl;
+  }
 }
 
 ::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4TableIdFromName(
@@ -824,6 +873,26 @@ void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
     }
   }
   return 0L;
+}
+
+::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4IndirectCounterIdFromName(
+  ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_, std::string counterName) {
+  for (::P4_CONFIG_NAMESPACE_ID::Counter counter : p4Info_.counters()) {
+    if (counterName == counter.preamble().name()) {
+      return counter.preamble().id();
+    }
+  }
+  return 0L;
+}
+
+std::list<::PROTOBUF_NAMESPACE_ID::uint32> P4RuntimeClient::GetP4IndirectCounterIds(
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
+  std::list<uint32_t> indirect_counter_ids = std::list<uint32_t>();
+  for (::P4_CONFIG_NAMESPACE_ID::Counter counter : p4Info_.counters()) {
+    // std::cout << "Indirect counter name: " << counter.preamble().name() << std::endl;
+    indirect_counter_ids.push_back(counter.preamble().id());
+  }
+  return indirect_counter_ids;
 }
 
 void P4RuntimeClient::HandleException(const char* errorMessage) {
