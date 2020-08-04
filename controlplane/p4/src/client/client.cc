@@ -124,16 +124,16 @@ P4Info P4RuntimeClient::GetP4Info() {
   return p4Info;
 }
 
-Status P4RuntimeClient::InsertEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::INSERT);
+Status P4RuntimeClient::InsertTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::INSERT);
 }
 
-Status P4RuntimeClient::ModifyEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::MODIFY);
+Status P4RuntimeClient::ModifyTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::MODIFY);
 }
 
-Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
+Status P4RuntimeClient::DeleteTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
 }
 
 std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
@@ -180,7 +180,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
 // Write will call, among others, the next classes:
 // ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
 // ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
-::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteEntry(std::list<P4TableEntry*> entries,
+::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteTableEntry(std::list<P4TableEntry*> entries,
     ::P4_NAMESPACE_ID::Update::Type updateType) {
   ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
   request.add_updates();
@@ -347,7 +347,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
 }
 
 // TODO: investigate how to read all available table entries (e.g., no filter defined)
-std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> filter) {
+std::list<P4TableEntry*> P4RuntimeClient::ReadTableEntry(std::list<P4TableEntry*> filter) {
   std::list<P4TableEntry*>::iterator it;
   std::list<P4TableEntry*> result;
   P4TableEntry * filter_entry;
@@ -448,6 +448,70 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
 
     result.push_back(entry);
   }
+
+  return result;  
+}
+
+// TODO: implement
+std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> filter) {
+  std::list<P4DirectCounterEntry*> result;
+  return result;
+}
+
+// TODO: test with proper counter IDs
+std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P4CounterEntry*> filter) {
+  std::list<P4CounterEntry*>::iterator it;
+  std::list<P4CounterEntry*> result;
+  P4CounterEntry * filter_entry;
+  P4CounterEntry * entry;
+  ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
+  ClientContext context;
+ 
+  request.set_device_id(deviceId_);
+  for (it = filter.begin(); it != filter.end(); ++it) {
+    filter_entry = *it;
+    ::P4_NAMESPACE_ID::CounterEntry *p4EntityIndirectCounterEntry = new ::P4_NAMESPACE_ID::CounterEntry();
+    p4EntityIndirectCounterEntry->set_counter_id(filter_entry->counter_id);
+    // p4EntityIndirectCounterEntry->set_allocated_index(filter_entry->index);
+    // p4EntityIndirectCounterEntry->set_allocated_data(filter_entry->data);
+    std::cout << "Read . Requested counter id = " << filter_entry->counter_id << std::endl;
+    // std::cout << "Read . Requested index = " << filter_entry->index.index << std::endl;
+    request.add_entities()->set_allocated_counter_entry(p4EntityIndirectCounterEntry);
+  }
+
+  ReadResponse response = ReadResponse();
+  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
+  clientReader->Read(&response);
+  clientReader->Finish();
+  bool read_entry_matches_filter = false;
+
+  std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
+  for (int i = 0; i < response.entities_size(); i++) {
+    const p4::v1::CounterEntry rentry = response.entities().Get(i).counter_entry();
+
+    // Check returned entries against those that were sent in the filter
+    for (it = filter.begin(); it != filter.end(); ++it) {
+      filter_entry = *it;
+      if (filter_entry->counter_id == rentry.counter_id()) {
+          read_entry_matches_filter = true;
+        }
+    }
+    // If there is no match, skip the current iteration (i.e., do not output entries that were not requested)
+    if (!read_entry_matches_filter) {
+      continue;
+    }
+
+    entry = new P4CounterEntry();
+    entry->index = rentry.index();
+    entry->data = rentry.data();
+    std::cout << "Read . Fetching counter id = " << entry->counter_id << std::endl;
+    std::cout << "Read . Fetching counter index = " << entry->index.index() << std::endl;
+    std::cout << "Read . Fetching counter data (byte count) = " << entry->data.byte_count() << std::endl;
+    std::cout << "Read . Fetching counter data (packet count) = " << entry->data.packet_count() << std::endl;
+
+    result.push_back(entry);
+  }
+  // FIXME: failing here if missing matched entries
 
   return result;  
 }

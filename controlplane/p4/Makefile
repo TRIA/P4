@@ -169,9 +169,7 @@ edf-dp-server-stop:
 	docker stop ${EDF_DATA_S_NAME} || true
 
 edf-dp-server-log:
-	docker exec -it ${EDF_DATA_S_NAME} tail -1000f $(shell docker exec -it ${EDF_DATA_S_NAME} find /tmp -name *stratum_bmv2*ERROR*)
-
-edf-dp-server-log-docker:
+	#docker exec -it ${EDF_DATA_S_NAME} tail -1000f $(shell docker exec -it ${EDF_DATA_S_NAME} find /tmp -name *stratum_bmv2*ERROR*)
 	docker logs -f ${EDF_DATA_S_NAME}
 
 edf-dp-server-clean:
