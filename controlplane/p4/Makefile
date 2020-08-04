@@ -122,7 +122,7 @@ edf-cp-client-build: edf-cp-setup
 
 edf-cp-client-start: edf-cp-client-build edf-cp-docker-net-create
 	@echo "Starting image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} in container ${EDF_CONTROL_C_NAME}"
-	cp -Rp ${EDF_DATA_PATH}/model/build/* ${EDF_CFG_PATH}/
+	make edf-dp-model-build
 	${EDF_CONTROL_C_EXISTS} && docker rm -f ${EDF_CONTROL_C_NAME} || true
 	docker run -it -v ${PWD}:${EDF_CLIENT_R_PATH}/p4 --network=${EDF_C_NET} \
 	--entrypoint ${EDF_CLIENT_R_PATH}/docker-entrypoint.sh --name ${EDF_CONTROL_C_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
