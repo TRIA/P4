@@ -30,7 +30,7 @@ env-stop:
 	@make docker_net_rm
 
 env-reset: env-stop
-	-rm -rf ./mininet/tmp
+	-@rm -rf ./mininet/tmp
 
 env-restart: env-reset env-start
 
@@ -64,7 +64,7 @@ p4runtime-log:
 	docker logs -f ${P4R_STR_NAME}
 
 clean:
-	-rm -rf model/build
+	-@rm -rf model/build
 
 efcp-build: model/efcp.p4
 	$(info *** Building P4 program...)
@@ -73,7 +73,8 @@ efcp-build: model/efcp.p4
 		p4c-bm2-ss --arch v1model -o model/build/bmv2.json \
 		--p4runtime-files model/build/p4info.txt --Wdisable=unsupported \
 		model/efcp.p4
-	@echo "*** P4 program compiled successfully! Output files are in model/build"
+	-@sudo chown ${USER}:${USER} ${PWD}/model -R
+	@echo "*** P4 program compiled successfully! Output files are in ${PWD}/model/build"
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
@@ -95,7 +96,7 @@ edf-dp-test-stratum:
 	@echo "Starting test for host2"
 	make edf-dp-test-stratum-send-pdu iface="eth2" src_host="h2" dst_host="h1" 
 	@sleep .5
-	-sudo chown ${USER}:${USER} ${PWD}/env/mininet/tmp -R
+	-@sudo chown ${USER}:${USER} ${PWD}/env/mininet/tmp -R
 	make env-stop
 
 edf-dp-test-stratum-send-pdu:

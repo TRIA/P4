@@ -95,6 +95,7 @@ edf-cp-docker-net-rm:
 # Data plane model generation
 
 edf-dp-model-build:
+	cd ${EDF_DATA_PATH} && make efcp-build && cd ${CURRENT}
 	mkdir -p ${EDF_CFG_PATH}
 	cp -Rp ${EDF_DATA_PATH}/model/build/* ${EDF_CFG_PATH}/
 
@@ -215,7 +216,6 @@ edf-dp-mininet-log:
 	cd ${EDF_DATA_PATH} && make mn-log && cd ${CURRENT}
 
 # Automated test with the Stratum-enabled bmv2 server
-## FIXME: NOT WORKING ("edf-dp-server-start" not starting in remote). Check permissions there
 edf-cp-test-stratum: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
