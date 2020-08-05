@@ -167,11 +167,21 @@ std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
 }
 
 uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
-  uint16_t res;
+  uint16_t res = 0;
 
-  res = str[0];
-  if (str.length() > 1) {
-    res = res | uint16_t(str[1]) << 8;
+  // From most to least significant bits (msb|lsb), compute value by shifting
+  // as many positions to the left as the most significant it in the octect
+  // (that is, shift(size(bitstring) - num_bit_from_right_to_left - 1); e.g.,
+  // a bitstring "2" will be  shift like this:
+  // str[0]: 0 << 6-0-1 == 0 << 5 == 000000
+  // str[1]: 0 << 6-1-1 == 0 << 4 == 000000
+  // str[2]: 0 << 6-2-1 == 0 << 3 == 000000
+  // str[3]: 0 << 6-3-1 == 0 << 2 == 000000
+  // str[4]: 1 << 6-4-1 == 1 << 1 == 000010
+  // str[5]: 0 << 6-5-1 == 0 << 1 == 000000
+  // summing up, the final value is: 000010 == 2
+  for (int i = 0; i < str.size(); i++) {
+    res += uint16_t(str[i]) << str.size()-i-1;
   }
 
   return res;
@@ -387,6 +397,7 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadTableEntry(std::list<P4TableEntry*
       filter_entry = *it;
       if ((filter_entry->table_id == rentry.table_id()) &&
         (filter_entry->action.action_id == rentry.action().action().action_id())) {
+          // TODO: filter by match value!
           read_entry_matches_filter = true;
         }
     }
@@ -452,7 +463,6 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadTableEntry(std::list<P4TableEntry*
   return result;  
 }
 
-// TODO: implement
 std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> filter) {
   std::list<P4DirectCounterEntry*>::iterator it;
   std::list<P4DirectCounterEntry*> result;
@@ -538,10 +548,14 @@ std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P
     entry->counter_id = rentry.counter_id();
     entry->index = rentry.index();
     entry->data = rentry.data();
-    std::cout << "Read . Fetching counter id = " << entry->counter_id << std::endl;
-    std::cout << "Read . Fetching counter index = " << entry->index.index() << std::endl;
-    std::cout << "Read . Fetching counter data (byte count) = " << entry->data.byte_count() << std::endl;
-    std::cout << "Read . Fetching counter data (packet count) = " << entry->data.packet_count() << std::endl;
+    if (entry->data.byte_count() > 0 || entry->data.packet_count() > 0) {
+      std::cout << "Read . Fetching counter id=" << entry->counter_id <<
+      ", index=" << entry->index.index() << ", values: bytes=" <<
+      entry->data.byte_count() << ", packets=" << entry->data.packet_count() << std::endl;
+    } else {
+      std::cout << "Read . Fetching counter id=" << entry->counter_id <<
+      ", index=" << entry->index.index() << " values: empty" << std::endl;
+    }
     result.push_back(entry);
   }
 
@@ -553,6 +567,11 @@ std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntries() {
   P4CounterEntry counter_entry;
   // All counters retrieved by using ID = 0
   counter_entry.counter_id = 0;
+  // All indexes retrieved by leaving the index unset. This is done by
+  //using a specific flag (negative number, which cannot be used anyway)
+  ::P4_NAMESPACE_ID::Index *p4IndirectCounterEntryIndex = new ::P4_NAMESPACE_ID::Index();
+  p4IndirectCounterEntryIndex->set_index(-1);
+  counter_entry.index = *p4IndirectCounterEntryIndex;
   counter_entries.push_back(&counter_entry);
   return ReadIndirectCounterEntry(counter_entries);  
 }
