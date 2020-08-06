@@ -5,6 +5,9 @@
 // Import declarations after any other
 #include "../common/ns_def.inc"
 
+// Test
+#include <unistd.h>
+
 using ::GRPC_NAMESPACE_ID::Status;
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 
@@ -310,6 +313,9 @@ int main(int argc, char** argv) {
   entry.matches.clear();
   entry.action.parameters.clear();
 
+  // NOTE: if in need to test the counter entries, introduce a sleep here and in the meantime, do transmit packets
+  // sleep(30);
+
   std::cout << "\n-------------- ReadDirectCounterEntry --------------\n" << std::endl;
   std::list<P4DirectCounterEntry *> direct_counter_entries;
   P4DirectCounterEntry direct_counter_entry;
@@ -485,6 +491,7 @@ int main(int argc, char** argv) {
     std::cerr << "Warning: no API version obtained" << std::endl;
   }
 
+  std::cout << "" << std::endl;
   p4RuntimeClient.TearDown();
 
   return 0;
