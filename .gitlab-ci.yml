@@ -16,6 +16,13 @@ job_cp_test:
     - make edf-cp-test-stratum
     - cat test/edf-dp-server.log
     - cat test/edf-cp-client.log
+  artifacts:
+    name: edf_cp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - test/edf-dp-server.log
+      - test/edf-cp-client.log
+    when: always
+    expire_in: 1 week
   dependencies:
     - job_efcp_build
   stage: test
@@ -27,6 +34,13 @@ job_dp_test:
     - make edf-dp-test-stratum
     - cat test/stratum_bmv2_test_h1.log
     - cat test/stratum_bmv2_test_h2.log
+  artifacts:
+    name: edf_dp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - test/stratum_bmv2_test_h1.log
+      - test/stratum_bmv2_test_h2.log
+    when: always
+    expire_in: 1 week
   dependencies:
     - job_efcp_build
   stage: test
