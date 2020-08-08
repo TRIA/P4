@@ -5,6 +5,8 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
 #include "client.h"
+#include "conversions.h"
+#include "print.h"
 // Import declarations after any other
 #include "../common/ns_def.inc"
 

@@ -1,3 +1,9 @@
+#ifndef P4RUNTIME_STRUCTS_H
+#define P4RUNTIME_STRUCTS_H
+
+// Import P4-related declarations after any other
+#include "../common/ns_def.inc"
+
 // To be imported by other header that imports the required classes
 
 struct P4Parameter {
@@ -61,3 +67,6 @@ struct P4CounterEntry {
   ::P4_NAMESPACE_ID::Index index;
   ::P4_NAMESPACE_ID::CounterData data;
 };
+
+#include "../common/ns_undef.inc"
+#endif

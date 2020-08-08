@@ -1,4 +1,8 @@
-#include <grpcpp/grpcpp.h>
+#ifndef P4RUNTIME_CONVERSIONS_H
+#define P4RUNTIME_CONVERSIONS_H
+
+// Import P4-related declarations after any other
+#include "../common/ns_def.inc"
 
 // Data structures
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
@@ -93,3 +97,6 @@ std::list<::PROTOBUF_NAMESPACE_ID::uint32> get_p4_indirect_counter_ids(
   }
   return indirect_counter_ids;
 }
+
+#include "../common/ns_undef.inc"
+#endif

@@ -1,6 +1,5 @@
 #include <grpcpp/grpcpp.h>
 
-// #include <unistd.h>
 #include "client.h"
 // Import declarations after any other
 #include "../common/ns_def.inc"
@@ -314,7 +313,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   // NOTE: if in need to test the counter entries, introduce a sleep here and in the meantime, do transmit packets
-  // sleep(30);
+  // sleep(15);
 
   std::cout << "\n-------------- ReadDirectCounterEntry --------------\n" << std::endl;
   std::list<P4DirectCounterEntry *> direct_counter_entries;

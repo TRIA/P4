@@ -5,19 +5,15 @@
 #include <queue>
 #include <math.h>
 #include <thread>
-// #include <iostream>
-// #include <fstream>
 
 #include "../common/grpc_out/p4/config/v1/p4info.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.pb.h"
 
+#include "p4_structs.h"
+
 // Import P4-related declarations after any other
 #include "../common/ns_def.inc"
-
-#include "p4_structs.h"
-#include "conversions.h"
-#include "print.h"
 
 
 class P4RuntimeClient {
@@ -127,11 +123,8 @@ class P4RuntimeClient {
     void PrintP4Info(
                     ::P4_CONFIG_NAMESPACE_ID::P4Info p4info);
 
-    // // Log
-    // std::string logFilePath_;
+    // Log
     // std::ofstream logFile_;
-    // void PrintToLog(std::string content, bool is_error=false);
-    // void PrintToLogAndStd(std::string content, bool is_error=false);
 };
 
 #include "../common/ns_undef.inc"

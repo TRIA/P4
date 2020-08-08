@@ -1,4 +1,8 @@
-#include <grpcpp/grpcpp.h>
+#ifndef P4RUNTIME_PRINT_H
+#define P4RUNTIME_PRINT_H
+
+// Import P4-related declarations after any other
+#include "../common/ns_def.inc"
 
 
 void print_p4info(::P4_CONFIG_NAMESPACE_ID::P4Info p4info) {
@@ -84,3 +88,6 @@ void print_response_type(::P4_NAMESPACE_ID::StreamMessageResponse* response) {
   //   }
   // }
 }
+
+#include "../common/ns_undef.inc"
+#endif
