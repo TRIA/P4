@@ -237,7 +237,7 @@ control MyVerifyChecksum(inout headers hdr,
 */
             verify_checksum(hdr.ipv4.isValid(),
             { hdr.ipv4.version,
-              hdr.ipv4.ihl,
+	          hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
               hdr.ipv4.totalLen,
               hdr.ipv4.identification,
@@ -260,6 +260,14 @@ control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
+/* 
+ * Counters
+ */
+     counter(64, CounterType.packets) count_efcp;
+     counter(64, CounterType.packets) count_ipv4;
+
+/*
+ *
 /*
 Primitive action mark_to_drop, have the side effect of assigning an
 implementation specific value DROP_PORT to this field (511 decimal for
@@ -280,6 +288,7 @@ the packet buffer, nor sent to egress processing.
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
+	count_efcp.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
@@ -290,6 +299,7 @@ the packet buffer, nor sent to egress processing.
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+	count_ipv4.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*

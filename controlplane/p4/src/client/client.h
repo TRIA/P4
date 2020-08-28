@@ -10,74 +10,41 @@
 #include "../common/grpc_out/p4/v1/p4runtime.grpc.pb.h"
 #include "../common/grpc_out/p4/v1/p4runtime.pb.h"
 
-// Import declarations after any other
+#include "p4_structs.h"
+
+// Import P4-related declarations after any other
 #include "../common/ns_def.inc"
 
-struct P4Parameter {
-  uint32_t id;
-  // Bitstring with enough capacity to express strings with variable sizes
-  uint64_t value;
-  size_t bitwidth;
-};
-
-struct P4Action {
-  uint32_t action_id;
-  // Flag to indicate whether the action is the default choice for a table
-  bool default_action;
-  std::list<P4Parameter> parameters;
-};
-
-// Using same IDs as in spec
-enum P4MatchType {
-  exact = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kExact,
-  ternary = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kTernary,
-  lpm = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kLpm,
-  range = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kRange,
-  optional = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOptional,
-  other = ::P4_NAMESPACE_ID::FieldMatch::FieldMatchTypeCase::kOther
-};
-
-struct P4Match {
-  uint32_t field_id;
-  P4MatchType type;
-  // Bitstring with enough capacity to express strings with variable sizes
-  uint64_t value;
-  size_t bitwidth;
-  // Only required for LPM
-  int32_t lpm_prefix;
-  // Only required for Ternary
-  std::string ternary_mask;
-  // Required for Range
-  std::string range_low;
-  std::string range_high;
-};
-
-struct P4TableEntry {
-  uint32_t table_id;
-  P4Action action;
-  std::list<P4Match> matches;
-  // Only available for Ternary, Range or Optional matches
-  int32_t priority;
-  // Only available for non-default Actions. Use nanoseconds
-  int64_t timeout_ns;
-};
 
 class P4RuntimeClient {
 
   public:
 
-    P4RuntimeClient(std::string bindAddress, 
+    P4RuntimeClient(std::string bind_address, 
                     std::string config,
-                    ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
-                    std::string electionId);
+                    ::PROTOBUF_NAMESPACE_ID::uint64 device_id,
+                    std::string election_id);
 
-    // RPC methods
+    // RPC methods: configuration
     ::GRPC_NAMESPACE_ID::Status SetFwdPipeConfig();
     ::P4_CONFIG_NAMESPACE_ID::P4Info GetP4Info();
-    ::GRPC_NAMESPACE_ID::Status InsertEntry(std::list<P4TableEntry*> entries);
-    ::GRPC_NAMESPACE_ID::Status ModifyEntry(std::list<P4TableEntry*> entries);
-    ::GRPC_NAMESPACE_ID::Status DeleteEntry(std::list<P4TableEntry*> entries);
-    std::list<P4TableEntry*> ReadEntry(std::list<P4TableEntry*> query);
+    // RPC methods: tables
+    ::GRPC_NAMESPACE_ID::Status InsertTableEntry(
+                    std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status ModifyTableEntry(
+                    std::list<P4TableEntry*> entries);
+    ::GRPC_NAMESPACE_ID::Status DeleteTableEntry(
+                    std::list<P4TableEntry*> entries);
+    std::list<P4TableEntry*> ReadTableEntry(
+                    std::list<P4TableEntry*> filter);
+    // RPC methods: counters
+    std::list<P4DirectCounterEntry*> ReadDirectCounterEntry(
+                    std::list<P4DirectCounterEntry*> filter);
+    std::list<P4DirectCounterEntry*> ReadDirectCounterEntries();
+    std::list<P4CounterEntry*> ReadIndirectCounterEntry(
+                    std::list<P4CounterEntry*> filter);
+    std::list<P4CounterEntry*> ReadIndirectCounterEntries();
+    // RPC methods: others
     std::string APIVersion();
 
     // Ancillary methods
@@ -85,10 +52,17 @@ class P4RuntimeClient {
     void TearDown();
 
     // P4-related methods
-    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4TableIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
-        std::string tableName);
-    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4ActionIdFromName(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_,
-        std::string actionName);
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4TableIdFromName(
+                    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info,
+                    std::string table_name);
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4ActionIdFromName(
+                    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info,
+                    std::string action_name);
+    ::PROTOBUF_NAMESPACE_ID::uint32 GetP4IndirectCounterIdFromName(
+                    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info,
+                    std::string counter_name);
+    std::list<::PROTOBUF_NAMESPACE_ID::uint32> GetP4IndirectCounterIds(
+                    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info);
 
   private:
 
@@ -116,28 +90,41 @@ class P4RuntimeClient {
     bool outThreadStop_;
 
     // RPC methods
-    ::GRPC_NAMESPACE_ID::Status WriteEntry(std::list<P4TableEntry*> entries,
-      ::P4_NAMESPACE_ID::Update::Type updateType);
+    ::GRPC_NAMESPACE_ID::Status WriteTableEntry(
+                    std::list<P4TableEntry*> entries,
+                    ::P4_NAMESPACE_ID::Update::Type update_type);
 
     // Ancillary methods
     void Handshake();
-    void SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId);
-    void SetElectionId(std::string electionId);
-    void HandleException(const char* errorMessage);
-    void HandleStatus(::GRPC_NAMESPACE_ID::Status status, const char* errorMessage);
+    void SetElectionId(
+                    ::P4_NAMESPACE_ID::Uint128* election_id);
+    void SetElectionId(
+                    std::string election_id);
+    void HandleException(
+                    const char* error_message);
+    void HandleStatus(
+                    ::GRPC_NAMESPACE_ID::Status status,
+                    const char* error_message);
 
-    ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(int expectedType, long timeout);
-    void CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse* response);
+    ::P4_NAMESPACE_ID::StreamMessageResponse* GetStreamPacket(
+                    int expected_type,
+                    long timeout);
     void ReadOutgoingMessagesFromQueue();
     void ReadOutgoingMessagesFromQueueInBg();
     void ReadIncomingMessagesFromStream();
     void ReadIncomingMessagesFromStreamInBg();
-    std::string EncodeParamValue(uint16_t value, size_t bitwidth);
-    uint16_t DecodeParamValue(const std::string str);
+    std::string EncodeParamValue(
+                    uint16_t value,
+                    size_t bitwidth);
+    uint16_t DecodeParamValue(
+                    const std::string str);
 
     // P4-info related methods
-    void PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_);
+    void PrintP4Info(
+                    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info);
 
+    // Log
+    // std::ofstream logFile_;
 };
 
 #include "../common/ns_undef.inc"
