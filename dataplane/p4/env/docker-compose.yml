@@ -34,7 +34,7 @@ services:
     volumes:
       - ./p4runtime/p4runtime-shell-entrypoint.sh:/p4runtime-sh/p4runtime-shell-entrypoint.sh
       - ./p4runtime/runtime-shell.py:/p4runtime-sh/runtime-shell.py
-      - ../model:/p4runtime-sh/p4src/
+      - ../build/arch/v1model:/p4runtime-sh/build/
       - ./p4runtime/p4runtime_sh/p4runtime.py:/p4runtime_sh/p4runtime.py
     entrypoint: "./p4runtime-shell-entrypoint.sh"
 #    networks:

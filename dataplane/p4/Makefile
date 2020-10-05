@@ -3,6 +3,8 @@ DOCKER_NET := rina-controlplane
 MN_STR_NAME := mn-stratum
 P4R_STR_NAME := p4runtime-sh
 
+efcp_build_arch_v1model := build/arch/v1model
+
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
 curr_dir_sha := $(shell echo -n "$(curr_dir)" | shasum | cut -c1-7)
@@ -17,22 +19,22 @@ docker_net_create:
 docker_net_rm:
 	@docker network rm ${DOCKER_NET} || true
 
-env-start: docker_net_create efcp-build
+env-v1model-start: docker_net_create efcp-v1model-build
 	cd env && docker-compose up --build -d && cd ..
 #docker attach --detach-keys "ctrl-z" ${MN_STR_NAME} || echo "*** Detached from Mininet CLI" 
 
 #	echo "MN_STRATUM_TMP_DIR=$(shell mktemp -d mn-stratum.XXX)" > env/.env 
 
-env-stop:
+env-v1model-stop:
 	cd env && docker-compose exec -d p4runtime mn-stratum rm /tmp/* || true && cd ..
 	cd env && docker-compose down -t0 && docker-compose rm -fsv && cd ..
 #	cd env && docker-compose down -t0 && rm -f .env && rm -rf mininet/tmp/* && cd ..
 	@make docker_net_rm
 
-env-reset: env-stop
+env-v1model-reset: env-v1model-stop
 	-rm -rf ./mininet/tmp
 
-env-restart: env-reset env-start
+env-v1model-restart: env-v1model-reset env-v1model-start
 
 mn-cli:
 	$(info *** Attaching to Mininet CLI...)
@@ -64,16 +66,16 @@ p4runtime-log:
 	docker logs -f ${P4R_STR_NAME}
 
 clean:
-	-rm -rf model/build
+	-rm -rf build
 
-efcp-build: model/efcp.p4
-	$(info *** Building P4 program...)
-	@mkdir -p model/build
+efcp-v1model-build: p4src/arch/v1model/efcp.p4
+	$(info *** Building P4 program \(arch=v1model\)...)
+	@mkdir -p ${efcp_build_arch_v1model}
 	docker run --rm -v ${curr_dir}:/workdir -w /workdir ${P4C_IMG} \
-		p4c-bm2-ss --arch v1model -o model/build/bmv2.json \
-		--p4runtime-files model/build/p4info.txt --Wdisable=unsupported \
-		model/efcp.p4
-	@echo "*** P4 program compiled successfully! Output files are in model/build"
+		p4c-bm2-ss --arch v1model -o ${efcp_build_arch_v1model}/bmv2.json \
+		--p4runtime-files ${efcp_build_arch_v1model}/p4info.txt --Wdisable=unsupported \
+		p4src/arch/v1model/efcp.p4
+	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_v1model}"
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
@@ -96,8 +98,8 @@ mn-stop:
 	docker rm -f ${MN_STR_NAME} || true
 	@make docker_net_rm
 
-edf-dp-test-stratum:
-	make env-restart
+edf-dp-test-stratum: efcp-v1model-build
+	make env-v1model-restart
 	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
 	@sleep 1
 	@echo "Starting test for host1"
@@ -106,7 +108,7 @@ edf-dp-test-stratum:
 	make edf-dp-test-stratum-send-pdu iface="eth2" src_host="h2" dst_host="h1" 
 	@sleep .5
 	-sudo chown ${USER}:${USER} ${PWD}/env/mininet/tmp -R
-	make env-stop
+	make env-v1model-stop
 
 edf-dp-test-stratum-send-pdu:
 	@touch ${PWD}/test/stratum_bmv2_test_${src_host}.log

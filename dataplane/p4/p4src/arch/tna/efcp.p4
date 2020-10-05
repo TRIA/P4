@@ -5,8 +5,8 @@
 #else
 #include <tna.p4>
 #endif
-#include "../common/headers.p4"
-#include "../common/util.p4"
+#include "../../common/headers.p4"
+#include "../../common/util.p4"
 
 
 /*************************************************************************

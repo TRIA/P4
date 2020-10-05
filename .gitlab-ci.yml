@@ -2,10 +2,10 @@ stages:
   - build
   - test
 
-job_efcp_build:
+job_efcp_v1model_build:
   script:
     - cd dataplane/p4
-    - make efcp-build
+    - make efcp-v1model-build
   stage: build
   tags: [npl_bmodel]
 
@@ -17,7 +17,7 @@ job_cp_test:
     - cat test/edf-dp-server.log
     - cat test/edf-cp-client.log
   dependencies:
-    - job_efcp_build
+    - job_efcp_v1model_build
   stage: test
   tags: [npl_bmodel]
 
@@ -28,6 +28,6 @@ job_dp_test:
     - cat test/stratum_bmv2_test_h1.log
     - cat test/stratum_bmv2_test_h2.log
   dependencies:
-    - job_efcp_build
+    - job_efcp_v1model_build
   stage: test
   tags: [npl_bmodel]

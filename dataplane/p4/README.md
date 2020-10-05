@@ -7,13 +7,15 @@ The _model_ folder contains the data plane code for the P4 target.
 
 ## Usage
 
+**Note**: the following environment and tests are based on the *v1model* architecture only.
+
 # Automatic verification of EFCP and IPv4 transmission
 make edf-dp-test-stratum
 
 # Manual verification of EFCP and IPv4 transmission
 
 ## From your host: spin up the containers
-make env-start
+make env-v1model-start
 
 ## From your host: attach to the mininet CLI
 make mn-cli
@@ -34,5 +36,5 @@ make mn-bmv2-sniff-eth1
 mininet> h2 python scripts/h2_send_ipv4_h1.py
 
 ## Stop containers after use
-make env-stop
+make env-v1model-stop
 ```
