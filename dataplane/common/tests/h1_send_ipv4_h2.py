@@ -9,13 +9,13 @@ import re
 import readline
 import socket
 import sys
-from scapy.all import Ether, IP, get_if_hwaddr, sendp, checksum, hexdump
+from scapy.all import Ether, IP, get_if_hwaddr, get_if_list, sendp, checksum, hexdump
 from time import sleep
 
 def get_if(if_name = "eth0"):
     ifs = get_if_list()
     iface = None
-    for i in get_if_list():
+    for i in ifs:
         if if_name in i:
             iface = i
             break;
