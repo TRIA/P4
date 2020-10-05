@@ -22,8 +22,10 @@ endif
 EDF_SOURCES := ${EDF_CLIENT_SRC_PATH}/main.cc
 EDF_SOURCES_OBJ := ${EDF_SOURCES:%.cc=%.o}
 EDF_CP_CLIENT_BIN := edf-cp-client
+EDF_CP_CLIENT_READY_SIGNAL := ${PWD}/.p4rt_cp.finished
 EDF_DP_SERVER_BIN := edf-dp-server
 EDF_DP_SERVER_MOCK_BIN := ${EDF_DP_SERVER_BIN}-mock
+EDP_DP_SERVER_READY_SIGNAL := ${PWD}/env/tmp/.stratum_bmv2.compiled
 CXX := g++
 CXXFLAGS += -std=c++17 -g -O0
 LDFLAGS += -L/usr/local/lib $(shell pkg-config --libs protobuf grpc++) -pthread
@@ -94,9 +96,9 @@ edf-cp-docker-net-rm:
 
 # Data plane model generation
 
-edf-dp-model-build:
+edf-dp-v1model-build:
 	mkdir -p ${EDF_CFG_PATH}
-	cp -Rp ${EDF_DATA_PATH}/model/build/* ${EDF_CFG_PATH}/
+	cp -Rp ${EDF_DATA_PATH}/build/arch/v1model/* ${EDF_CFG_PATH}/
 
 # Client environment setup
 
@@ -114,6 +116,7 @@ edf-cp-client-clean:
 edf-cp-client-test-clean:
 	@echo "Clean-up any related image and container"
 	docker rm -f ${EDF_CONTROL_C_T_NAME} || true
+	rm -f ${EDF_CP_CLIENT_READY_SIGNAL}
 
 edf-cp-client-build: edf-cp-setup
 	@echo "Building and tagging image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}"
@@ -148,7 +151,9 @@ edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	@echo "Starting image stratum-dev in container ${EDF_DATA_S_NAME}"
 	docker rm -f ${EDF_DATA_S_NAME} || true
 	cd ${EDF_SERVER_SRC_PATH} && \
-	docker run -d -v ${PWD}/src/server/stratum/:/stratum -v /home/${USER}/.cache:/home/${USER}/.cache \
+	mkdir -p ${PWD}/env/tmp/ && \
+	docker run -d -v ${PWD}/env/tmp/:/tmp -v ${PWD}/src/server/stratum/:/stratum \
+	-v /home/${USER}/.cache:/home/${USER}/.cache \
 	-v ${EDF_SERVER_SRC_PATH}/docker-entrypoint.sh:/docker-entrypoint.sh \
 	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/common/p4_service.cc:/p4_service.cc \
 	-v ${EDF_REFERENCE_SRC_PATH}/stratum/hal/lib/bmv2/bmv2_switch.cc:/bmv2_switch.cc \
@@ -176,6 +181,7 @@ edf-dp-server-log-docker:
 
 edf-dp-server-clean:
 	docker rm -f ${EDF_DATA_S_NAME} || true
+	rm -f ${EDP_DP_SERVER_READY_SIGNAL}
 
 
 # Tests
@@ -186,7 +192,7 @@ edf-dp-server-clean:
 edf-cp-test-mininet: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
-	make edf-dp-model-build
+	make edf-dp-v1model-build
 	make edf-dp-mininet-start
 	make edf-cp-client-start
 
@@ -195,7 +201,7 @@ edf-cp-test-mininet-clean: edf-cp-client-clean edf-dp-mininet-stop edf-cp-docker
 # Automated test with a mocked gRPC server
 edf-cp-test-mock: edf-cp-client-build edf-cp-docker-net-create
 	@echo "Starting container ${EDF_CONTROL_C_T_NAME} with image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}, then running a quick test"
-	make edf-dp-model-build
+	make edf-dp-v1model-build
 	${EDF_CONTROL_C_T_EXISTS} && docker rm -f ${EDF_CONTROL_C_T_NAME} || true
 	docker run -d -v ${PWD}:/${EDF_CLIENT_R_PATH}/p4 \
 	--network=${EDF_C_NET} \
@@ -221,16 +227,21 @@ edf-dp-mininet-log:
 edf-cp-test-stratum: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
-	make edf-dp-model-build
+	rm -f ${EDP_DP_SERVER_READY_SIGNAL} ${EDF_CP_CLIENT_READY_SIGNAL}
+	make edf-dp-v1model-build
 	make edf-dp-server-clean
 	make edf-dp-server-start
 	${EDF_CONTROL_C_T_EXISTS} && docker rm -f ${EDF_CONTROL_C_T_NAME} || true
+	while [ ! -f ${EDP_DP_SERVER_READY_SIGNAL} ]; do sleep 10; done
+	ls -lah ${PWD}
 	docker run -d -v ${PWD}:/${EDF_CLIENT_R_PATH}/p4 \
 	--network=${EDF_C_NET} \
 	--entrypoint ${EDF_CLIENT_R_PATH}/p4/test/docker-test-server-entrypoint.sh \
 	--name ${EDF_CONTROL_C_T_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
-	sleep 120s
+	while [ ! -f ${EDF_CP_CLIENT_READY_SIGNAL} ]; do sleep 2; done
+	echo "SAVE TO ${EDF_TEST_PATH}/${EDF_CONTROL_C_NAME}.log"
 	docker logs ${EDF_CONTROL_C_T_NAME} > ${EDF_TEST_PATH}/${EDF_CONTROL_C_NAME}.log
+	echo "SAVE TO ${EDF_DATA_S_NAME} > ${EDF_TEST_PATH}/${EDF_DATA_S_NAME}.log"
 	docker logs ${EDF_DATA_S_NAME} > ${EDF_TEST_PATH}/${EDF_DATA_S_NAME}.log
 	#sudo cp -p $(docker inspect --format='{{.LogPath}}' ${EDF_DATA_S_NAME}) ${EDF_TEST_PATH}/${EDF_DATA_S_NAME}.log
 	sudo chown ${USER}:${USER} -R ${EDF_TEST_PATH}/*.log

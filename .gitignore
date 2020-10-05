@@ -1,7 +1,11 @@
 # Transient files
 *.swp
-dataplane/p4/env/mininet/tmp
+dataplane/p4/env/**/tmp
 dataplane/p4/build
+controlplane/p4/env
+
+# Downloaded repositories
+controlplane/p4/src/common/grpc
 
 # Logs
 *.log
