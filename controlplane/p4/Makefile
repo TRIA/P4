@@ -98,6 +98,8 @@ edf-cp-docker-net-rm:
 
 edf-dp-v1model-build:
 	mkdir -p ${EDF_CFG_PATH}
+	current=${PWD} && cd ${EDF_DATA_PATH} && \
+	make efcp-v1model-build && cd ${current}
 	cp -Rp ${EDF_DATA_PATH}/build/arch/v1model/* ${EDF_CFG_PATH}/
 
 # Client environment setup
@@ -143,6 +145,8 @@ edf-cp-client-restart: edf-cp-client-stop edf-cp-client-start
 edf-dp-server-build: edf-cp-setup
 	@echo "Cloning Stratum if not there"
 	if [ ! -d ${EDF_SERVER_SRC_PATH}/stratum ]; then git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/stratum ; fi
+	@echo "Copying custom Stratum's Dockerfile.dev"
+	cp -p ${EDF_REFERENCE_SRC_PATH}/stratum/Dockerfile.dev ${EDF_SERVER_SRC_PATH}/stratum/
 	@echo "Building and tagging image ${EDF_DATA_S_NAME}:${GRPC_RELEASE}"
 	cd ${EDF_SERVER_SRC_PATH}/stratum && \
 	docker build -t stratum-dev --build-arg USER_NAME="${USER}" --build-arg USER_ID="1000" -f Dockerfile.dev .
@@ -164,7 +168,8 @@ edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	-e NP4_INSTALL=/usr -p 28000:28000 -p 9339:9339 -w /stratum \
 	--network=${EDF_C_NET} \
 	--entrypoint /docker-entrypoint.sh \
-	--user ${USER} --name ${EDF_DATA_S_NAME} stratum-dev
+	--privileged --name ${EDF_DATA_S_NAME} stratum-dev
+	#--user ${USER} --name ${EDF_DATA_S_NAME} stratum-dev
 
 edf-dp-server-attach:
 	@echo "Attaching to container ${EDF_DATA_S_NAME}"
@@ -239,6 +244,8 @@ edf-cp-test-stratum: edf-cp-client-build
 	--entrypoint ${EDF_CLIENT_R_PATH}/p4/test/docker-test-server-entrypoint.sh \
 	--name ${EDF_CONTROL_C_T_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
 	while [ ! -f ${EDF_CP_CLIENT_READY_SIGNAL} ]; do sleep 2; done
+	# Remove
+	sleep 10
 	echo "SAVE TO ${EDF_TEST_PATH}/${EDF_CONTROL_C_NAME}.log"
 	docker logs ${EDF_CONTROL_C_T_NAME} > ${EDF_TEST_PATH}/${EDF_CONTROL_C_NAME}.log
 	echo "SAVE TO ${EDF_DATA_S_NAME} > ${EDF_TEST_PATH}/${EDF_DATA_S_NAME}.log"

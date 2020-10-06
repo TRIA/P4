@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#echo $(whoami)
+##mkdir /tmp/test1111
+#
+##current=$PWD
+#sudo -S su
+##cd $current
+#cd /stratum
+
 ready_signal=/tmp/.stratum_bmv2.compiled
 [[ -f ${ready_signal} ]] && rm -f ${ready_signal}
 
@@ -20,9 +28,20 @@ cp -p /common.cpp ${com_github_p4lang_pi_path}
 
 # Build code
 bazel build //stratum/hal/lib/common/...
+
+## Copy changes to external libraries
+##cp -p /deps.bzl /stratum/bazel/
+#com_github_p4lang_pi_path="/stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/"
+#cp -p /device_mgr.cpp ${com_github_p4lang_pi_path}
+#cp -p /action_helpers.cpp ${com_github_p4lang_pi_path}
+#cp -p /common.cpp ${com_github_p4lang_pi_path}
+
 bazel build //stratum/hal/bin/bmv2:stratum_bmv2
+## Copy chassis configuration for bmv2 model
+#cp -p /stratum/stratum/hal/bin/bmv2/dummy.json /stratum/bazel-bin/stratum/hal/bin/bmv2/
 
 # Run server
 cd bazel-bin/stratum/hal/bin/bmv2
 touch ${ready_signal}
 ./stratum_bmv2 --initial-pipeline=dummy.json
+#./bazel-bin/stratum/hal/bin/bmv2/stratum_bmv2 --initial-pipeline=dummy.json
