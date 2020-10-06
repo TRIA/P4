@@ -237,13 +237,13 @@ edf-cp-test-stratum: edf-cp-client-build
 	make edf-dp-server-clean
 	make edf-dp-server-start
 	${EDF_CONTROL_C_T_EXISTS} && docker rm -f ${EDF_CONTROL_C_T_NAME} || true
-	while [ ! -f ${EDP_DP_SERVER_READY_SIGNAL} ]; do sleep 10; done
+	while [ ! -f ${EDP_DP_SERVER_READY_SIGNAL} ] && [ "$(docker container inspect -f '{{.State.Running}}' ${EDF_DATA_S_NAME})" = "true" ]; do sleep 10; done
 	ls -lah ${PWD}
 	docker run -d -v ${PWD}:/${EDF_CLIENT_R_PATH}/p4 \
 	--network=${EDF_C_NET} \
 	--entrypoint ${EDF_CLIENT_R_PATH}/p4/test/docker-test-server-entrypoint.sh \
 	--name ${EDF_CONTROL_C_T_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
-	while [ ! -f ${EDF_CP_CLIENT_READY_SIGNAL} ]; do sleep 2; done
+	while [ ! -f ${EDF_CP_CLIENT_READY_SIGNAL} ] && [ "$(docker container inspect -f '{{.State.Running}}' ${EDF_CONTROL_C_T_NAME})" = "true" ]; do sleep 2; done
 	# Remove
 	sleep 10
 	echo "SAVE TO ${EDF_TEST_PATH}/${EDF_CONTROL_C_NAME}.log"
