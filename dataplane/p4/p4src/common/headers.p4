@@ -1,12 +1,18 @@
 #ifndef _HEADERS_
 #define _HEADERS_
 
+/*
+ * Header types
+ */
 typedef bit<48> mac_addr_t;
 typedef bit<32> ipv4_addr_t;
 typedef bit<128> ipv6_addr_t;
 typedef bit<12> vlan_id_t;
 typedef bit<9>  egress_spec;
 
+/*
+ * Ether Types
+ */
 typedef bit<16> etherType;
 const etherType IPV4_ETYPE = 16w0x0800;
 const etherType ETHERTYPE_ARP = 16w0x0806;
@@ -18,6 +24,28 @@ typedef bit<8> ip_protocol_t;
 const ip_protocol_t IP_PROTOCOLS_ICMP = 1;
 const ip_protocol_t IP_PROTOCOLS_TCP = 6;
 const ip_protocol_t IP_PROTOCOLS_UDP = 17;
+
+/*
+ * PDU Types
+ */
+const bit<8> DATA_TRANSFER = 0x80;
+const bit<8> LAYER_MANAGEMENT = 0x40;
+const bit<8> ACK_ONLY = 0xC1;
+const bit<8> NACK_ONLY = 0xC2;
+const bit<8> ACK_AND_FLOW_CONTROL = 0xC5;
+const bit<8> NACK_AND_FLOW_CONTROL = 0xC6;
+const bit<8> FLOW_CONTROL_ONLY = 0xC4;
+const bit<8> SELECTIVE_ACK = 0xC9;
+const bit<8> SELECTIVE_NACK = 0xCA;
+const bit<8> SELECTIVE_ACK_AND_FLOW_CONTROL = 0xCD;
+const bit<8> SELECTIVE_NACK_AND_FLOW_CONTROL = 0xCE;
+const bit<8> CONTROL_ACK = 0xC0;
+const bit<8> RENDEVOUS = 0xCF;
+
+/*
+ * ECN threshold for congestion control
+ */
+const bit<19> ECN_THRESHOLD = 1;
 
 header ethernet_h {
     mac_addr_t dstAddr;
@@ -153,6 +181,34 @@ struct header_t {
     ipv4_h      ipv4;
 }
 
+struct egress_metadata_t {
+    bit<16> checksum_ipv4_tmp;
+    bit<16> checksum_efcp_tmp;
+
+    bool checksum_upd_ipv4;
+    bool checksum_upd_efcp;
+
+    bool checksum_err_ipv4_igprs;
+    bool checksum_err_efcp_igprs;
+ 
+    bit<19> enq_qdepth;
+}
+
+
+struct metadata_t {
+    bit<16> checksum_ipv4_tmp;
+    bit<16> checksum_efcp_tmp;
+
+    bool checksum_upd_ipv4;
+    bool checksum_upd_efcp;
+
+    bool checksum_err_ipv4_igprs;
+    bool checksum_err_efcp_igprs;
+    bit<16> checksum_error;
+    bit<16> parser_error;
+    bit<9>  egress_spec;
+
+}
 struct empty_header_t {}
 
 struct empty_metadata_t {}
