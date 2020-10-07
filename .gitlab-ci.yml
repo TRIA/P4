@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - clean
 
 job_efcp_v1model_build:
   script:
