@@ -73,14 +73,16 @@ Run the program, providing any suitable argument. If none is provided, defaults 
 
 ```bash
 make edf-cp-client-attach
+
 cd p4
 make edf-cp-client
+CFG_V1MODEL="cfg/arch/v1model/p4info.txt,cfg/arch/v1model/bmv2.json"
 # Option 1 for data plane server
-./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=${CFG_V1MODEL} --election-id=0,1
 # Option 2 for data plane server
-./bin/edf-cp-client --grpc-addr=edf-dp-server:28000 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=edf-dp-server:28000 --config=${CFG_V1MODEL} --election-id=0,1
 # Option 3 for data plane server (deprecated)
-./bin/edf-cp-client --grpc-addr=localhost:50051 --config=cfg/p4info.txt,cfg/bmv2.json --election-id=0,1
+./bin/edf-cp-client --grpc-addr=localhost:50051 --config=${CFG_V1MODEL} --election-id=0,1
 ```
 
 ### Extra: all-in-one testing
