@@ -155,7 +155,7 @@ control MyVerifyChecksum(inout header_t hdr,
 /*************************************************************************
 **************  I N G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
-control MyIngress(inout header_t hdr,
+control SwitchIngress(inout header_t hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
@@ -329,7 +329,7 @@ control MyDeparser(packet_out packet, in header_t hdr) {
 V1Switch(
 MyParser(),
 MyVerifyChecksum(),
-MyIngress(),
+SwitchIngress(),
 MyEgress(),
 MyComputeChecksum(),
 MyDeparser()

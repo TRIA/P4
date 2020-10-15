@@ -159,7 +159,7 @@ Counter<bit<32>, PortId_t>(
 	    miss;
             NoAction;
         }
-    //    size = 1024;
+        //size = 1024;
         default_action = NoAction();
     }
 
@@ -175,7 +175,7 @@ Counter<bit<32>, PortId_t>(
 	    miss;
             NoAction;
         }
-      //  size = 1024; default_action = miss();
+        //size = 1024; default_action = miss();
     }
 
     apply {
@@ -359,7 +359,7 @@ control SwitchEgressDeparser(
                  hdr.ipv4.diffserv,
                  hdr.ipv4.total_len,
                  hdr.ipv4.identification,
-                 hdr.ipv4.flags, //REVISAR QUE LOS NOMBRES SON ASÍ
+                 hdr.ipv4.flags, 
                  hdr.ipv4.frag_offset,
                  hdr.ipv4.ttl,
                  hdr.ipv4.protocol,
@@ -391,11 +391,11 @@ control SwitchEgressDeparser(
 ***********************  S W I T C H  *******************************
 *************************************************************************/
 
-Pipeline(SwitchIngressParser(), //DONE pero hay que revisar cosas
-         SwitchIngress(), //
-         SwitchIngressDeparser(), //DONE
-         SwitchEgressParser(), //DONE pero hay que revisar cosas
-         SwitchEgress(), //
-         SwitchEgressDeparser()) pipe; //DONE pero hay que revisar cosas
+Pipeline(SwitchIngressParser(), 
+         SwitchIngress(), 
+         SwitchIngressDeparser(), 
+         SwitchEgressParser(), 
+         SwitchEgress(), 
+         SwitchEgressDeparser()) pipe;
 
 Switch(pipe) main;
