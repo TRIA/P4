@@ -48,7 +48,7 @@ error {
 /*************************************************************************
 *********************** P A R S E R  ***********************************
 *************************************************************************/
-parser MyParser(packet_in packet,
+parser SwitchIngressParser(packet_in packet,
                 out header_t hdr,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
@@ -111,7 +111,7 @@ standard_metadata checksum_error field will be equal to 1 when the
 packet begins ingress processing.
 */
 
-control MyVerifyChecksum(inout header_t hdr,
+control SwitchIngressVerifyChecksum(inout header_t hdr,
                         inout metadata meta) {
     apply {
 /*
@@ -244,7 +244,7 @@ the packet buffer, nor sent to egress processing.
 ****************  E G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
 
-control MyEgress(inout header_t hdr,
+control SwitchEgress(inout header_t hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
 
@@ -267,7 +267,7 @@ control MyEgress(inout header_t hdr,
 *************   C H E C K S U M    C O M P U T A T I O N   **************
 *************************************************************************/
 
-control MyComputeChecksum(inout header_t hdr, inout metadata meta) {
+control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
     apply {
 /*
 * Compute checksum for EFCP packets
@@ -312,7 +312,7 @@ control MyComputeChecksum(inout header_t hdr, inout metadata meta) {
 ***********************  D E P A R S E R  *******************************
 *************************************************************************/
 
-control MyDeparser(packet_out packet, in header_t hdr) {
+control SwitchEgressDeparser(packet_out packet, in header_t hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.efcp);
@@ -327,10 +327,10 @@ control MyDeparser(packet_out packet, in header_t hdr) {
 *************************************************************************/
 
 V1Switch(
-MyParser(),
-MyVerifyChecksum(),
+SwitchIngressParser(),
+SwitchIngressVerifyChecksum(),
 SwitchIngress(),
-MyEgress(),
-MyComputeChecksum(),
-MyDeparser()
+SwitchEgress(),
+SwitchEgressComputeChecksum(),
+SwitchEgressDeparser()
 ) main;
