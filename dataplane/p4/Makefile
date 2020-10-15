@@ -79,20 +79,10 @@ efcp-v1model-build: p4src/arch/v1model/efcp.p4
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
-		-v ${PWD}/../common/tests:/root/tests -v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp \
-		-v ${PWD}/../common/tests/pdu_types.py:/root/pdu_types.py \
-		-v ${PWD}/../common/tests/send_efcp_h1.py:/root/send_efcp_h1.py \
-		-v ${PWD}/../common/tests/send_efcp_h2.py:/root/send_efcp_h2.py -p50001:50001 \
+		-v ${PWD}/../common/tests:/root/tests \
+		-v ${PWD}/env/mininet/tmp/${MN_STR_NAME}:/tmp \
+		-p50001:50001 \
 		--name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} sergiogimenez/mininet-mod:latest
-#	current=${PWD} && \
-#		cd env/mininet && \
-#		docker build -t edf-dp-mn-stratum:latest . && \
-#		docker run --privileged --rm -it -v ${PWD}/env/mininet/scripts:/root/scripts -v /tmp/${MN_STR_NAME}:/tmp -p50001-50030:50001-50030 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} edf-dp-mn-stratum:latest && \
-#		cd ${current}
-#	-xhost +si:localuser:root
-#	# OLD
-#	docker run --privileged --rm -it -v ${PWD}/env/mininet/scripts:/root/scripts -v /tmp/${MN_STR_NAME}:/tmp -p50001-50030:50001-50030 --name ${MN_STR_NAME} --hostname ${MN_STR_NAME} --network=${DOCKER_NET} opennetworking/${MN_STR_NAME}
-#	-xhost +si:localuser:root
 
 mn-stop:
 	docker rm -f ${MN_STR_NAME} || true
@@ -101,7 +91,7 @@ mn-stop:
 edf-dp-test-stratum: efcp-v1model-build
 	make env-v1model-restart
 	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
-	@sleep 1
+	@sleep 3
 	@echo "Starting test for host1"
 	make edf-dp-test-stratum-send-pdu iface="eth1" src_host="h1" dst_host="h2"
 	@echo "Starting test for host2"
