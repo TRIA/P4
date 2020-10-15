@@ -122,11 +122,12 @@ edf-cp-client-test-clean:
 
 edf-cp-client-build: edf-cp-setup
 	@echo "Building and tagging image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}"
-	sudo rm -rf ${PWD}/env/tmp/
+	sudo rm -rf ${PWD}/env/tmp/ || true
 	docker build --build-arg GRPC_RELEASE=${GRPC_RELEASE} -f Dockerfile -t ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} .
 
 edf-cp-client-start: edf-cp-client-build edf-cp-docker-net-create
 	@echo "Starting image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} in container ${EDF_CONTROL_C_NAME}"
+	make edf-dp-v1model-build
 	${EDF_CONTROL_C_EXISTS} && docker rm -f ${EDF_CONTROL_C_NAME} || true
 	docker run -it -v ${PWD}:${EDF_CLIENT_R_PATH}/p4 --network=${EDF_C_NET} \
 	--entrypoint ${EDF_CLIENT_R_PATH}/docker-entrypoint.sh --name ${EDF_CONTROL_C_NAME} ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
@@ -144,7 +145,7 @@ edf-cp-client-restart: edf-cp-client-stop edf-cp-client-start
 
 edf-dp-server-build: edf-cp-setup
 	@echo "Cloning Stratum if not there"
-	if [ ! -d ${EDF_SERVER_SRC_PATH}/stratum ]; then git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/stratum ; fi
+	[ ! -d ${EDF_SERVER_SRC_PATH}/stratum ] && git clone https://github.com/stratum/stratum.git ${EDF_SERVER_SRC_PATH}/stratum
 	sudo rm -rf ${PWD}/env/tmp/
 	@echo "Copying custom Stratum's Dockerfile.dev"
 	cp -p ${EDF_REFERENCE_SRC_PATH}/stratum/Dockerfile.dev ${EDF_SERVER_SRC_PATH}/stratum/
@@ -157,6 +158,7 @@ edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	docker rm -f ${EDF_DATA_S_NAME} || true
 	cd ${EDF_SERVER_SRC_PATH} && \
 	mkdir -p ${PWD}/env/tmp/ && \
+	echo "Running container ${EDF_DATA_S_NAME} (non-privileged user=${USER})" && \
 	docker run -d -v ${PWD}/env/tmp/:/tmp -v ${PWD}/src/server/stratum/:/stratum \
 	-v /home/${USER}/.cache:/home/${USER}/.cache \
 	-v ${EDF_SERVER_SRC_PATH}/docker-entrypoint.sh:/docker-entrypoint.sh \
@@ -170,7 +172,6 @@ edf-dp-server-start: edf-dp-server-build edf-cp-docker-net-create
 	--network=${EDF_C_NET} \
 	--entrypoint /docker-entrypoint.sh \
 	--user ${USER} --name ${EDF_DATA_S_NAME} stratum-dev
-	#--privileged --name ${EDF_DATA_S_NAME} stratum-dev
 
 edf-dp-server-attach:
 	@echo "Attaching to container ${EDF_DATA_S_NAME}"
@@ -180,21 +181,19 @@ edf-dp-server-stop:
 	docker stop ${EDF_DATA_S_NAME} || true
 
 edf-dp-server-log:
-	docker exec -it ${EDF_DATA_S_NAME} tail -1000f $(shell docker exec -it ${EDF_DATA_S_NAME} find /tmp -name *stratum_bmv2*ERROR*)
-
-edf-dp-server-log-docker:
+	#docker exec -it ${EDF_DATA_S_NAME} tail -1000f $(shell docker exec -it ${EDF_DATA_S_NAME} find /tmp -name *stratum_bmv2*ERROR*)
 	docker logs -f ${EDF_DATA_S_NAME}
 
 edf-dp-server-clean:
 	docker rm -f ${EDF_DATA_S_NAME} || true
 	rm -f ${EDP_DP_SERVER_READY_SIGNAL}
+	[ -d ${EDF_SERVER_SRC_PATH}/stratum ] && sudo chown ${USER}:${USER} -R ${EDF_SERVER_SRC_PATH}/stratum || true
 
 
 # Tests
 
 # Manual test with bmv2's P4 virtual switches running in Mininet (mn-stratum)
 # Note: Dockerfile for mn-stratum in https://github.com/stratum/stratum/blob/master/tools/mininet/Dockerfile
-## FIXME: NOT WORKING ("edf-cp-client-start" not starting). Either run all containers as daemons or use docker-compose
 edf-cp-test-v1model-mininet: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-v1model-mininet-stop\")"
@@ -229,18 +228,17 @@ edf-dp-mininet-log:
 	cd ${EDF_DATA_PATH} && make mn-log && cd ${CURRENT}
 
 # Automated test with the Stratum-enabled bmv2 server
+## NOTE: does not fully work in CI environments with gitlab-runner. Test rather in local
 edf-cp-test-stratum: edf-cp-client-build
 	@echo "Starting containers with images ${EDF_DATA_C_T_NAME} and ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} for manual tests"
 	@echo "Remove manually (\"make edf-cp-test-mininet-stop\")"
 	rm -f ${EDP_DP_SERVER_READY_SIGNAL} ${EDF_CP_CLIENT_READY_SIGNAL}
 	make edf-dp-v1model-build
 	make edf-dp-server-clean
-	sudo rm -rf ${PWD}/env/tmp/
 	make edf-dp-server-start
 	${EDF_CONTROL_C_T_EXISTS} && docker rm -f ${EDF_CONTROL_C_T_NAME} || true
 	sleep 5
 	# This one will close the DP server soon, thus not allowing it to fail, thus returning success
-	#while [ ! -f ${EDP_DP_SERVER_READY_SIGNAL} ] && [ "$(docker inspect -f '{{.State.Running}}' ${EDF_DATA_S_NAME})" == "true" ]; do sleep 10; done
 	while [ ! -f ${EDP_DP_SERVER_READY_SIGNAL} ] && [ "$(docker inspect -f '{{.State.Running}}' ${EDF_DATA_S_NAME})" != "false" ]; do sleep 10; done
 	docker run -d -v ${PWD}:/${EDF_CLIENT_R_PATH}/p4 \
 	--network=${EDF_C_NET} \
@@ -257,6 +255,7 @@ edf-cp-test-stratum: edf-cp-client-build
 	[ -f ${EDP_DP_SERVER_READY_SIGNAL} ] && [ -f ${EDF_CP_CLIENT_READY_SIGNAL} ] && make edf-cp-test-stratum-clean
 
 edf-cp-test-stratum-clean: edf-cp-client-test-clean edf-dp-server-clean
+	sudo rm -rf ${PWD}/env/tmp/
 
 #
 # Code (logic)

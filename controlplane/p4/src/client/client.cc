@@ -5,6 +5,8 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
 #include "client.h"
+#include "conversions.h"
+#include "print.h"
 // Import declarations after any other
 #include "../common/ns_def.inc"
 
@@ -21,7 +23,7 @@ using ::P4_NAMESPACE_ID::P4Runtime;
 // Channel
 using ::GRPC_NAMESPACE_ID::CreateChannel;
 using ::GRPC_NAMESPACE_ID::InsecureChannelCredentials;
-// iata structures
+// Data structures
 using ::P4_CONFIG_NAMESPACE_ID::P4Info;
 using ::P4_NAMESPACE_ID::CapabilitiesRequest;
 using ::P4_NAMESPACE_ID::CapabilitiesResponse;
@@ -40,29 +42,29 @@ using ::P4_NAMESPACE_ID::Update;
 using ::P4_NAMESPACE_ID::WriteRequest;
 using ::P4_NAMESPACE_ID::WriteResponse;
 
-P4RuntimeClient::P4RuntimeClient(std::string bindAddress,
+P4RuntimeClient::P4RuntimeClient(std::string bind_address,
                 std::string config,
-                ::PROTOBUF_NAMESPACE_ID::uint64 deviceId,
-                std::string electionId) {
-  channel_ = CreateChannel(bindAddress, InsecureChannelCredentials());
+                ::PROTOBUF_NAMESPACE_ID::uint64 device_id,
+                std::string election_id) {
+  channel_ = CreateChannel(bind_address, InsecureChannelCredentials());
   stub_ = P4Runtime::NewStub(channel_);
+
+  // if (!logFile_.is_open()) {
+  //   logFile_.open(logFilePath_);
+  // }
 
   auto configIndex = config.find_first_of(",");
   p4InfoPath_ = config.substr(0, configIndex);
   binaryCfgPath_ = config.substr(configIndex + 1);
 
-  deviceId_ = deviceId;
-  SetElectionId(electionId);
+  deviceId_ = device_id;
+  SetElectionId(election_id);
 
   SetUpStream();
 }
 
 // RPC methods
 
-// NOTE: any fix should check gRPC status codes at https://grpc.github.io/grpc/core/md_doc_statuscodes.html
-
-// See reference/p4runtime-shell-python/p4runtime.py#set_fwd_pipe_config
-// TODO: validate
 Status P4RuntimeClient::SetFwdPipeConfig() {
   std::cout << "Setting forwarding pipeline config" << std::endl;
   SetForwardingPipelineConfigRequest request = SetForwardingPipelineConfigRequest();
@@ -70,29 +72,29 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   request.set_allocated_election_id(electionId_);
   request.set_action(request.VERIFY_AND_COMMIT);
 
-  std::ifstream p4InfoFileIfStream("./" + p4InfoPath_);
-  if (!p4InfoFileIfStream.is_open()) {
-    const std::string errorMessage = "Cannot open file " + p4InfoPath_;
-    HandleException(errorMessage.c_str());
+  std::ifstream p4info_file_ifstream("./" + p4InfoPath_);
+  if (!p4info_file_ifstream.is_open()) {
+    const std::string error_message = "Cannot open file " + p4InfoPath_;
+    HandleException(error_message.c_str());
   }
-  ZeroCopyInputStream* p4InfoFile = new IstreamInputStream(&p4InfoFileIfStream, -1);
+  ZeroCopyInputStream* p4info_file = new IstreamInputStream(&p4info_file_ifstream, -1);
 
-  std::ifstream binaryCfgFileIfStream("./" + binaryCfgPath_);
-  if (!binaryCfgFileIfStream.is_open()) {
-    const std::string errorMessage = "Cannot open file " + binaryCfgPath_;
-    HandleException(errorMessage.c_str());
+  std::ifstream binary_cfg_file_ifstream("./" + binaryCfgPath_);
+  if (!binary_cfg_file_ifstream.is_open()) {
+    const std::string error_message = "Cannot open file " + binaryCfgPath_;
+    HandleException(error_message.c_str());
   }
-  ZeroCopyInputStream* binaryCfgFile = new IstreamInputStream(&binaryCfgFileIfStream, -1);
-  std::stringstream binaryCfgFileStream;
-  binaryCfgFileStream << binaryCfgFileIfStream.rdbuf();
-  std::string binaryCfgFileStr = binaryCfgFileStream.str();
+  ZeroCopyInputStream* binary_cfg_file = new IstreamInputStream(&binary_cfg_file_ifstream, -1);
+  std::stringstream binary_cfg_file_stream;
+  binary_cfg_file_stream << binary_cfg_file_ifstream.rdbuf();
+  std::string binary_cfg_file_str = binary_cfg_file_stream.str();
 
   ForwardingPipelineConfig* config = ForwardingPipelineConfig().New();
-  config->set_p4_device_config(binaryCfgFileStr);
-  P4Info p4Info = request.config().p4info();
-  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4InfoFile, &p4Info);
+  config->set_p4_device_config(binary_cfg_file_str);
+  P4Info p4info = request.config().p4info();
+  ::PROTOBUF_NAMESPACE_ID::TextFormat::Merge(p4info_file, &p4info);
   // The current information (already allocated in memory) is shared with the config object
-  config->set_allocated_p4info(&p4Info);
+  config->set_allocated_p4info(&p4info);
   request.set_allocated_config(config);
 
   ClientContext context;
@@ -107,7 +109,6 @@ Status P4RuntimeClient::SetFwdPipeConfig() {
   return status;
 }
 
-// See reference/p4runtime-shell-python/p4runtime.py#get_p4info
 P4Info P4RuntimeClient::GetP4Info() {
   std::cout << "Retrieving P4Info file" << std::endl;
   GetForwardingPipelineConfigRequest request = GetForwardingPipelineConfigRequest();
@@ -119,69 +120,36 @@ P4Info P4RuntimeClient::GetP4Info() {
   const std::string errorMessage = "Cannot get configuration from the forwarding pipeline";
   Status status = stub_->GetForwardingPipelineConfig(&context, request, &response);
   HandleStatus(status, errorMessage.c_str());
-  P4Info p4Info = response.config().p4info();
-  PrintP4Info(p4Info);
-  return p4Info;
+  P4Info p4info = response.config().p4info();
+  PrintP4Info(p4info);
+  return p4info;
 }
 
-Status P4RuntimeClient::InsertEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::INSERT);
+Status P4RuntimeClient::InsertTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::INSERT);
 }
 
-Status P4RuntimeClient::ModifyEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::MODIFY);
+Status P4RuntimeClient::ModifyTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::MODIFY);
 }
 
-Status P4RuntimeClient::DeleteEntry(std::list<P4TableEntry*> entries) {
-  return WriteEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
+Status P4RuntimeClient::DeleteTableEntry(std::list<P4TableEntry*> entries) {
+  return WriteTableEntry(entries, ::P4_NAMESPACE_ID::Update::DELETE);
 }
 
 std::string P4RuntimeClient::EncodeParamValue(uint16_t value, size_t bitwidth) {
-  char lsb, msb;
-  std::string res;
-
-  // From most to least significant bits (msb|lsb), retrieve specific octet by shifting
-  // as many positions to the right as the most significant it in the octect
-  // (that is, shift(bitwidth - most_significant_bit_position); e.g.,
-  // "msb" will shift 16 bits - 16 bits, "lsb" will shift 16 bits - 8 bits)
-  msb = value & 0xFF;
-  lsb = value >> 8;
-  res.push_back(msb);
-  if (lsb != 0) {
-    res.push_back(lsb);
-  }
-
-  // Fill in the remaining bytes (computed as the expected "nbytes" - sizeof generated string)
-  // with leading zeros in order to fit the full bitwidth expected per value
-  size_t nbytes = (bitwidth + 7) / 8;
-  int remaining_zeros = nbytes - res.size();
-  std::string res_byte = "";
-  while (remaining_zeros-- > 0) {
-    msb = 0 & 0xFF;
-    res_byte.push_back(msb);
-    res = res_byte + res;
-    res_byte = "";
-  }
-
-  return res;
+  return encode_param_value(value, bitwidth);
 }
 
 uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
-  uint16_t res;
-
-  res = str[0];
-  if (str.length() > 1) {
-    res = res | uint16_t(str[1]) << 8;
-  }
-
-  return res;
+  return decode_param_value(str);
 }
 
 // Write will call, among others, the next classes:
 // ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/device_mgr.cpp
 // ./stratum/bazel-stratum/external/com_github_p4lang_PI/proto/frontend/src/common.cpp
-::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteEntry(std::list<P4TableEntry*> entries,
-    ::P4_NAMESPACE_ID::Update::Type updateType) {
+::GRPC_NAMESPACE_ID::Status P4RuntimeClient::WriteTableEntry(std::list<P4TableEntry*> entries,
+    ::P4_NAMESPACE_ID::Update::Type update_type) {
   ::P4_NAMESPACE_ID::WriteRequest request = ::P4_NAMESPACE_ID::WriteRequest();
   request.add_updates();
   ::P4_NAMESPACE_ID::Update * update = request.mutable_updates(0);
@@ -209,7 +177,7 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
   // }
 
   // Level1. Update
-  update->set_type(updateType);
+  update->set_type(update_type);
   update->set_allocated_entity(entity);
   std::cout << "Write . Setting entity type = " << update->type() << std::endl;
 
@@ -340,14 +308,14 @@ uint16_t P4RuntimeClient::DecodeParamValue(const std::string str) {
 
   WriteResponse response = WriteResponse();
   ClientContext context;
-  const std::string errorMessage = "Error executing Write command";
+  const std::string error_message = "Error executing Write command";
   Status status = stub_->Write(&context, request, &response);
-  HandleStatus(status, errorMessage.c_str());
+  HandleStatus(status, error_message.c_str());
   return status;
 }
 
 // TODO: investigate how to read all available table entries (e.g., no filter defined)
-std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> filter) {
+std::list<P4TableEntry*> P4RuntimeClient::ReadTableEntry(std::list<P4TableEntry*> filter) {
   std::list<P4TableEntry*>::iterator it;
   std::list<P4TableEntry*> result;
   P4TableEntry * filter_entry;
@@ -360,33 +328,34 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
   request.set_device_id(deviceId_);
   for (it = filter.begin(); it != filter.end(); ++it) {
     filter_entry = *it;
-    ::P4_NAMESPACE_ID::Action *p4EntityAction = new ::P4_NAMESPACE_ID::Action();
-    p4EntityAction->set_action_id(filter_entry->action.action_id);
-    ::P4_NAMESPACE_ID::TableAction * p4EntityTableAction = new ::P4_NAMESPACE_ID::TableAction();
-    p4EntityTableAction->set_allocated_action(p4EntityAction);
-    ::P4_NAMESPACE_ID::TableEntry * p4EntityTableEntry = new ::P4_NAMESPACE_ID::TableEntry();
-    p4EntityTableEntry->set_table_id(filter_entry->table_id);
+    ::P4_NAMESPACE_ID::Action *p4_entity_action = new ::P4_NAMESPACE_ID::Action();
+    p4_entity_action->set_action_id(filter_entry->action.action_id);
+    ::P4_NAMESPACE_ID::TableAction * p4_entity_table_action = new ::P4_NAMESPACE_ID::TableAction();
+    p4_entity_table_action->set_allocated_action(p4_entity_action);
+    ::P4_NAMESPACE_ID::TableEntry * p4_entity_table_entry = new ::P4_NAMESPACE_ID::TableEntry();
+    p4_entity_table_entry->set_table_id(filter_entry->table_id);
     std::cout << "Read . Requested table id = " << filter_entry->table_id << std::endl;
     std::cout << "Read . Requested action id = " << filter_entry->action.action_id << std::endl;
-    p4EntityTableEntry->mutable_action()->set_allocated_action(p4EntityAction);
-    request.add_entities()->set_allocated_table_entry(p4EntityTableEntry);
+    p4_entity_table_entry->mutable_action()->set_allocated_action(p4_entity_action);
+    request.add_entities()->set_allocated_table_entry(p4_entity_table_entry);
   }
 
   ReadResponse response = ReadResponse();
-  std::unique_ptr<ClientReader<ReadResponse> > clientReader = stub_->Read(&context, request);
-  clientReader->Read(&response);
-  clientReader->Finish();
+  std::unique_ptr<ClientReader<ReadResponse> > client_reader = stub_->Read(&context, request);
+  client_reader->Read(&response);
+  client_reader->Finish();
   bool read_entry_matches_filter = false;
 
   std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
   for (int i = 0; i < response.entities_size(); i++) {
-    const p4::v1::TableEntry rentry = response.entities().Get(i).table_entry();
+    const p4::v1::TableEntry ret_entry = response.entities().Get(i).table_entry();
 
     // Check returned entries against those that were sent in the filter
     for (it = filter.begin(); it != filter.end(); ++it) {
       filter_entry = *it;
-      if ((filter_entry->table_id == rentry.table_id()) &&
-        (filter_entry->action.action_id == rentry.action().action().action_id())) {
+      if ((filter_entry->table_id == ret_entry.table_id()) &&
+        (filter_entry->action.action_id == ret_entry.action().action().action_id())) {
+          // TODO: filter by match value!
           read_entry_matches_filter = true;
         }
     }
@@ -396,49 +365,49 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
     }
 
     entry = new P4TableEntry();
-    entry->table_id = rentry.table_id();
+    entry->table_id = ret_entry.table_id();
     std::cout << "Read . Fetching table id = " << entry->table_id << std::endl;
-    entry->action.action_id = rentry.action().action().action_id();
+    entry->action.action_id = ret_entry.action().action().action_id();
     std::cout << "Read . Fetching action id = " << entry->action.action_id << std::endl;
-    std::cout << "Read . Fetching param size = " << rentry.action().action().params().size() << std::endl;
-    for (int p = 0; p < rentry.action().action().params_size(); p++) {
+    std::cout << "Read . Fetching param size = " << ret_entry.action().action().params().size() << std::endl;
+    for (int p = 0; p < ret_entry.action().action().params_size(); p++) {
       param = new P4Parameter();
-      if (rentry.action().action().params().size() > 0) {
-        param->id = rentry.action().action().params(p).param_id();
-        param->value = DecodeParamValue(rentry.action().action().params(p).value());
+      if (ret_entry.action().action().params().size() > 0) {
+        param->id = ret_entry.action().action().params(p).param_id();
+        param->value = DecodeParamValue(ret_entry.action().action().params(p).value());
         std::cout << "Read . Fetching param id = " << param->id << ", value = " << param->value << std::endl;
       }
       entry->action.parameters.push_back(*param);
     }
-    entry->timeout_ns = rentry.idle_timeout_ns();
+    entry->timeout_ns = ret_entry.idle_timeout_ns();
     std::cout << "Read . Fetching timeout = " << entry->timeout_ns << std::endl;
 
-    std::cout << "Read . Fetching match size = " << rentry.match_size() << std::endl;
-    for (int m = 0; m < rentry.match_size(); m++) {
+    std::cout << "Read . Fetching match size = " << ret_entry.match_size() << std::endl;
+    for (int m = 0; m < ret_entry.match_size(); m++) {
       match = new P4Match();
-      match->field_id = rentry.match(m).field_id();
-      if (rentry.match(m).has_exact()) {
+      match->field_id = ret_entry.match(m).field_id();
+      if (ret_entry.match(m).has_exact()) {
         match->type = P4MatchType::exact;
-        match->value = DecodeParamValue(rentry.match(m).exact().value());
-      } else if (rentry.match(m).has_ternary()) {
+        match->value = DecodeParamValue(ret_entry.match(m).exact().value());
+      } else if (ret_entry.match(m).has_ternary()) {
         match->type = P4MatchType::ternary;
-        match->value = DecodeParamValue(rentry.match(m).ternary().value());
-        match->ternary_mask = rentry.match(m).ternary().mask();
-        entry->priority = rentry.priority();
-      } else if (rentry.match(m).has_lpm()) {
+        match->value = DecodeParamValue(ret_entry.match(m).ternary().value());
+        match->ternary_mask = ret_entry.match(m).ternary().mask();
+        entry->priority = ret_entry.priority();
+      } else if (ret_entry.match(m).has_lpm()) {
         match->type = P4MatchType::lpm;
-        match->value = DecodeParamValue(rentry.match(m).lpm().value());
-        match->lpm_prefix = rentry.match(m).lpm().prefix_len();
-      } else if (rentry.match(m).has_range()) {
+        match->value = DecodeParamValue(ret_entry.match(m).lpm().value());
+        match->lpm_prefix = ret_entry.match(m).lpm().prefix_len();
+      } else if (ret_entry.match(m).has_range()) {
         match->type = P4MatchType::range;
-        match->range_low = rentry.match(m).range().low();
-        match->range_high = rentry.match(m).range().high();
-        entry->priority = rentry.priority();
-      } else if (rentry.match(m).has_optional()) {
+        match->range_low = ret_entry.match(m).range().low();
+        match->range_high = ret_entry.match(m).range().high();
+        entry->priority = ret_entry.priority();
+      } else if (ret_entry.match(m).has_optional()) {
         match->type = P4MatchType::optional;
-        match->value = DecodeParamValue(rentry.match(m).optional().value());
-        entry->priority = rentry.priority();
-      } else if (rentry.match(m).has_other()) {
+        match->value = DecodeParamValue(ret_entry.match(m).optional().value());
+        entry->priority = ret_entry.priority();
+      } else if (ret_entry.match(m).has_other()) {
         match->type = P4MatchType::other;
       }
       std::cout << "Read . Fetching match type = " << match->type << ", value = " <<
@@ -452,6 +421,120 @@ std::list<P4TableEntry*> P4RuntimeClient::ReadEntry(std::list<P4TableEntry*> fil
   return result;  
 }
 
+std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntry(std::list<P4DirectCounterEntry*> filter) {
+  std::list<P4DirectCounterEntry*>::iterator it;
+  std::list<P4DirectCounterEntry*> result;
+  P4DirectCounterEntry * filter_entry;
+  P4DirectCounterEntry * entry;
+  ::P4_NAMESPACE_ID::TableEntry *p4_entity_direct_counter_entry_table = new ::P4_NAMESPACE_ID::TableEntry();
+  ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
+  ClientContext context;
+ 
+  request.set_device_id(deviceId_);
+  for (it = filter.begin(); it != filter.end(); ++it) {
+    filter_entry = *it;
+    ::P4_NAMESPACE_ID::DirectCounterEntry *p4_entity_direct_counter_entry = 
+      new ::P4_NAMESPACE_ID::DirectCounterEntry();
+    p4_entity_direct_counter_entry_table->set_table_id(filter_entry->table_entry.table_id);
+    p4_entity_direct_counter_entry->set_allocated_table_entry(p4_entity_direct_counter_entry_table);
+    std::cout << "Read . Requested table id = " << filter_entry->table_entry.table_id << std::endl;
+    request.add_entities()->set_allocated_direct_counter_entry(p4_entity_direct_counter_entry);
+  }
+
+  ReadResponse response = ReadResponse();
+  std::unique_ptr<ClientReader<ReadResponse> > client_reader = stub_->Read(&context, request);
+  client_reader->Read(&response);
+  client_reader->Finish();
+  bool read_entry_matches_filter = false;
+
+  std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
+  for (int i = 0; i < response.entities_size(); i++) {
+    const p4::v1::CounterEntry ret_entry = response.entities().Get(i).counter_entry();
+    entry = new P4DirectCounterEntry();
+    entry->data = ret_entry.data();
+    std::cout << "Read . Fetching counter data (byte count) = " << entry->data.byte_count() << std::endl;
+    std::cout << "Read . Fetching counter data (packet count) = " << entry->data.packet_count() << std::endl;
+    result.push_back(entry);
+  }
+
+  return result;  
+}
+
+std::list<P4DirectCounterEntry*> P4RuntimeClient::ReadDirectCounterEntries() {
+  std::list<P4DirectCounterEntry *> counter_entries;
+  P4DirectCounterEntry counter_entry;
+  // All counters retrieved by using ID = 0
+  counter_entry.table_entry.table_id = 0;
+  counter_entries.push_back(&counter_entry);
+  return ReadDirectCounterEntry(counter_entries);  
+}
+
+std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntry(std::list<P4CounterEntry*> filter) {
+  std::list<P4CounterEntry*>::iterator it;
+  std::list<P4CounterEntry*> result;
+  P4CounterEntry * filter_entry;
+  P4CounterEntry * entry;
+  ::P4_NAMESPACE_ID::ReadRequest request = ::P4_NAMESPACE_ID::ReadRequest();
+  ClientContext context;
+ 
+  request.set_device_id(deviceId_);
+  for (it = filter.begin(); it != filter.end(); ++it) {
+    filter_entry = *it;
+    ::P4_NAMESPACE_ID::CounterEntry *p4_entity_indirect_counter_entry = new ::P4_NAMESPACE_ID::CounterEntry();
+    // Counter == 0: provide all counter cells for all counters (as per P4Runtime spec)
+    p4_entity_indirect_counter_entry->set_counter_id(filter_entry->counter_id);
+    std::cout << "Read . Requested counter id = " << filter_entry->counter_id << std::endl;
+    // No index defined: provide all counter cells (as per P4Runtime spec)
+    if (filter_entry->index.index() >= 0) {
+      ::P4_NAMESPACE_ID::Index *p4_entity_indirect_counter_entry_index = new ::P4_NAMESPACE_ID::Index();
+      p4_entity_indirect_counter_entry_index->set_index(filter_entry->index.index());
+      std::cout << "Read . Requested index = " << filter_entry->index.index() << std::endl;
+      p4_entity_indirect_counter_entry->set_allocated_index(p4_entity_indirect_counter_entry_index);
+    }
+    request.add_entities()->set_allocated_counter_entry(p4_entity_indirect_counter_entry);
+  }
+
+  ReadResponse response = ReadResponse();
+  std::unique_ptr<ClientReader<ReadResponse> > client_reader = stub_->Read(&context, request);
+  client_reader->Read(&response);
+  client_reader->Finish();
+  bool read_entry_matches_filter = false;
+
+  std::cout << "Read . Entities available = " << response.entities_size() << std::endl;
+  for (int i = 0; i < response.entities_size(); i++) {
+    const p4::v1::CounterEntry ret_entry = response.entities().Get(i).counter_entry();
+    entry = new P4CounterEntry();
+    entry->counter_id = ret_entry.counter_id();
+    entry->index = ret_entry.index();
+    entry->data = ret_entry.data();
+    if (entry->data.byte_count() > 0 || entry->data.packet_count() > 0) {
+      std::cout << "Read . Fetching counter id=" << entry->counter_id <<
+      ", index=" << entry->index.index() << ", values: bytes=" <<
+      entry->data.byte_count() << ", packets=" << entry->data.packet_count() << std::endl;
+    } else {
+      std::cout << "Read . Fetching counter id=" << entry->counter_id <<
+      ", index=" << entry->index.index() << " values: empty" << std::endl;
+    }
+    result.push_back(entry);
+  }
+
+  return result;  
+}
+
+std::list<P4CounterEntry*> P4RuntimeClient::ReadIndirectCounterEntries() {
+  std::list<P4CounterEntry *> counter_entries;
+  P4CounterEntry counter_entry;
+  // All counters retrieved by using ID = 0
+  counter_entry.counter_id = 0;
+  // All indexes retrieved by leaving the index unset. This is done by
+  //using a specific flag (negative number, which cannot be used anyway)
+  ::P4_NAMESPACE_ID::Index *p4_indirect_counter_entry_index = new ::P4_NAMESPACE_ID::Index();
+  p4_indirect_counter_entry_index->set_index(-1);
+  counter_entry.index = *p4_indirect_counter_entry_index;
+  counter_entries.push_back(&counter_entry);
+  return ReadIndirectCounterEntry(counter_entries);  
+}
+
 std::string P4RuntimeClient::APIVersion() {
   std::cout << "Fetching version of the API" << std::endl;
 
@@ -460,18 +543,13 @@ std::string P4RuntimeClient::APIVersion() {
   ClientContext context;
 
   Status status = stub_->Capabilities(&context, request, &response);
-  const std::string errorMessage = "Cannot retrieve information on the API version";
-  HandleStatus(status, errorMessage.c_str());
+  const std::string error_message = "Cannot retrieve information on the API version";
+  HandleStatus(status, error_message.c_str());
   return response.p4runtime_api_version();
 }
 
 // Ancillary methods
 
-// TODO: complete. See reference/p4runtime-shell-python/p4runtime.py#set_up_stream
-// INFO:
-// 1) https://github.com/p4lang/p4runtime-shell/blob/master/p4runtime_sh/p4runtime.py#L138
-// 2) https://github.com/p4lang/p4runtime-shell/blob/master/p4runtime_sh/test.py#L40
-// 3) https://github.com/p4lang/p4runtime/blob/16c55eebd887c949b59d6997bb2d841a59c6bb32/docs/v1/P4Runtime-Spec.mdk#L673 (edited) 
 void P4RuntimeClient::SetUpStream() {
   ClientContext context;
   std::cout << "SetUpStream. Setting up stream from channel" << std::endl;
@@ -485,9 +563,12 @@ void P4RuntimeClient::SetUpStream() {
   Handshake();
 }
 
-// TODO: complete. Check reference/p4runtime-shell-python/p4runtime.py#tear_down
 void P4RuntimeClient::TearDown() {
-  std::cout << "TearDown. Cleaning up stream, queues, threads and channel" << std::endl;
+  std::cout << "TearDown. Cleaning up queues and threads" << std::endl;
+  // if (logFile_.is_open()) {
+  //   logFile_.close();
+  // }
+
   qOutMtx_.lock();
   outThreadStop_ = true;
   qOutMtx_.unlock();
@@ -495,24 +576,29 @@ void P4RuntimeClient::TearDown() {
   inThreadStop_ = true;
   qInMtx_.unlock();
 
-  streamOutgoingThread_.join();
-  streamIncomingThread_.join();
+  // FIXME: one of these may produce "aborted (core dumped)"
+  // NOTE: when not there, a "segmentation fault (core dumped)" occurs
+  if (streamOutgoingThread_.joinable()) {
+    streamOutgoingThread_.join();
+  }
+  if (streamIncomingThread_.joinable()) {
+    streamIncomingThread_.join();
+  }
   stream_->Finish();
+  // FIXME: a "segmentation fault (core dumped)" occurs at some point after this
 }
 
-// TODO: complete and check if this works. Check reference/p4runtime-shell-python/p4runtime.py#get_stream_packet
-StreamMessageResponse* P4RuntimeClient::GetStreamPacket(int expectedType=-1, long timeout=1) {
+StreamMessageResponse* P4RuntimeClient::GetStreamPacket(int expected_type=-1, long timeout=1) {
     StreamMessageResponse* response = NULL;
-    int responseType = -1;
+    int response_type = -1;
     std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    std::chrono::duration<long> timeoutDuration(timeout);
+    std::chrono::duration<long> timeout_duration(timeout);
     while (true) {
-      auto remaining = timeoutDuration - (std::chrono::system_clock::now() - start);
-
+      auto remaining = timeout_duration - (std::chrono::system_clock::now() - start);
       if (remaining < std::chrono::seconds{0}) {
         break;
       }
-      
+
       qInMtx_.lock();
       if (!streamQueueIn_.empty()) {
         std::cout << "GetStreamPacket. BEFORE - Size for queueIN = " << streamQueueIn_.size() << std::endl;
@@ -525,26 +611,23 @@ StreamMessageResponse* P4RuntimeClient::GetStreamPacket(int expectedType=-1, lon
           break;
         }
 
-        responseType = response->update_case();
+        response_type = response->update_case();
         // Get out if an unexpected packet is retrieved
         // Details in p4runtime.pb.h:
         //   kArbitration = 1, kPacket = 2, kDigestAck = 3, kOther = 4, UPDATE_NOT_SET = 0
         // Note: -1 to indicate that we do not care about the type of packet (if that ever happens)
-        if (expectedType != -1 && responseType != expectedType) {
-          std::cout << "GetStreamPacket. Returning due to unexpected type obtained (received = " << responseType << ", expected = " << expectedType << ")" << std::endl;
+        if (expected_type != -1 && response_type != expected_type) {
+          std::cout << "GetStreamPacket. Returning due to unexpected type obtained (received = " << response_type << ", expected = " << expected_type << ")" << std::endl;
           return response;
         }
 
-        // DEBUG
-        CheckResponseType(response);
-        // DEBUG - END
+        print_response_type(response);
         std::cout << "GetStreamPacket. Returning with proper response" << std::endl;
         return response;
-      } else {
-        qInMtx_.unlock();
       }
+      qInMtx_.unlock();
     }
-
+    
     return NULL;
 }
 
@@ -558,7 +641,7 @@ void P4RuntimeClient::ReadIncomingMessagesFromStream() {
       std::cout << "ReadIncomingMessagesFromStream. Exiting thread, I must stop" << std::endl;
       break;
     }
-
+    
     qInMtx_.unlock();
     try {
       if (stream_ == NULL || ::grpc_connectivity_state::GRPC_CHANNEL_READY != channel_->GetState(false)) {
@@ -607,7 +690,7 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueue() {
       request = streamQueueOut_.front();
       streamQueueOut_.pop();
       qOutMtx_.unlock();
-      
+
       if (request == NULL) {
         std::cout << "Ignoring NULL request" << std::endl;
         continue;
@@ -617,14 +700,14 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueue() {
         std::cout << "ReadOutgoingMessagesFromQueue. Reading request. Arbitration for device ID = " << request->mutable_arbitration()->device_id() << "." << std::endl;
       }
 
-      const StreamMessageRequest* requestConst = request;
-      bool messageSent = stream_->Write(*requestConst);
+      const StreamMessageRequest* request_const = request;
+      bool message_sent = stream_->Write(*request_const);
 
-      if (messageSent) {
+      if (message_sent) {
         std::cout << "ReadOutgoingMessagesFromQueue. Sent Write request to server" << std::endl;
       } else {
         std::cout << "ReadOutgoingMessageFromQueue. Could not send message to server" << std::endl;
-      } 
+      }
     } else {
       qOutMtx_.unlock();
     }
@@ -642,16 +725,14 @@ void P4RuntimeClient::ReadOutgoingMessagesFromQueueInBg() {
   }
 }
 
-// TODO: complete. Check reference/p4runtime-shell-python/p4runtime.py#handshake
 void P4RuntimeClient::Handshake() {
-
   // Generate arbitration message
-  StreamMessageRequest* requestOut = StreamMessageRequest().New();
-  requestOut->mutable_arbitration()->set_device_id(deviceId_);
-  requestOut->mutable_arbitration()->mutable_election_id()->set_high(electionId_->high());
-  requestOut->mutable_arbitration()->mutable_election_id()->set_low(electionId_->low());
+  StreamMessageRequest* request_out = StreamMessageRequest().New();
+  request_out->mutable_arbitration()->set_device_id(deviceId_);
+  request_out->mutable_arbitration()->mutable_election_id()->set_high(electionId_->high());
+  request_out->mutable_arbitration()->mutable_election_id()->set_low(electionId_->low());
   qOutMtx_.lock();
-  streamQueueOut_.push(requestOut);
+  streamQueueOut_.push(request_out);
   qOutMtx_.unlock();
   std::cout << "Handshake. Pushing arbitration request to QueueOUT" << std::endl;
 
@@ -661,115 +742,64 @@ void P4RuntimeClient::Handshake() {
     exit(1);
   }
 
-  bool isMaster = reply->arbitration().status().code() == ::GRPC_NAMESPACE_ID::StatusCode::OK;
-  std::string role = isMaster ? "master (R/W)" : "slave (R/O)";
+  bool is_master = reply->arbitration().status().code() == ::GRPC_NAMESPACE_ID::StatusCode::OK;
+  std::string role = is_master ? "master (R/W)" : "slave (R/O)";
   std::cout << "Handshake succeeded. Controller has " << role << " access to the server" << std::endl;
 }
 
-void P4RuntimeClient::SetElectionId(::P4_NAMESPACE_ID::Uint128* electionId) {
-  electionId_ = electionId;
-  electionId_->set_high(electionId->high());
-  electionId_->set_low(electionId->low());
+void P4RuntimeClient::SetElectionId(::P4_NAMESPACE_ID::Uint128* election_id) {
+  electionId_ = election_id;
+  electionId_->set_high(election_id->high());
+  electionId_->set_low(election_id->low());
 }
 
-void P4RuntimeClient::SetElectionId(std::string electionId) {
+void P4RuntimeClient::SetElectionId(std::string election_id) {
   try {
-    auto electionIdIndex = electionId.find_first_of(",");
-    ::PROTOBUF_NAMESPACE_ID::uint64 electionIdHigh = std::stoull(electionId.substr(0, electionIdIndex));
-    ::PROTOBUF_NAMESPACE_ID::uint64 electionIdLow = std::stoull(electionId.substr(electionIdIndex + 1));
-    ::P4_NAMESPACE_ID::Uint128* electionId = ::P4_NAMESPACE_ID::Uint128().New();
-    electionId->set_high(electionIdHigh);
-    electionId->set_low(electionIdLow);
-    SetElectionId(electionId);
+    auto election_id_index = election_id.find_first_of(",");
+    ::PROTOBUF_NAMESPACE_ID::uint64 election_id_high = std::stoull(election_id.substr(0, election_id_index));
+    ::PROTOBUF_NAMESPACE_ID::uint64 election_id_low = std::stoull(election_id.substr(election_id_index + 1));
+    ::P4_NAMESPACE_ID::Uint128* election_id = ::P4_NAMESPACE_ID::Uint128().New();
+    election_id->set_high(election_id_high);
+    election_id->set_low(election_id_low);
+    SetElectionId(election_id);
   } catch (...) {
-    const std::string errorMessage = "Cannot parse electionId with value = " + electionId;
-    HandleException(errorMessage.c_str());
+    const std::string error_message = "Cannot parse electionId with value = " + election_id;
+    HandleException(error_message.c_str());
   }
 }
 
-void P4RuntimeClient::CheckResponseType(::P4_NAMESPACE_ID::StreamMessageResponse* response) {
-    int responseType = response->update_case();
-    switch (responseType) {
-    case ::P4_NAMESPACE_ID::StreamMessageRequest::kArbitration: {
-      std::cout << "GetStreamPacket. Is arbitration" << std::endl;
-      std::cout << "GetStreamPacket. Arbitration message = " << response->arbitration().SerializeAsString() << std::endl;
-      std::cout << "GetStreamPacket. Device_id = " << response->arbitration().device_id() << std::endl;
-      std::cout << "GetStreamPacket. Election_id - high = " << response->arbitration().election_id().high() << std::endl;
-      std::cout << "GetStreamPacket. Election_id - low = " << response->arbitration().election_id().low() << std::endl;
-      break;
-    }
-    case ::P4_NAMESPACE_ID::StreamMessageRequest::kPacket: {
-      std::cout << "GetStreamPacket. Is a packet" << std::endl;
-      break;
-    }
-    case ::P4_NAMESPACE_ID::StreamMessageRequest::kDigestAck:
-    case ::P4_NAMESPACE_ID::StreamMessageRequest::UPDATE_NOT_SET:
-      std::cout << "GetStreamPacket. Is a digest" << std::endl;
-      break;
-  }
-}
-
-void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_) {
-  std::cout << "Printing P4Info\n" << std::endl;
-  int tableSize = p4Info_.tables_size();
-  std::cout << "Number of tables: " << tableSize << std::endl;
-  if (tableSize == 0) {
-    return;
-  }
-  std::cout << "Arch: " << p4Info_.pkg_info().arch() << std::endl;
-  for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
-    std::cout << "  Table id: " << table.preamble().id() << std::endl;
-    std::cout << "  Table name: " << table.preamble().name() << std::endl;
-    for (::P4_CONFIG_NAMESPACE_ID::MatchField matchField : table.match_fields()) {
-      std::cout << "    Match id: " << matchField.id() << std::endl;
-      std::cout << "    Match name: " << matchField.name() << std::endl;
-      std::cout << "    Match bitwidth: " << matchField.bitwidth() << std::endl;
-      std::cout << "    Match type: " << matchField.match_type() << std::endl;
-    }
-    for (::P4_CONFIG_NAMESPACE_ID::ActionRef actionRef : table.action_refs()) {
-      for (::P4_CONFIG_NAMESPACE_ID::Action action : p4Info_.actions()) {
-        if (actionRef.id() == action.preamble().id()) {
-          std::cout << "    Action id: " << action.preamble().id() << std::endl;
-          std::cout << "    Action name: " << action.preamble().name() << std::endl;
-          for (::P4_CONFIG_NAMESPACE_ID::Action_Param param : action.params()) {
-            std::cout << "      Action param id: " << param.id() << std::endl;
-            std::cout << "      Action param name: " << param.name() << std::endl;
-            std::cout << "      Action param bitwidth: " << param.bitwidth() << std::endl;
-          }
-        }
-      }
-    }
-  }
+void P4RuntimeClient::PrintP4Info(::P4_CONFIG_NAMESPACE_ID::P4Info p4info) {
+  print_p4info(p4info);
 }
 
 ::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4TableIdFromName(
-    ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_, std::string tableName) {
-  for (::P4_CONFIG_NAMESPACE_ID::Table table : p4Info_.tables()) {
-    if (tableName == table.preamble().name()) {
-      return table.preamble().id();
-    }
-  }
-  return 0L;
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info, std::string table_name) {
+  return get_p4_table_id_from_name(p4info, table_name);
 }
 
 ::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4ActionIdFromName(
-    ::P4_CONFIG_NAMESPACE_ID::P4Info p4Info_, std::string actionName) {
-  for (::P4_CONFIG_NAMESPACE_ID::Action action : p4Info_.actions()) {
-    if (actionName == action.preamble().name()) {
-      return action.preamble().id();
-    }
-  }
-  return 0L;
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info, std::string action_name) {
+  return get_p4_action_id_from_name(p4info, action_name);
 }
 
-void P4RuntimeClient::HandleException(const char* errorMessage) {
-  std::cerr << "Exception: " << errorMessage << std::endl;
-  throw errorMessage;
+::PROTOBUF_NAMESPACE_ID::uint32 P4RuntimeClient::GetP4IndirectCounterIdFromName(
+  ::P4_CONFIG_NAMESPACE_ID::P4Info p4info, std::string counter_name) {
+  return get_p4_indirect_counter_id_from_name(p4info, counter_name);
 }
 
-void P4RuntimeClient::HandleStatus(Status status, const char* errorMessage) {
+std::list<::PROTOBUF_NAMESPACE_ID::uint32> P4RuntimeClient::GetP4IndirectCounterIds(
+    ::P4_CONFIG_NAMESPACE_ID::P4Info p4info) {
+  return get_p4_indirect_counter_ids(p4info);
+}
+
+void P4RuntimeClient::HandleException(const char* error_message) {
+  std::cerr << "Exception: " << error_message << std::endl;
+  throw error_message;
+}
+
+void P4RuntimeClient::HandleStatus(Status status, const char* error_message) {
   if (!status.ok()) {
-    std::cerr << errorMessage << ". Error code: " << status.error_code() << std::endl;
+    std::cerr << error_message << ". Error code: " << status.error_code() << std::endl;
   }
 }
 

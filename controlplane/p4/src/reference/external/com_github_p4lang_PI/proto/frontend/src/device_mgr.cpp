@@ -1744,7 +1744,13 @@ class DeviceMgrImp {
   Status counter_read(const p4v1::CounterEntry &counter_entry,
                       const SessionTemp &session,
                       p4v1::ReadResponse *response) const {
+    // BEGIN
+    std::cout << "DeviceMgr::counter_read -> starting method" << std::endl;
+    // END
     auto counter_id = counter_entry.counter_id();
+    // BEGIN
+    std::cout << "DeviceMgr::counter_read -> counter_id = " << counter_id << std::endl;
+    // END
     if (counter_id == 0) {  // read all entries for all counters
       for (auto c_id = pi_p4info_counter_begin(p4info.get());
            c_id != pi_p4info_counter_end(p4info.get());
@@ -1765,6 +1771,9 @@ class DeviceMgrImp {
       RETURN_IF_ERROR(counter_read_one(
           counter_id, counter_entry, session, response));
     }
+    // BEGIN
+    std::cout << "DeviceMgr::counter_read -> about to finish" << std::endl;
+    // END
     RETURN_OK_STATUS();
   }
 
