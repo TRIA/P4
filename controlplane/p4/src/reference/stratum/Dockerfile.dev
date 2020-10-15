@@ -1,0 +1,41 @@
+# Copyright 2018-present Open Networking Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+FROM stratumproject/build:build
+
+ARG USER_NAME=default
+ARG USER_ID=1000
+ARG GIT_GLOBAL_NAME=
+ARG GIT_GLOBAL_EMAIL=
+ARG GIT_GLOBAL_EDITOR=vim
+
+RUN useradd -ms /bin/bash -l -u $USER_ID $USER_NAME && \
+    adduser $USER_NAME sudo && \
+    echo "%sudo ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers && \
+    echo "source /usr/local/lib/bazel/bin/bazel-complete.bash" >> /home/$USER_NAME/.bashrc
+
+USER $USER_NAME
+
+RUN (test "$GIT_GLOBAL_NAME" = "" || git config --global user.name "$GIT_GLOBAL_NAME") && \
+    (test "$GIT_GLOBAL_EMAIL" = "" || git config --global user.email "$GIT_GLOBAL_EMAIL") && \
+    (test "$GIT_GLOBAL_EDITOR" = "" || git config --global code.editor "$GIT_GLOBAL_EDITOR")
+
+# Install Bazel
+
+## Working (download specific binary)
+ENV BAZEL_VERSION="3.5.1"
+RUN sudo mkdir -p /usr/local/lib/bazel/bin/ && cd /usr/local/lib/bazel/bin/ && sudo wget --no-check-certificate https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64
+RUN sudo chmod u+x /usr/local/lib/bazel/bin/bazel-${BAZEL_VERSION}-linux-x86_64
+RUN sudo chown $USER_NAME:$USER_NAME /usr/local/lib/bazel/bin/bazel-${BAZEL_VERSION}-linux-x86_64
+RUN sudo mv /usr/local/bin/bazel /usr/local/bin/bazel.bak
+RUN sudo ln -s /usr/local/lib/bazel/bin/bazel-${BAZEL_VERSION}-linux-x86_64 /usr/local/bin/bazel
+RUN bazel --version
+
+## Working partially (repository with latest binary, may break apt-get)
+#RUN sudo apt-get update
+#RUN sudo apt-get -y install curl
+#RUN sudo curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+#RUN echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+#RUN sudo apt-get update
+#RUN sudo apt-get install -y bazel
+#RUN bazel --version

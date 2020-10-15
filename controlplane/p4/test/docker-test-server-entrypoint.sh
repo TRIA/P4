@@ -1,5 +1,8 @@
 #!/bin/bash
 
+ready_signal=.p4rt_cp.finished
+[[ -f ${ready_signal} ]] && rm -f ${ready_signal}
+
 EDF_CP_CLIENT_BIN=edf-cp-client
 
 cd p4
@@ -17,3 +20,5 @@ make ${EDF_CP_CLIENT_BIN}
 
 # Run client
 ${BIN_PATH}/${EDF_CP_CLIENT_BIN} --grpc-addr=edf-dp-server:28000 --config=${CFG_REL_PATH}/p4info.txt,${CFG_REL_PATH}/bmv2.json --election-id=0,1 
+
+touch ${ready_signal}

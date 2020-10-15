@@ -13,7 +13,7 @@ First, compile the P4 program to be used in the switch. This will generate the e
 ```bash
 current=${PWD}
 cd ../dataplane/p4
-make efcp-build
+make efcp-v1model-build
 cd $current
 ```
 

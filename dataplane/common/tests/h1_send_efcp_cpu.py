@@ -10,7 +10,8 @@ import pdu_types
 import binascii
 
 from scapy.all import Packet, XByteField, ShortField, XShortField, IntField,\
-        bind_layers, Ether, get_if_hwaddr, sendp, checksum, hexdump
+        bind_layers, Ether, get_if_hwaddr, get_if_list, sendp, checksum, \
+        hexdump
 
 class EFCP(Packet):
     name = "EFCP"
@@ -71,7 +72,7 @@ bind_layers(Ether, EFCP, type=0xD1F)
 def get_if(if_name = "eth0"):
     ifs = get_if_list()
     iface = None
-    for i in get_if_list():
+    for i in ifs:
         if if_name in i:
             iface = i
             break;

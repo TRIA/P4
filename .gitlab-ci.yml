@@ -1,11 +1,12 @@
 stages:
   - build
   - test
+  - clean
 
-job_efcp_build:
+job_efcp_v1model_build:
   script:
     - cd dataplane/p4
-    - make efcp-build
+    - make efcp-v1model-build
   stage: build
   tags: [npl_bmodel]
 
@@ -23,7 +24,7 @@ job_cp_test:
     when: always
     expire_in: 1 week
   dependencies:
-    - job_efcp_build
+    - job_efcp_v1model_build
   stage: test
   tags: [npl_bmodel]
 
@@ -40,6 +41,6 @@ job_dp_test:
     when: always
     expire_in: 1 week
   dependencies:
-    - job_efcp_build
+    - job_efcp_v1model_build
   stage: test
   tags: [npl_bmodel]
