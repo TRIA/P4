@@ -150,7 +150,7 @@ Counter<bit<32>, PortId_t>(
 /*
  * EFCP exact table
  */
-    table efcp_lpm {
+    table efcp_exact {
         key = {
             hdr.efcp.dstAddr: exact;
         }
@@ -184,7 +184,7 @@ Counter<bit<32>, PortId_t>(
                 if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
                     ig_md.egress_spec = CPU_PORT;
                 } else {
-                    efcp_lpm.apply();
+                    efcp_exact.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             ig_md.checksum_error == 0) {
@@ -213,7 +213,7 @@ control SwitchIngressDeparser(packet_out packet,
         // the program.
         if (ig_md.checksum_upd_ipv4) {
             hdr.ipv4.hdr_checksum = ipv4_checksum.update(
-                {hdr.ipv4.version,
+                { hdr.ipv4.version,
                  hdr.ipv4.ihl,
                  hdr.ipv4.diffserv,
                  hdr.ipv4.total_len,
@@ -223,11 +223,11 @@ control SwitchIngressDeparser(packet_out packet,
                  hdr.ipv4.ttl,
                  hdr.ipv4.protocol,
                  hdr.ipv4.srcAddr,
-                 hdr.ipv4.dstAddr});
+                 hdr.ipv4.dstAddr });
         }
 	 if (ig_md.checksum_upd_efcp) {
             hdr.efcp.hdr_checksum = efcp_checksum.update(
-                {hdr.efcp.ver,
+	      { hdr.efcp.ver,
 	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,
@@ -236,7 +236,7 @@ control SwitchIngressDeparser(packet_out packet,
               hdr.efcp.pduType,
               hdr.efcp.flags,
               hdr.efcp.len,
-              hdr.efcp.seqnum});
+              hdr.efcp.seqnum });
         }
 	packet.emit(hdr.ethernet);
         packet.emit(hdr.efcp);
@@ -368,7 +368,7 @@ control SwitchEgressDeparser(
         }
 	 if (eg_md.checksum_upd_efcp) {
             hdr.efcp.hdr_checksum = efcp_checksum.update(
-                {hdr.efcp.ver,
+	      {hdr.efcp.ver,
 	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,

@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   // Step 3: insert a new entry with action "SwitchIngress.efcp_forward"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   // Step 4: insert a new entry with action "SwitchIngress.efcp_forward"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
 
   std::cout << "\n-------------- ModifyTableEntry --------------\n" << std::endl;
   // Update entry in ipv4_lpm with a given match, just changing 1st param to MAC for h1
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   match.field_id = 1;
@@ -294,7 +294,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   std::cout << "\n-------------- ReadTableEntry --------------\n" << std::endl;
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   match.field_id = 1;
   match.type = P4MatchType::exact;
@@ -435,7 +435,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   // Step 3: delete entry with action "SwitchIngress.efcp_forward"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
@@ -452,7 +452,7 @@ int main(int argc, char** argv) {
   entry.action.parameters.clear();
 
   // Step 4: delete entry with action "SwitchIngress.efcp_forward"
-  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_lpm");
+  entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;

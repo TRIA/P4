@@ -204,7 +204,7 @@ the packet buffer, nor sent to egress processing.
 /*
  * EFCP exact table
  */
-    table efcp_lpm {
+    table efcp_exact {
         key = {
             hdr.efcp.dstAddr: exact;
         }
@@ -240,7 +240,7 @@ the packet buffer, nor sent to egress processing.
                 if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
                     standard_metadata.egress_spec = CPU_PORT;
                 } else {
-                    efcp_lpm.apply();
+                    efcp_exact.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             standard_metadata.checksum_error == 0) {
