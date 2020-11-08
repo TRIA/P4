@@ -4,6 +4,7 @@ MN_STR_NAME := mn-stratum
 P4R_STR_NAME := p4runtime-sh
 
 efcp_build_arch_v1model := build/arch/v1model
+efcp_build_arch_tna := build/arch/tna
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
@@ -76,6 +77,15 @@ efcp-v1model-build: p4src/arch/v1model/efcp.p4
 		--p4runtime-files ${efcp_build_arch_v1model}/p4info.txt --Wdisable=unsupported \
 		p4src/arch/v1model/efcp.p4
 	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_v1model}"
+
+efcp-tna-build: p4src/arch/tna/efcp.p4
+	$(info *** Building P4 program \(arch=tna\)...)
+	@mkdir -p ${efcp_build_arch_tna}
+	docker run --rm -v ${curr_dir}:/workdir -w /workdir ${P4C_IMG} \
+		p4c-bm2-ss --arch tna -o ${efcp_build_arch_tna}/bmv2.json \
+		--p4runtime-files ${efcp_build_arch_tna}/p4info.txt --Wdisable=unsupported \
+		p4src/arch/tna/efcp.p4
+	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_tna}"
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
