@@ -85,7 +85,7 @@ efcp-tna-build: src/arch/tna
 	$(info *** Building P4 program \(arch=tna\)...)
 	@(if [ ! -f ${SDE}/../p4_build-9.2.0.sh ]; then echo "Missing SDE or p4_build-9.2.0.sh script" && exit 1; fi)
 	@(current=${PWD} && cd $< && \
-		${SDE}/../p4_build-9.2.0.sh --with-p4c --with-graphs efcp.p4 \
+		${SDE}/../p4_build-9.2.0.sh --with-p4c --with-graphs -I${PWD}/common efcp.p4 \
 		P4_VERSION=p4_16 P4_ARCHITECTURE=tna P4_NAME=${EDF_DP_P4_TNA_NAME} && \
 		mkdir -p ${EDF_DP_BUILD_ARCH_TNA} && mkdir -p ${EDF_DP_INSTALL_ARCH_TNA} && \
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/${EDF_DP_P4_TNA_NAME}.conf ${SDE_INSTALL}/share/p4/targets/tofino/ && \
@@ -94,7 +94,7 @@ efcp-tna-build: src/arch/tna
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/tofino.bin ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
 		cp -Rp ${EDF_DP_BUILD_SDE_ARCH_TNA}/* ${EDF_DP_BUILD_ARCH_TNA}/ && \
 		cd ${current} && \
-		echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_TNA} and ${EDF_DP_INSTALL_ARCH_TNA}")
+	 	echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_TNA} and ${EDF_DP_INSTALL_ARCH_TNA}")
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
@@ -142,3 +142,20 @@ edf-dp-test-stratum-send-pdu-type:
 	@sleep 1
 	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
 	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
+
+edf-dp-test-tna-bfmodel: efcp-tna-build 
+	@echo "Copying test files"
+	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA}/
+	@echo "Terminating any running Tofino model or switch instance"
+	@${PWD}/test/arch/tna/tofino_model_terminate.sh
+	@${PWD}/test/arch/tna/tofino_switch_terminate.sh
+	@echo "Running Tofino model"
+	${SDE}/run_tofino_model.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
+	@sleep 30
+	@echo "Running Tofino switch"
+	${SDE}/run_switchd.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
+	@sleep 60
+	@echo "Running ${EDF_DP_P4_TNA_NAME} test"
+	# Target fails if test fails
+	${SDE}/run_p4_tests.sh -p ${EDF_DP_P4_TNA_NAME} 2>&1
+	#${SDE}/run_p4_tests.sh -p ${EDF_DP_P4_TNA_NAME} > ${PWD}/test/arch/tna/bfmodel_${EDF_DP_P4_TNA_NAME}.log 2>&1
