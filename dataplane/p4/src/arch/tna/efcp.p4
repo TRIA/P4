@@ -31,8 +31,8 @@
  * because it is done "by the architecture", i.e. outside of P4 functions. It is 
  * allocated in headers.p4
  */
-#include "common/headers.p4"
-#include "common/util.p4"
+#include "../../common/headers.p4"
+#include "../../common/util.p4"
 
 
 // NOTE: consider reviewing whether something can be moved into headers.p4

@@ -7,39 +7,61 @@ typedef bit<128> ipv6_addr_t;
 typedef bit<12> vlan_id_t;
 typedef bit<9>  egress_spec;
 
-typedef bit<16> etherType;
-const etherType IPV4_ETYPE = 16w0x0800;
-const etherType ETHERTYPE_ARP = 16w0x0806;
-const etherType ETHERTYPE_IPV6 = 16w0x86dd;
-const etherType VLAN_ETYPE = 16w0x8100;
-const etherType EFCP_ETYPE = 16w0xD1F;
+typedef bit<16> ether_type_t;
+const ether_type_t ETHERTYPE_ARP = 16w0x0806;
+const ether_type_t ETHERTYPE_EFCP = 16w0xD1F;
+const ether_type_t ETHERTYPE_IPV4 = 16w0x0800;
+const ether_type_t ETHERTYPE_IPV6 = 16w0x86dd;
+const ether_type_t ETHERTYPE_VLAN = 16w0x8100;
 
 typedef bit<8> ip_protocol_t;
 const ip_protocol_t IP_PROTOCOLS_ICMP = 1;
 const ip_protocol_t IP_PROTOCOLS_TCP = 6;
 const ip_protocol_t IP_PROTOCOLS_UDP = 17;
 
+/*
+ * PDU Types
+ */
+const bit<8> DATA_TRANSFER = 0x80;
+const bit<8> LAYER_MANAGEMENT = 0x40;
+const bit<8> ACK_ONLY = 0xC1;
+const bit<8> NACK_ONLY = 0xC2;
+const bit<8> ACK_AND_FLOW_CONTROL = 0xC5;
+const bit<8> NACK_AND_FLOW_CONTROL = 0xC6;
+const bit<8> FLOW_CONTROL_ONLY = 0xC4;
+const bit<8> SELECTIVE_ACK = 0xC9;
+const bit<8> SELECTIVE_NACK = 0xCA;
+const bit<8> SELECTIVE_ACK_AND_FLOW_CONTROL = 0xCD;
+const bit<8> SELECTIVE_NACK_AND_FLOW_CONTROL = 0xCE;
+const bit<8> CONTROL_ACK = 0xC0;
+const bit<8> RENDEVOUS = 0xCF;
+
+/*
+ * ECN threshold for congestion control
+ */
+const bit<19> ECN_THRESHOLD = 1;
+
 header ethernet_h {
-    mac_addr_t dstAddr;
-    mac_addr_t srcAddr;
-    bit<16> etherType;
+    mac_addr_t dst_addr;
+    mac_addr_t src_addr;
+    ether_type_t ether_type;
 }
 
 header vlan_tag_h {
     bit<3> pcp;
     bit<1> cfi;
     vlan_id_t vlan_id;
-    bit<16> etherType;
+    ether_type_t ether_type;
 }
 
 header efcp_h {
     bit<8>  ver;
-    bit<16> dstAddr; 
-    bit<16> srcAddr;
-    bit<8>  qosID;
-    bit<16> dstCEPID;
-    bit<16> srcCEPID;
-    bit<8> pduType;
+    bit<16> dst_addr; 
+    bit<16> src_addr;
+    bit<8>  qos_id;
+    bit<16> dst_cep_id;
+    bit<16> src_cep_id;
+    bit<8> pdu_type;
     bit<8> flags;
     bit<16> len;
     bit<32> seqnum;
@@ -64,8 +86,8 @@ header ipv4_h {
     bit<8> ttl;
     bit<8> protocol;
     bit<16> hdr_checksum;
-    ipv4_addr_t srcAddr;
-    ipv4_addr_t dstAddr;
+    ipv4_addr_t src_addr;
+    ipv4_addr_t dst_addr;
 }
 
 header ipv6_h {
