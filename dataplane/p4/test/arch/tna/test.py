@@ -258,25 +258,26 @@ class EFCPExactMatchTest(BfRuntimeTest):
     """@brief Basic test for algorithmic-lpm-based lpm matches.
     """
 
-    def _get_tx_packet(self, ipc_dst_addr, ipc_src_addr, mac_dst_addr, mac_src_addr, vlan_id):
-        # FIXME: failing with type in Ether() - check why
-        #pkt = Ether(dst=mac_dst_addr, src=mac_src_addr, type=0xD1F) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
-        pkt = Ether(dst=mac_dst_addr, src=mac_src_addr) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
-        pkt = pkt / "EFCP packet sent from CLI to BM :)"
-        pktlen = 100
-        codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
-        codecs_decode_str = "".join(["%02x"%(x%256) for x in range(pktlen - len(pkt)) ])
-        codecs_decode = codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
-        pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
-        return pkt
+    # DO NOT USE. Just to check
+#    def _get_tx_packet(self, ipc_dst_addr, ipc_src_addr, mac_dst_addr, mac_src_addr, vlan_id):
+#        # FIXME: failing with type in Ether() - check why
+#        #pkt = Ether(dst=mac_dst_addr, src=mac_src_addr, type=0xD1F) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
+#        pkt = Ether(dst=mac_dst_addr, src=mac_src_addr) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
+#        pkt = pkt / "EFCP packet sent from CLI to BM :)"
+#        pktlen = 100
+#        codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
+#        codecs_decode_str = "".join(["%02x"%(x%256) for x in range(pktlen - len(pkt)) ])
+#        codecs_decode = codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
+#        pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
+#        return pkt
 
     MINSIZE = 0
 
     # Adapted from simple_tcp_packet_ext_taglist in $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
     def simple_efcp_packet_ext_taglist(self,
                                   pktlen=100,
-                                  eth_dst='00:01:02:03:04:05',
-                                  eth_src='00:06:07:08:09:0a',
+                                  eth_dst="00:01:02:03:04:05",
+                                  eth_src="00:06:07:08:09:0a",
                                   dl_taglist_enable=False,
                                   dl_vlan_pcp_list=[0],
                                   dl_vlan_cfi_list=[0],
@@ -288,12 +289,18 @@ class EFCPExactMatchTest(BfRuntimeTest):
 
         if self.MINSIZE > pktlen:
             pktlen = self.MINSIZE
+        
+        #bind_layers(Ether, VLAN)
+        #bind_layers(VLAN, EFCP, type=0x8100)
 
         efcp_payload = "EFCP packet sent from CLI to BM :)"
+        # FIXME: failing with type in Ether() - check why
+        #efcp_pkt = Ether(dst=eth_dst, src=eth_src, type=0x8100) / VLAN(ethertype=0xD1F) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
         efcp_pkt = EFCP(ipc_src_addr=ipc_src_addr, ipc_dst_addr=ipc_dst_addr, pdu_type=EFCP_TYPES["DATA_TRANSFER"])
         # Computed in the expected one (may need to be used -- if so fix it)
-        #efcp_pkt.hdr_checksum = checksum(efcp_pkt[:20])
-        efcp_pkt = efcp_pkt / efcp_payload
+        # NOTE: comment if this gives issues, but uncomment after fixing
+        # efcp_pkt.hdr_checksum = checksum(efcp_pkt[:20])
+        pkt = efcp_pkt / efcp_payload
         eth_pkt = Ether(dst=eth_dst, src=eth_src, type=0xD1F)
 
         pkt = eth_pkt
@@ -309,19 +316,16 @@ class EFCPExactMatchTest(BfRuntimeTest):
         pkt = pkt / efcp_pkt
 
         codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
-        #print("codecs_decode_range: " + str(codecs_decode_range))
         codecs_decode_str = "".join(["%02x"%(x%256) for x in range(pktlen - len(pkt)) ])
-        #print("codecs_decode_str: " + str(codecs_decode_str))
         codecs_decode = codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
-        #print("codecs_decode: " + str(codecs_decode))
         pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
         return pkt
 
     # Adapted from simple_tcp_packet in $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
     def simple_efcp_packet(self,
                       pktlen=100,
-                      eth_dst='00:01:02:03:04:05',
-                      eth_src='00:06:07:08:09:0a',
+                      eth_dst="00:01:02:03:04:05",
+                      eth_src="00:06:07:08:09:0a",
                       dl_vlan_enable=False,
                       vlan_vid=0,
                       vlan_pcp=0,
@@ -355,7 +359,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
         client_id = 0
         p4_name = "tna_efcp_test"
         BfRuntimeTest.setUp(self, client_id, p4_name)
-
+    #FIXME: Update with correct parameters
     def delete_rules(self, key_tuple_list, efcp_exact_table, target, gc):
         # Delete table entries
         for item in key_tuple_list:
@@ -372,8 +376,8 @@ class EFCPExactMatchTest(BfRuntimeTest):
         seed = random.randint(1, 65535)
         logger.info("Seed used %d", seed)
         random.seed(seed)
-        #num_entries = random.randint(1, 30)
-        num_entries = 1
+        num_entries = random.randint(1, 30)
+        #num_entries = 12
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp_test")
@@ -390,11 +394,11 @@ class EFCPExactMatchTest(BfRuntimeTest):
         unique_keys = {}
         exact_dict= {}
 
-        logger.info("Installing %d Exact entries" % (num_entries))
-        efcp_id_list = [random.randint(0, 255) for x in range(num_entries)]
-        vlan_id_list = [random.randint(0, 4095) for x in range(num_entries)]
+        efcp_id_list = list(set([random.randint(0, 255) for x in range(num_entries)]))
+        vlan_id_list = [random.randint(0, 4095) for x in range(len(efcp_id_list))]
+        logger.info("Installing %d Exact entries" % (len(efcp_id_list)))
 
-        for i in range(0, num_entries):
+        for i in range(0, len(efcp_id_list)):
             vrf = 0
             dst_ipc = efcp_id_list[i]
             vlan_id = vlan_id_list[i]
@@ -432,6 +436,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
             efcp_src_id = random.randint(0, 255)
             src_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
 
+            # NOTE: do not change this (a priori)
             # A1
             #pkt = self._get_tx_packet(key_item.dst_addr, None, None, None, None)
             # A2
@@ -447,6 +452,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
             print("ScaPy emitted packet")
             pkt.show()
             
+            # NOTE: do not change this (a priori)
             # A1
             #exp_pkt = self._get_tx_packet(None, efcp_src_id, data_item.dst_mac, src_mac, vlan_id)
             # A2
@@ -471,8 +477,13 @@ class EFCPExactMatchTest(BfRuntimeTest):
             except Exception as e:
                 logger.error("Error on packet verification")
                 raise e
-            finally:
-                self.delete_rules(key_tuple_list, efcp_exact_table, target, gc)
+            #finally:
+                #self.delete_rules(key_tuple_list, efcp_exact_table, target, gc)
 
         logger.info("All expected packets received")
-        logger.info("Deleting %d Exact entries" % (num_entries))
+        logger.info("Deleting %d Exact entries" % (len(efcp_id_list)))
+        # Delete table entries
+        for i in range(0, len(efcp_id_list)):
+            efcp_exact_table.entry_del(
+                target,
+                [efcp_exact_table.make_key([gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[i])])])
