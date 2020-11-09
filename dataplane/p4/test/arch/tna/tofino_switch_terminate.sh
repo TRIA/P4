@@ -1,6 +1,13 @@
 #!/bin/bash
 
-PID=$(ps -ef | grep run_switchd | grep -v grep | grep -v $0 | awk {'print $2'})
-for pid_ in ${PID}; do
+function killpid() {
+  PID=("$@")
+  for pid_ in ${PID[@]}; do
     [[ ! -z ${pid_} ]] && echo "Terminating PID ${pid_} for Tofino switch" && sudo kill -9 ${pid_}
-done
+  done
+}
+
+PID=$(sudo ps aux | grep run_switchd | grep -v grep | grep -v $0 | grep -v tmux | awk {'print $2'})
+killpid ${PID}
+PID=$(sudo ps aux | grep bf_switchd | grep -v grep | grep -v $0 | grep -v tmux | awk {'print $2'})
+killpid ${PID}

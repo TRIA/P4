@@ -143,12 +143,14 @@ edf-dp-test-stratum-send-pdu-type:
 	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
 	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
 
-edf-dp-test-tna-bfmodel: efcp-tna-build 
-	@echo "Copying test files"
-	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA}/
+edf-dp-test-tna-bfmodel-clean:
 	@echo "Terminating any running Tofino model or switch instance"
 	@${PWD}/test/arch/tna/tofino_model_terminate.sh
 	@${PWD}/test/arch/tna/tofino_switch_terminate.sh
+
+edf-dp-test-tna-bfmodel: efcp-tna-build edf-dp-test-tna-bfmodel-clean
+	@echo "Copying test files"
+	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA}/
 	@echo "Running Tofino model"
 	${SDE}/run_tofino_model.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
 	@sleep 30
@@ -158,4 +160,4 @@ edf-dp-test-tna-bfmodel: efcp-tna-build
 	@echo "Running ${EDF_DP_P4_TNA_NAME} test"
 	# Target fails if test fails
 	${SDE}/run_p4_tests.sh -p ${EDF_DP_P4_TNA_NAME} 2>&1
-	#${SDE}/run_p4_tests.sh -p ${EDF_DP_P4_TNA_NAME} > ${PWD}/test/arch/tna/bfmodel_${EDF_DP_P4_TNA_NAME}.log 2>&1
+	@make edf-dp-test-tna-bfmodel-clean
