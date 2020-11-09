@@ -57,7 +57,7 @@ class IPV4LpmMatchTest(BfRuntimeTest):
 
     def setUp(self):
         client_id = 0
-        p4_name = "tna_efcp_test"
+        p4_name = "tna_efcp"
         BfRuntimeTest.setUp(self, client_id, p4_name)
 
     def runTest(self):
@@ -68,7 +68,7 @@ class IPV4LpmMatchTest(BfRuntimeTest):
         num_entries = random.randint(1, 30)
 
         # Get bfrt_info and set it as part of the test
-        bfrt_info = self.interface.bfrt_info_get("tna_efcp_test")
+        bfrt_info = self.interface.bfrt_info_get("tna_efcp")
         ipv4_lpm_table = bfrt_info.table_get("SwitchIngress.ipv4_lpm")
         ipv4_lpm_table.info.key_field_annotation_add("hdr.ipv4.dst_addr", "ipv4")
         ipv4_lpm_table.info.data_field_annotation_add("src_mac", "SwitchIngress.ipv4_forward", "mac")
@@ -149,7 +149,7 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
 
     def setUp(self):
         client_id = 0
-        p4_name = "tna_efcp_test"
+        p4_name = "tna_efcp"
         BfRuntimeTest.setUp(self, client_id, p4_name)
 
     def runTest(self):
@@ -160,7 +160,7 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
         num_entries = random.randint(1, 30)
 
         # Get bfrt_info and set it as part of the test
-        bfrt_info = self.interface.bfrt_info_get("tna_efcp_test")
+        bfrt_info = self.interface.bfrt_info_get("tna_efcp")
         ipv4_lpm_table = bfrt_info.table_get("SwitchIngress.ipv4_lpm")
         counter_table = bfrt_info.table_get("SwitchIngress.ipv4_counter")
         ipv4_lpm_table.info.key_field_annotation_add("hdr.ipv4.dst_addr", "ipv4")
@@ -251,8 +251,8 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
 
 
 #@unittest.skip("Filtering")
-# NOTE: it should be no longer needed to run "bfrt.tna_efcp_test.pipe.SwitchIngress.efcp_exact.clear()" and then
-# "bfrt.tna_efcp_test.pipe.SwitchIngress.efcp_exact.dump()" to verify
+# NOTE: it should be no longer needed to run "bfrt.tna_efcp.pipe.SwitchIngress.efcp_exact.clear()" and then
+# "bfrt.tna_efcp.pipe.SwitchIngress.efcp_exact.dump()" to verify
 # there are no EFCP-related rules in the Tofino switch before running this test
 class EFCPExactMatchTest(BfRuntimeTest):
     """@brief Basic test for algorithmic-lpm-based lpm matches.
@@ -357,9 +357,10 @@ class EFCPExactMatchTest(BfRuntimeTest):
 
     def setUp(self):
         client_id = 0
-        p4_name = "tna_efcp_test"
+        p4_name = "tna_efcp"
         BfRuntimeTest.setUp(self, client_id, p4_name)
-    #FIXME: Update with correct parameters
+
+    # FIXME: Update with correct parameters
     def delete_rules(self, key_tuple_list, efcp_exact_table, target, gc):
         # Delete table entries
         for item in key_tuple_list:
@@ -380,7 +381,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
         #num_entries = 12
 
         # Get bfrt_info and set it as part of the test
-        bfrt_info = self.interface.bfrt_info_get("tna_efcp_test")
+        bfrt_info = self.interface.bfrt_info_get("tna_efcp")
         efcp_exact_table = bfrt_info.table_get("SwitchIngress.efcp_exact")
         efcp_exact_table.info.key_field_annotation_add("hdr.efcp.dst_addr", "bit")
         efcp_exact_table.info.data_field_annotation_add("vlan_id", "SwitchIngress.efcp_forward", "bit")
@@ -396,7 +397,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
 
         efcp_id_list = list(set([random.randint(0, 255) for x in range(num_entries)]))
         vlan_id_list = [random.randint(0, 4095) for x in range(len(efcp_id_list))]
-        logger.info("Installing %d Exact entries" % (len(efcp_id_list)))
+        logger.info("Installing %d exact entries" % (len(efcp_id_list)))
 
         for i in range(0, len(efcp_id_list)):
             vrf = 0
