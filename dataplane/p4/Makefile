@@ -3,8 +3,11 @@ DOCKER_NET := rina-controlplane
 MN_STR_NAME := mn-stratum
 P4R_STR_NAME := p4runtime-sh
 
-efcp_build_arch_v1model := build/arch/v1model
-efcp_build_arch_tna := build/arch/tna
+EDF_DP_BUILD_ARCH_V1MODEL := build/arch/v1model
+EDF_DP_P4_TNA_NAME := tna_efcp
+EDF_DP_BUILD_ARCH_TNA := ${SDE}/pkgsrc/p4-examples/p4_16_programs/${EDF_DP_P4_TNA_NAME}
+EDF_DP_INSTALL_ARCH_TNA := ${SDE_INSTALL}/share/tofinopd/${EDF_DP_P4_TNA_NAME}
+EDF_DP_BUILD_SDE_ARCH_TNA := ${SDE}/build/p4-build/${EDF_DP_P4_TNA_NAME}/tofino/${EDF_DP_P4_TNA_NAME}
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
@@ -69,23 +72,29 @@ p4runtime-log:
 clean:
 	-rm -rf build
 
-efcp-v1model-build: p4src/arch/v1model/efcp.p4
+efcp-v1model-build: src/arch/v1model/efcp.p4
 	$(info *** Building P4 program \(arch=v1model\)...)
-	@mkdir -p ${efcp_build_arch_v1model}
+	@mkdir -p ${EDF_DP_BUILD_ARCH_V1MODEL}
 	docker run --rm -v ${curr_dir}:/workdir -w /workdir ${P4C_IMG} \
-		p4c-bm2-ss --arch v1model -o ${efcp_build_arch_v1model}/bmv2.json \
-		--p4runtime-files ${efcp_build_arch_v1model}/p4info.txt --Wdisable=unsupported \
-		p4src/arch/v1model/efcp.p4
-	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_v1model}"
+		p4c-bm2-ss --arch v1model -o ${EDF_DP_BUILD_ARCH_V1MODEL}/bmv2.json \
+		--p4runtime-files ${EDF_DP_BUILD_ARCH_V1MODEL}/p4info.txt --Wdisable=unsupported \
+		src/arch/v1model/efcp.p4
+	@echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_V1MODEL}"
 
-efcp-tna-build: p4src/arch/tna/efcp.p4
+efcp-tna-build: src/arch/tna
 	$(info *** Building P4 program \(arch=tna\)...)
-	@mkdir -p ${efcp_build_arch_tna}
-	docker run --rm -v ${curr_dir}:/workdir -w /workdir ${P4C_IMG} \
-		p4c-bm2-ss --arch tna -o ${efcp_build_arch_tna}/bmv2.json \
-		--p4runtime-files ${efcp_build_arch_tna}/p4info.txt --Wdisable=unsupported \
-		p4src/arch/tna/efcp.p4
-	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_tna}"
+	@(if [ ! -f ${SDE}/../p4_build-9.2.0.sh ]; then echo "Missing SDE or p4_build-9.2.0.sh script" && exit 1; fi)
+	@(current=${PWD} && cd $< && \
+		${SDE}/../p4_build-9.2.0.sh --with-p4c --with-graphs efcp.p4 \
+		P4_VERSION=p4_16 P4_ARCHITECTURE=tna P4_NAME=${EDF_DP_P4_TNA_NAME} && \
+		mkdir -p ${EDF_DP_BUILD_ARCH_TNA} && mkdir -p ${EDF_DP_INSTALL_ARCH_TNA} && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/${EDF_DP_P4_TNA_NAME}.conf ${SDE_INSTALL}/share/p4/targets/tofino/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/bf-rt.json ${EDF_DP_INSTALL_ARCH_TNA}/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/context.json ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/tofino.bin ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
+		cp -Rp ${EDF_DP_BUILD_SDE_ARCH_TNA}/* ${EDF_DP_BUILD_ARCH_TNA}/ && \
+		cd ${current} && \
+		echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_TNA} and ${EDF_DP_INSTALL_ARCH_TNA}")
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
