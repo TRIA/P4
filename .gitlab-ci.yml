@@ -1,22 +1,33 @@
+# Allow job execution when:
+workflow:
+  rules:
+    # There is a Merge Request against the master branch
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+    # The master branch is building
+    - if: $CI_COMMIT_BRANCH == "master"
+    # A building process is running
+    - if: $CI_JOB_NAME =~ /_build$/
+    # ... And do not build if the branch being built is other than master and cron is not running it
+    - if: $CI_COMMIT_BRANCH != "master" && $CRON_AUTO != "true"
+      when: never
+
 stages:
   - build
   - test
   - clean
 
+#
+# v1model arch
+#
+
 job_efcp_v1model_build:
   script:
     - cd dataplane/p4
     - make efcp-v1model-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
-      when: always
-    - if: '$CI_COMMIT_BRANCH != "master" && $CRON_AUTO == "true"'
-      when: never
-    - when: manual
   stage: build
   tags: [npl_bmodel]
 
-job_cp_test:
+job_efcp_v1model_cp_test:
   script:
     - sudo -S su
     - cd controlplane/p4
@@ -25,12 +36,10 @@ job_cp_test:
     - cat test/edf-cp-client.log
   dependencies:
     - job_efcp_v1model_build
-  rules:
-    - when: on_success
   stage: test
   tags: [npl_bmodel]
 
-job_dp_test:
+job_efcp_v1model_dp_test:
   script:
     - cd dataplane/p4
     - make edf-dp-test-stratum
@@ -38,7 +47,25 @@ job_dp_test:
     - cat test/stratum_bmv2_test_h2.log
   dependencies:
     - job_efcp_v1model_build
-  rules:
-    - when: on_success
+  stage: test
+  tags: [npl_bmodel]
+
+#
+# Tofino arch
+#
+
+job_efcp_tna_build:
+  script:
+    - cd dataplane/p4
+    - make efcp-tna-build
+  stage: build
+  tags: [npl_bmodel]
+
+job_efcp_tna_dp_test:
+  script:
+    - cd dataplane/p4
+    - make edf-dp-test-tna-bfmodel
+  dependencies:
+    - job_efcp_tna_build
   stage: test
   tags: [npl_bmodel]
