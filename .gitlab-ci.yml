@@ -7,9 +7,12 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "master"
     # A building process is running
     - if: $CI_JOB_NAME =~ /_build$/
-    # ... And do not build if the branch being built is other than master and cron is not running it
+    # The "CRON_AUTO" variable is set (used in scheduled pipelines)
+    - if: $CRON_AUTO == "true"
+    # ... And do not build automatically if the branch being built is
+    # other than master and cron is not running it
     - if: $CI_COMMIT_BRANCH != "master" && $CRON_AUTO != "true"
-      when: never
+      when: manual
 
 stages:
   - build
