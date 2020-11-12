@@ -1,6 +1,7 @@
 /* -*- P4_16 -*- */
 #include <core.p4>
 #include <v1model.p4>
+#include "../../common/headers.p4"
 
 /*************************************************************************
 *********************** C O N S T A N T S ********************************
@@ -24,120 +25,18 @@ CPU_PORT.
 #define CPU_CLONE_SESSION_ID 99
 
 
-/*
- * ECN threshold for congestion control
- */
-const bit<19> ECN_THRESHOLD = 1;
-
-/*
- * PDU Types
- */
-const bit<8> DATA_TRANSFER = 0x80;
-const bit<8> LAYER_MANAGEMENT = 0x40;
-const bit<8> ACK_ONLY = 0xC1;
-const bit<8> NACK_ONLY = 0xC2;
-const bit<8> ACK_AND_FLOW_CONTROL = 0xC5;
-const bit<8> NACK_AND_FLOW_CONTROL = 0xC6;
-const bit<8> FLOW_CONTROL_ONLY = 0xC4;
-const bit<8> SELECTIVE_ACK = 0xC9;
-const bit<8> SELECTIVE_NACK = 0xCA;
-const bit<8> SELECTIVE_ACK_AND_FLOW_CONTROL = 0xCD;
-const bit<8> SELECTIVE_NACK_AND_FLOW_CONTROL = 0xCE;
-const bit<8> CONTROL_ACK = 0xC0;
-const bit<8> RENDEVOUS = 0xCF;
-
-
-
 /*************************************************************************
-*********************** H E A D E R S  ***********************************
+*********************** M E T A D A T A  *******************************
 *************************************************************************/
 
-/*
- * Define the headers the program will recognize
- */
-typedef bit<9>  egressSpec_t;
-typedef bit<48> macAddr_t;
-typedef bit<32> ip4Addr_t;
-
-/*
- * Standard ethernet header
- */
-header ethernet_t {
-    macAddr_t dstAddr;
-    macAddr_t srcAddr;
-    bit<16> etherType;
-}
-
-/*
- * VLAN Header. We'll use ethertype 0x8100
- */
-const bit<16> VLAN_ETYPE = 0x8100;
-header vlan_t {
-    bit<3>  pcp;
-    bit<1> dei;
-    bit<12> vlan_id;
-    bit<16> etherType;
-}
-
-
-/*
- * EFCP Header. We'll use ethertype 0xD1F
- */
-const bit<16> EFCP_ETYPE = 0xD1F;
-header efcp_t {
-    bit<8>  ver;
-    bit<16> dstAddr;
-    bit<16> srcAddr;
-    bit<8>  qosID;
-    bit<16> dstCEPID;
-    bit<16> srcCEPID;
-    bit<8> pduType;
-    bit<8> flags;
-    bit<16> len;
-    bit<32> seqnum;
-    bit<16> hdrChecksum;
-}
-
-/*
- * IPv4 Header. We'll use ethertype 0x800
- */
-const bit<16> IPV4_ETYPE = 0x0800;
-header ipv4_t {
-    bit<4>    version;
-    bit<4>    ihl;
-    bit<8>    diffserv;
-    bit<16>   totalLen;
-    bit<16>   identification;
-    bit<3>    flags;
-    bit<13>   fragOffset;
-    bit<8>    ttl;
-    bit<8>    protocol;
-    bit<16>   hdrChecksum;
-    ip4Addr_t srcAddr;
-    ip4Addr_t dstAddr;
-}
 
 /*
  * All metadata, globally used in the program, also  needs to be assembed
- * into a single struct. As in the case of the headers, we only need to
- * declare the type, but there is no need to instantiate it,
- * because it is done "by the architecture", i.e. outside of P4 functions
+ * into a single struct. 
  */
 
 struct metadata {
     /* In our case it is empty */
-}
-
-/*
- * All headers, used in the program needs to be assembed into a single struct.
- * We only need to declare the type, but there is no need to instantiate it,
- * because it is done "by the architecture", i.e. outside of P4 functions
- */
-struct headers {
-    ethernet_t  ethernet;
-    efcp_t      efcp;
-    vlan_t      vlan;
-    ipv4_t      ipv4;
 }
 
 
@@ -149,8 +48,8 @@ error {
 /*************************************************************************
 *********************** P A R S E R  ***********************************
 *************************************************************************/
-parser MyParser(packet_in packet,
-                out headers hdr,
+parser SwitchIngressParser(packet_in packet,
+                out header_t hdr,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
 
@@ -212,7 +111,7 @@ standard_metadata checksum_error field will be equal to 1 when the
 packet begins ingress processing.
 */
 
-control MyVerifyChecksum(inout headers hdr,
+control SwitchIngressVerifyChecksum(inout header_t hdr,
                         inout metadata meta) {
     apply {
 /*
@@ -229,7 +128,7 @@ control MyVerifyChecksum(inout headers hdr,
               hdr.efcp.flags,
               hdr.efcp.len,
               hdr.efcp.seqnum },
-            hdr.efcp.hdrChecksum,
+            hdr.efcp.hdr_checksum,
             HashAlgorithm.csum16);
 
 /*
@@ -239,16 +138,16 @@ control MyVerifyChecksum(inout headers hdr,
             { hdr.ipv4.version,
 	          hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
-              hdr.ipv4.totalLen,
+              hdr.ipv4.total_len,
               hdr.ipv4.identification,
               hdr.ipv4.flags,
-              hdr.ipv4.fragOffset,
+              hdr.ipv4.frag_offset,
               hdr.ipv4.ttl,
               hdr.ipv4.protocol,
               hdr.ipv4.srcAddr,
               hdr.ipv4.dstAddr
               },
-            hdr.ipv4.hdrChecksum,
+            hdr.ipv4.hdr_checksum,
             HashAlgorithm.csum16);
     }
 }
@@ -256,7 +155,7 @@ control MyVerifyChecksum(inout headers hdr,
 /*************************************************************************
 **************  I N G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
-control MyIngress(inout headers hdr,
+control SwitchIngress(inout header_t hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 
@@ -283,7 +182,7 @@ the packet buffer, nor sent to egress processing.
 /*
  * EFCP forwarding action
  */
-    action efcp_forward(bit<12> vlan_id, macAddr_t dstAddr, egressSpec_t port) {
+    action efcp_forward(bit<12> vlan_id, mac_addr_t dstAddr, egress_spec port) {
         hdr.vlan.vlan_id = vlan_id;
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
@@ -294,7 +193,7 @@ the packet buffer, nor sent to egress processing.
 /*
  * IPv4 forwarding action
  */
-    action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+    action ipv4_forward(mac_addr_t dstAddr, egress_spec port) {
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
@@ -305,7 +204,7 @@ the packet buffer, nor sent to egress processing.
 /*
  * EFCP exact table
  */
-    table efcp_lpm {
+    table efcp_exact {
         key = {
             hdr.efcp.dstAddr: exact;
         }
@@ -341,7 +240,7 @@ the packet buffer, nor sent to egress processing.
                 if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
                     standard_metadata.egress_spec = CPU_PORT;
                 } else {
-                    efcp_lpm.apply();
+                    efcp_exact.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             standard_metadata.checksum_error == 0) {
@@ -355,7 +254,7 @@ the packet buffer, nor sent to egress processing.
 ****************  E G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
 
-control MyEgress(inout headers hdr,
+control SwitchEgress(inout header_t hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
 
@@ -378,7 +277,7 @@ control MyEgress(inout headers hdr,
 *************   C H E C K S U M    C O M P U T A T I O N   **************
 *************************************************************************/
 
-control MyComputeChecksum(inout headers hdr, inout metadata meta) {
+control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
     apply {
 /*
 * Compute checksum for EFCP packets
@@ -395,7 +294,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
               hdr.efcp.flags,
               hdr.efcp.len,
               hdr.efcp.seqnum },
-            hdr.efcp.hdrChecksum,
+            hdr.efcp.hdr_checksum,
             HashAlgorithm.csum16);
 
 /*
@@ -406,15 +305,15 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
             { hdr.ipv4.version,
 	      hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
-              hdr.ipv4.totalLen,
+              hdr.ipv4.total_len,
               hdr.ipv4.identification,
               hdr.ipv4.flags,
-              hdr.ipv4.fragOffset,
+              hdr.ipv4.frag_offset,
               hdr.ipv4.ttl,
               hdr.ipv4.protocol,
               hdr.ipv4.srcAddr,
               hdr.ipv4.dstAddr },
-            hdr.ipv4.hdrChecksum,
+            hdr.ipv4.hdr_checksum,
             HashAlgorithm.csum16);
    }
 }
@@ -423,7 +322,7 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 ***********************  D E P A R S E R  *******************************
 *************************************************************************/
 
-control MyDeparser(packet_out packet, in headers hdr) {
+control SwitchEgressDeparser(packet_out packet, in header_t hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.efcp);
@@ -438,10 +337,10 @@ control MyDeparser(packet_out packet, in headers hdr) {
 *************************************************************************/
 
 V1Switch(
-MyParser(),
-MyVerifyChecksum(),
-MyIngress(),
-MyEgress(),
-MyComputeChecksum(),
-MyDeparser()
+SwitchIngressParser(),
+SwitchIngressVerifyChecksum(),
+SwitchIngress(),
+SwitchEgress(),
+SwitchEgressComputeChecksum(),
+SwitchEgressDeparser()
 ) main;

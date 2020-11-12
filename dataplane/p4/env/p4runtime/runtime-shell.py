@@ -12,14 +12,14 @@ print("Connected to bmv2")
 # TABLE ENTRIES
 
 ## EFCP
-te = sh.TableEntry("MyIngress.efcp_lpm")(action = "MyIngress.efcp_forward")
+te = sh.TableEntry("SwitchIngress.efcp_lpm")(action = "SwitchIngress.efcp_forward")
 te.match["hdr.efcp.dstAddr"] = "1"
 te.action["dstAddr"] = "00:00:00:00:00:01"
 te.action["port"] = "1"
 te.action["vlan_id"] = "0"
 te.insert()
 
-te = sh.TableEntry("MyIngress.efcp_lpm")(action = "MyIngress.efcp_forward")
+te = sh.TableEntry("SwitchIngress.efcp_lpm")(action = "SwitchIngress.efcp_forward")
 te.match["hdr.efcp.dstAddr"] = "2"
 te.action["dstAddr"] = "00:00:00:00:00:02"
 te.action["port"] = "2"
@@ -27,13 +27,13 @@ te.action["vlan_id"] = "0"
 te.insert()
 
 ## IPv4
-te = sh.TableEntry("MyIngress.ipv4_lpm")(action = "MyIngress.ipv4_forward")
+te = sh.TableEntry("SwitchIngress.ipv4_lpm")(action = "SwitchIngress.ipv4_forward")
 te.match["hdr.ipv4.dstAddr"] = "10.0.0.1"
 te.action["dstAddr"] = "00:00:00:00:00:01"
 te.action["port"] = "1"
 te.insert()
 
-te = sh.TableEntry("MyIngress.ipv4_lpm")(action = "MyIngress.ipv4_forward")
+te = sh.TableEntry("SwitchIngress.ipv4_lpm")(action = "SwitchIngress.ipv4_forward")
 te.match["hdr.ipv4.dstAddr"] = "10.0.0.2"
 te.action["dstAddr"] = "00:00:00:00:00:02"
 te.action["port"] = "2"

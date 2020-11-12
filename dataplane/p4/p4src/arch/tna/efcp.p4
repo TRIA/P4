@@ -6,7 +6,6 @@
 #include <tna.p4>
 #endif
 #include "../../common/headers.p4"
-#include "../../common/util.p4"
 
 
 /*************************************************************************
@@ -31,85 +30,6 @@ CPU_PORT.
 #define CPU_CLONE_SESSION_ID 99
 
 
-/*
- * ECN threshold for congestion control
- */
-const bit<19> ECN_THRESHOLD = 1;
-
-/*
- * PDU Types
- */
-const bit<8> DATA_TRANSFER = 0x80; //MAYBE THE NAME HAS TO BE: DATA_TRANSFER_T
-const bit<8> LAYER_MANAGEMENT = 0x40;
-const bit<8> ACK_ONLY = 0xC1;
-const bit<8> NACK_ONLY = 0xC2;
-const bit<8> ACK_AND_FLOW_CONTROL = 0xC5;
-const bit<8> NACK_AND_FLOW_CONTROL = 0xC6;
-const bit<8> FLOW_CONTROL_ONLY = 0xC4;
-const bit<8> SELECTIVE_ACK = 0xC9;
-const bit<8> SELECTIVE_NACK = 0xCA;
-const bit<8> SELECTIVE_ACK_AND_FLOW_CONTROL = 0xCD;
-const bit<8> SELECTIVE_NACK_AND_FLOW_CONTROL = 0xCE;
-const bit<8> CONTROL_ACK = 0xC0;
-const bit<8> RENDEVOUS = 0xCF;
-/*
-typedef bit<128> srv6_sid_t;
-struct srv6_metadata_t {
-    srv6_sid_t sid; // SRH[SL]
-    bit<16> rewrite; // Rewrite index
-    bool psp; // Penultimate Segment Pop
-    bool usp; // Ultimate Segment Pop
-    bool decap;
-    bool encap;
-}*/
-
-struct egress_metadata_t {
-    bit<16> checksum_ipv4_tmp;
-    bit<16> checksum_efcp_tmp;
-
-    bool checksum_upd_ipv4;
-    bool checksum_upd_efcp;
-
-    bool checksum_err_ipv4_igprs;
-    bool checksum_err_efcp_igprs;
- 
-    bit<19> enq_qdepth;
-    //srv6_metadata_t srv6;
-}
-
-
-/*
- * All metadata, globally used in the program, also  needs to be assembed
- * into a single struct. As in the case of the headers, we only need to
- * declare the type, but there is no need to instantiate it,
- * because it is done "by the architecture", i.e. outside of P4 functions
- */
-
-struct metadata_t {
-    bit<16> checksum_ipv4_tmp;
-    bit<16> checksum_efcp_tmp;
-
-    bool checksum_upd_ipv4;
-    bool checksum_upd_efcp;
-
-    bool checksum_err_ipv4_igprs;
-    bool checksum_err_efcp_igprs;
-    bit<16> checksum_error;
-    bit<16> parser_error;
-    bit<9>  egress_spec;
-
-}
-
-
-/*
- * All headers, used in the program needs to be assembed into a single struct.
- * We only need to declare the type, but there is no need to instantiate it,
- * because it is done "by the architecture", i.e. outside of P4 functions. It is 
- * allocated in headers.p4
- */
-
-
-
 // Declare user-defined errors that may be signaled during parsing
 error {
     WrongPDUtype
@@ -123,12 +43,10 @@ parser SwitchIngressParser(
         out header_t hdr,
         out metadata_t ig_md,
         out ingress_intrinsic_metadata_t ig_intr_md) {
-    //TofinoIngressParser() tofino_parser;
     Checksum() efcp_checksum;
     Checksum() ipv4_checksum;
 
     state start {
-      //  tofino_parser.apply(packet, ig_intr_md);
         transition parse_ethernet;
     }
 
@@ -232,7 +150,7 @@ Counter<bit<32>, PortId_t>(
 /*
  * EFCP exact table
  */
-    table efcp_lpm {
+    table efcp_exact {
         key = {
             hdr.efcp.dstAddr: exact;
         }
@@ -241,7 +159,7 @@ Counter<bit<32>, PortId_t>(
 	    miss;
             NoAction;
         }
-    //    size = 1024;
+        //size = 1024;
         default_action = NoAction();
     }
 
@@ -257,7 +175,7 @@ Counter<bit<32>, PortId_t>(
 	    miss;
             NoAction;
         }
-      //  size = 1024; default_action = miss();
+        //size = 1024; default_action = miss();
     }
 
     apply {
@@ -266,7 +184,7 @@ Counter<bit<32>, PortId_t>(
                 if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
                     ig_md.egress_spec = CPU_PORT;
                 } else {
-                    efcp_lpm.apply();
+                    efcp_exact.apply();
                 }
         } else if (hdr.ipv4.isValid() &&
             ig_md.checksum_error == 0) {
@@ -295,7 +213,7 @@ control SwitchIngressDeparser(packet_out packet,
         // the program.
         if (ig_md.checksum_upd_ipv4) {
             hdr.ipv4.hdr_checksum = ipv4_checksum.update(
-                {hdr.ipv4.version,
+                { hdr.ipv4.version,
                  hdr.ipv4.ihl,
                  hdr.ipv4.diffserv,
                  hdr.ipv4.total_len,
@@ -305,11 +223,11 @@ control SwitchIngressDeparser(packet_out packet,
                  hdr.ipv4.ttl,
                  hdr.ipv4.protocol,
                  hdr.ipv4.srcAddr,
-                 hdr.ipv4.dstAddr});
+                 hdr.ipv4.dstAddr });
         }
 	 if (ig_md.checksum_upd_efcp) {
             hdr.efcp.hdr_checksum = efcp_checksum.update(
-                {hdr.efcp.ver,
+	      { hdr.efcp.ver,
 	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,
@@ -318,7 +236,7 @@ control SwitchIngressDeparser(packet_out packet,
               hdr.efcp.pduType,
               hdr.efcp.flags,
               hdr.efcp.len,
-              hdr.efcp.seqnum});
+              hdr.efcp.seqnum });
         }
 	packet.emit(hdr.ethernet);
         packet.emit(hdr.efcp);
@@ -347,7 +265,7 @@ parser SwitchEgressParser(
     state parse_ethernet {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            EFCP_ETYPE: parse_efcp; //YO CREO QUE SI HACE FALTA VALIDAR CHECKSUM
+            EFCP_ETYPE: parse_efcp;
             VLAN_ETYPE: parse_vlan;
             IPV4_ETYPE: parse_ipv4;
             default: accept;
@@ -441,7 +359,7 @@ control SwitchEgressDeparser(
                  hdr.ipv4.diffserv,
                  hdr.ipv4.total_len,
                  hdr.ipv4.identification,
-                 hdr.ipv4.flags, //REVISAR QUE LOS NOMBRES SON ASÍ
+                 hdr.ipv4.flags, 
                  hdr.ipv4.frag_offset,
                  hdr.ipv4.ttl,
                  hdr.ipv4.protocol,
@@ -450,7 +368,7 @@ control SwitchEgressDeparser(
         }
 	 if (eg_md.checksum_upd_efcp) {
             hdr.efcp.hdr_checksum = efcp_checksum.update(
-                {hdr.efcp.ver,
+	      {hdr.efcp.ver,
 	      hdr.efcp.dstAddr,
               hdr.efcp.srcAddr,
               hdr.efcp.qosID,
@@ -473,11 +391,11 @@ control SwitchEgressDeparser(
 ***********************  S W I T C H  *******************************
 *************************************************************************/
 
-Pipeline(SwitchIngressParser(), //DONE pero hay que revisar cosas
-         SwitchIngress(), //
-         SwitchIngressDeparser(), //DONE
-         SwitchEgressParser(), //DONE pero hay que revisar cosas
-         SwitchEgress(), //
-         SwitchEgressDeparser()) pipe; //DONE pero hay que revisar cosas
+Pipeline(SwitchIngressParser(), 
+         SwitchIngress(), 
+         SwitchIngressDeparser(), 
+         SwitchEgressParser(), 
+         SwitchEgress(), 
+         SwitchEgressDeparser()) pipe;
 
 Switch(pipe) main;

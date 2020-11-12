@@ -88,26 +88,26 @@ mn-stop:
 	docker rm -f ${MN_STR_NAME} || true
 	@make docker_net_rm
 
-edf-dp-test-stratum: efcp-v1model-build
+edf-dp-test-v1model-stratum: efcp-v1model-build
 	make env-v1model-restart
 	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
 	@sleep 3
 	@echo "Starting test for host1"
-	make edf-dp-test-stratum-send-pdu iface="eth1" src_host="h1" dst_host="h2"
+	make edf-dp-test-v1model-stratum-send-pdu iface="eth1" src_host="h1" dst_host="h2"
 	@echo "Starting test for host2"
-	make edf-dp-test-stratum-send-pdu iface="eth2" src_host="h2" dst_host="h1" 
+	make edf-dp-test-v1model-stratum-send-pdu iface="eth2" src_host="h2" dst_host="h1" 
 	@sleep .5
 	-sudo chown ${USER}:${USER} ${PWD}/env/mininet/tmp -R
 	make env-v1model-stop
 
-edf-dp-test-stratum-send-pdu:
+edf-dp-test-v1model-stratum-send-pdu:
 	@touch ${PWD}/test/stratum_bmv2_test_${src_host}.log
-	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp"
-	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4"
+	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp"
+	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4"
 	@test -s ${PWD}/test/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
 		echo "Test for host ${src_host} did not pass"
 
-edf-dp-test-stratum-send-pdu-type:
+edf-dp-test-v1model-stratum-send-pdu-type:
 	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c 1 -w output_${iface}
 	@docker exec ${MN_STR_NAME} m ${src_host} python scripts/${src_host}_send_${pdu}_${dst_host}.py
 	@sleep 1

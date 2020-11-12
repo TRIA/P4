@@ -31,7 +31,7 @@ job_cp_test:
 job_dp_test:
   script:
     - cd dataplane/p4
-    - make edf-dp-test-stratum
+    - make edf-dp-test-v1model-stratum
     - cat test/stratum_bmv2_test_h1.log
     - cat test/stratum_bmv2_test_h2.log
   artifacts:
