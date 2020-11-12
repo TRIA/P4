@@ -59,15 +59,21 @@ job_efcp_v1model_dp_test:
 
 job_efcp_tna_build:
   script:
-    - cd dataplane/p4
-    - make efcp-tna-build
+    - |
+      sudo -H -i -u ubuntu sh -e -x <<EOS
+      cd dataplane/p4
+      make efcp-tna-build
+      EOS
   stage: build
   tags: [p4_tna]
 
 job_efcp_tna_dp_test:
   script:
-    - cd dataplane/p4
-    - make edf-dp-test-tna-bfmodel
+    - |
+      sudo -H -i -u ubuntu sh -e -x <<EOS
+      cd dataplane/p4
+      make edf-dp-test-tna-bfmodel
+      EOS
   dependencies:
     - job_efcp_tna_build
   stage: test
