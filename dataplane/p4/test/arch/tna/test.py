@@ -36,10 +36,14 @@ from edf_pdu_types import EFCP_TYPES
 
 # ScaPy initialisation
 bind_layers(Ether, EFCP, type=0xD1F)
+bind_layers(Ether, Dot1Q, type=0x8100)
+bind_layers(Dot1Q, EFCP, type=0xD1F)
 
 logger = logging.getLogger("Test")
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler())
+
+MAX_PKTS_SENT = 15
 
 swports = []
 for device, port, ifname in config["interfaces"]:
@@ -50,9 +54,12 @@ if swports == []:
     swports = list(range(9))
 
 
-@unittest.skip("Filtering")
+# TODO: review similarities between IPV4-related test classes
+# and do a base class, same as with EFCPTest
+#@unittest.skip("Filtering")
 class IPV4LpmMatchTest(BfRuntimeTest):
-    """@brief Basic test for algorithmic-lpm-based lpm matches.
+    """
+    @brief Basic test for algorithmic-lpm-based lpm matches.
     """
 
     def setUp(self):
@@ -65,7 +72,7 @@ class IPV4LpmMatchTest(BfRuntimeTest):
         seed = random.randint(1, 65535)
         logger.info("Seed used %d", seed)
         random.seed(seed)
-        num_entries = random.randint(1, 30)
+        num_entries = random.randint(1, MAX_PKTS_SENT)
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
@@ -142,9 +149,10 @@ class IPV4LpmMatchTest(BfRuntimeTest):
                                                           prefix_len=item.prefix_len)])])
 
 
-@unittest.skip("Filtering")
+#@unittest.skip("Filtering")
 class IPv4IndirectCounterTest(BfRuntimeTest):
-    """@brief Basic test for counting IPv4 packets.
+    """
+    @brief Basic test for counting IPv4 packets.
     """
 
     def setUp(self):
@@ -157,7 +165,7 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
         seed = random.randint(1, 65535)
         logger.info("Seed used %d", seed)
         random.seed(seed)
-        num_entries = random.randint(1, 30)
+        num_entries = random.randint(1, MAX_PKTS_SENT)
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
@@ -201,7 +209,7 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
             lpm_dict[key] = data
 
             # add new counter
-            counter_table.entry_add(target,[counter_table.make_key([gc.KeyTuple('$COUNTER_INDEX', eg_port)])],[counter_table.make_data([gc.DataTuple('$COUNTER_SPEC_BYTES', 0),gc.DataTuple('$COUNTER_SPEC_PKTS', 0)])])
+            counter_table.entry_add(target,[counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", eg_port)])],[counter_table.make_data([gc.DataTuple("$COUNTER_SPEC_BYTES", 0),gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])])
             # default packet size is 100 bytes and model adds 4 bytes of CRC
             pkt_size = 100 + 4
             num_pkts = num_entries
@@ -230,7 +238,7 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
             logger.info("Expecting packet on port %d", data_item.eg_port)
             testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
 
-            resp = counter_table.entry_get(target,[counter_table.make_key([gc.KeyTuple('$COUNTER_INDEX', data_item.eg_port)])],{"from_hw": True},None)
+            resp = counter_table.entry_get(target,[counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])],{"from_hw": True},None)
 
             # parse resp to get the counter
             data_dict = next(resp)[0].to_dict()
@@ -250,30 +258,19 @@ class IPv4IndirectCounterTest(BfRuntimeTest):
                 prefix_len=item.prefix_len)])])
 
 
-#@unittest.skip("Filtering")
-# NOTE: it should be no longer needed to run "bfrt.tna_efcp.pipe.SwitchIngress.efcp_exact.clear()" and then
-# "bfrt.tna_efcp.pipe.SwitchIngress.efcp_exact.dump()" to verify
-# there are no EFCP-related rules in the Tofino switch before running this test
-class EFCPExactMatchTest(BfRuntimeTest):
-    """@brief Basic test for algorithmic-lpm-based lpm matches.
+class EFCPTest(BfRuntimeTest):
+    """
+    @brief Base EFCP test.
     """
 
-    # DO NOT USE. Just to check
-#    def _get_tx_packet(self, ipc_dst_addr, ipc_src_addr, mac_dst_addr, mac_src_addr, vlan_id):
-#        # FIXME: failing with type in Ether() - check why
-#        #pkt = Ether(dst=mac_dst_addr, src=mac_src_addr, type=0xD1F) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
-#        pkt = Ether(dst=mac_dst_addr, src=mac_src_addr) / Dot1Q(vlan=vlan_id) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
-#        pkt = pkt / "EFCP packet sent from CLI to BM :)"
-#        pktlen = 100
-#        codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
-#        codecs_decode_str = "".join(["%02x"%(x%256) for x in range(pktlen - len(pkt)) ])
-#        codecs_decode = codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
-#        pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
-#        return pkt
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.MINSIZE = 0
+        self.counter_test = False
+        self.counter_table = None
 
-    MINSIZE = 0
-
-    # Adapted from simple_tcp_packet_ext_taglist in $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
+    # EFCP packet submission adapted from the method with a similar name (for TCP)
+    # under $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
     def simple_efcp_packet_ext_taglist(self,
                                   pktlen=100,
                                   eth_dst="00:01:02:03:04:05",
@@ -289,30 +286,23 @@ class EFCPExactMatchTest(BfRuntimeTest):
 
         if self.MINSIZE > pktlen:
             pktlen = self.MINSIZE
-        
-        #bind_layers(Ether, VLAN)
-        #bind_layers(VLAN, EFCP, type=0x8100)
 
         efcp_payload = "EFCP packet sent from CLI to BM :)"
-        # FIXME: failing with type in Ether() - check why
-        #efcp_pkt = Ether(dst=eth_dst, src=eth_src, type=0x8100) / VLAN(ethertype=0xD1F) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdu_type=0x8001)
         efcp_pkt = EFCP(ipc_src_addr=ipc_src_addr, ipc_dst_addr=ipc_dst_addr, pdu_type=EFCP_TYPES["DATA_TRANSFER"])
-        # Computed in the expected one (may need to be used -- if so fix it)
-        # NOTE: comment if this gives issues, but uncomment after fixing
+        # Checksum computation is not correct anymore
         # efcp_pkt.hdr_checksum = checksum(efcp_pkt[:20])
         pkt = efcp_pkt / efcp_payload
         eth_pkt = Ether(dst=eth_dst, src=eth_src, type=0xD1F)
-
         pkt = eth_pkt
 
-        # Note Dot1Q.id is really CFI
+        # Note Dot1Q.id is really DEI (aka CFI)
         if (dl_taglist_enable):
             for i in range(0, len(dl_vlanid_list)):
-                pkt = pkt / Dot1Q(prio=dl_vlan_pcp_list[i], id=dl_vlan_cfi_list[i], vlan=dl_vlanid_list[i])
+                dot1q_pkt = Dot1Q(prio=dl_vlan_pcp_list[i], id=dl_vlan_cfi_list[i], vlan=dl_vlanid_list[i])
+                pkt = pkt / dot1q_pkt
             for i in range(1, len(dl_tpid_list)):
                 pkt[Dot1Q:i].type=dl_tpid_list[i]
             pkt.type=dl_tpid_list[0]
-
         pkt = pkt / efcp_pkt
 
         codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
@@ -321,7 +311,6 @@ class EFCPExactMatchTest(BfRuntimeTest):
         pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
         return pkt
 
-    # Adapted from simple_tcp_packet in $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
     def simple_efcp_packet(self,
                       pktlen=100,
                       eth_dst="00:01:02:03:04:05",
@@ -331,7 +320,7 @@ class EFCPExactMatchTest(BfRuntimeTest):
                       vlan_pcp=0,
                       dl_vlan_cfi=0,
                       ipc_src_addr=1,
-                      ipc_dst_addr=2
+                      ipc_dst_addr=2,
                       ):
         pcp_list = []
         cfi_list = []
@@ -360,29 +349,29 @@ class EFCPExactMatchTest(BfRuntimeTest):
         p4_name = "tna_efcp"
         BfRuntimeTest.setUp(self, client_id, p4_name)
 
-    # FIXME: Update with correct parameters
-    def delete_rules(self, key_tuple_list, efcp_exact_table, target, gc):
+    def delete_rules(self, key_tuple_list, efcp_exact_table, target, gc, efcp_id_list):
         # Delete table entries
-        for item in key_tuple_list:
+        for i in range(0, len(efcp_id_list)):
             efcp_exact_table.entry_del(
-                target, [
-                    efcp_exact_table.make_key([
-                        gc.KeyTuple("hdr.efcp.dst_addr", item.dst_addr)
-                    ])
-                ]
-            )
+                target,
+                [efcp_exact_table.make_key([gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[i])])])
 
-    def runTest(self):
+    def _run_test(self, *args, **kwargs):
+        try:
+            self.counter_test = kwargs["counter_test"]
+        except Exception as e:
+            logger.error("Could not load \"counter_test\" flag - defaults to False. Details: {0}".format(e))
         ig_port = swports[1]
         seed = random.randint(1, 65535)
         logger.info("Seed used %d", seed)
         random.seed(seed)
-        num_entries = random.randint(1, 30)
-        #num_entries = 12
+        num_entries = random.randint(1, MAX_PKTS_SENT)
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
         efcp_exact_table = bfrt_info.table_get("SwitchIngress.efcp_exact")
+        if self.counter_test:
+            self.counter_table = bfrt_info.table_get("SwitchIngress.efcp_counter")
         efcp_exact_table.info.key_field_annotation_add("hdr.efcp.dst_addr", "bit")
         efcp_exact_table.info.data_field_annotation_add("vlan_id", "SwitchIngress.efcp_forward", "bit")
         efcp_exact_table.info.data_field_annotation_add("dst_mac", "SwitchIngress.efcp_forward", "mac")
@@ -421,8 +410,23 @@ class EFCPExactMatchTest(BfRuntimeTest):
             key.apply_mask()
             exact_dict[key] = data
 
+            if self.counter_test:
+                # add new counter
+                self.counter_table.entry_add(target,
+                        [self.counter_table.make_key(
+                            [gc.KeyTuple("$COUNTER_INDEX", eg_port)])
+                        ],
+                        [self.counter_table.make_data(
+                            [gc.DataTuple("$COUNTER_SPEC_BYTES", 0),
+                            gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])
+                        ])
+                # default packet size is 100 bytes and model adds 4 bytes of CRC
+                pkt_size = 100 + 4
+                num_pkts = num_entries
+                num_bytes = num_pkts * pkt_size
+
         # check get
-        resp  = efcp_exact_table.entry_get(target)
+        resp = efcp_exact_table.entry_get(target)
         for data, key in resp:
             exact_dict_keys = [ _ for _ in exact_dict.keys() ]
             assert exact_dict[key] == data
@@ -432,45 +436,32 @@ class EFCPExactMatchTest(BfRuntimeTest):
         test_tuple_list = list(zip(key_tuple_list, data_tuple_list))
         
         logger.info("Sending packets for the installed entries to verify")
+
         # send pkt and verify sent
+        i = 0
         for key_item, data_item in test_tuple_list:
             efcp_src_id = random.randint(0, 255)
             src_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
+            vlan_id = vlan_id_list[i]
+            vlan_enable = i % 2 == 0
+            i += 1
 
-            # NOTE: do not change this (a priori)
-            # A1
-            #pkt = self._get_tx_packet(key_item.dst_addr, None, None, None, None)
-            # A2
-            #pkt = self._get_tx_packet(key_item.dst_addr, efcp_src_id, data_item.dst_mac, src_mac, vlan_id)
-            # B
+            #logger.info("ScaPy emitted packet")
             pkt = self.simple_efcp_packet(eth_src=src_mac, eth_dst=data_item.dst_mac, \
-                    vlan_vid=vlan_id, \
+                    dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
                     ipc_src_addr=efcp_src_id, ipc_dst_addr=key_item.dst_addr \
                     )
-            #exp_pkt = testutils.simple_tcp_packet(eth_dst=data_item.dmac,
-            #                                      eth_src=data_item.smac,
-            #                                      ip_dst=key_item.dst_ip)
-            print("ScaPy emitted packet")
-            pkt.show()
+            #pkt.show()
             
-            # NOTE: do not change this (a priori)
-            # A1
-            #exp_pkt = self._get_tx_packet(None, efcp_src_id, data_item.dst_mac, src_mac, vlan_id)
-            # A2
-            #exp_pkt = self._get_tx_packet(key_item.dst_addr, efcp_src_id, data_item.dst_mac, src_mac, vlan_id)
-            # B
-            # NOTE: "eth_src" will be equal to "eth_dst" because of the logic in tna_efcp.p4
+            #logger.info("ScaPy expected packet")
             exp_pkt = self.simple_efcp_packet(eth_dst=data_item.dst_mac, eth_src=data_item.dst_mac, \
-                    vlan_vid=vlan_id, \
+                    dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
                     ipc_src_addr=efcp_src_id, ipc_dst_addr=key_item.dst_addr \
                     )
-            #exp_pkt = testutils.simple_tcp_packet(eth_dst=data_item.dst_mac)
-            print("ScaPy expected packet")
-            exp_pkt.show()
-            
+            #exp_pkt.show()
+
             logger.info("Sending packet on port %d", ig_port)
             testutils.send_packet(self, ig_port, pkt)
-
             logger.info("Verifying entry for IPC ID %s" % key_item.dst_addr)
             logger.info("Expecting packet on port %d", data_item.dst_port)
             try:
@@ -478,13 +469,44 @@ class EFCPExactMatchTest(BfRuntimeTest):
             except Exception as e:
                 logger.error("Error on packet verification")
                 raise e
-            #finally:
-                #self.delete_rules(key_tuple_list, efcp_exact_table, target, gc)
 
+            if self.counter_test:
+                resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.dst_port)])],{"from_hw": True},None)
+
+                # parse resp to get the counter
+                data_dict = next(resp)[0].to_dict()
+                recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
+                recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
+
+                logger.info("The counter value for port %s is %s",data_item.dst_port,str(recv_pkts))
+        
         logger.info("All expected packets received")
         logger.info("Deleting %d Exact entries" % (len(efcp_id_list)))
         # Delete table entries
-        for i in range(0, len(efcp_id_list)):
-            efcp_exact_table.entry_del(
-                target,
-                [efcp_exact_table.make_key([gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[i])])])
+        self.delete_rules(key_tuple_list, efcp_exact_table, target, gc, efcp_id_list)
+
+
+#@unittest.skip("Filtering")
+class EFCPExactMatchTest(EFCPTest):
+    """
+    @brief Basic test for EFCP exact match.
+    """
+
+    def runTest(self):
+        test_options = {
+            "counter_test": False
+        }
+        self._run_test(**test_options)
+
+
+#@unittest.skip("Filtering")
+class EFCPCounterTest(EFCPTest):
+    """
+    @brief Basic test for EFCP counter test.
+    """
+
+    def runTest(self):
+        test_options = {
+            "counter_test": True
+        }
+        self._run_test(**test_options)

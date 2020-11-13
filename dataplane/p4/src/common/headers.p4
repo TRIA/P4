@@ -5,14 +5,14 @@ typedef bit<48> mac_addr_t;
 typedef bit<32> ipv4_addr_t;
 typedef bit<128> ipv6_addr_t;
 typedef bit<12> vlan_id_t;
-typedef bit<9>  egress_spec;
+typedef bit<9> egress_spec;
 
 typedef bit<16> ether_type_t;
 const ether_type_t ETHERTYPE_ARP = 16w0x0806;
 const ether_type_t ETHERTYPE_EFCP = 16w0xD1F;
 const ether_type_t ETHERTYPE_IPV4 = 16w0x0800;
 const ether_type_t ETHERTYPE_IPV6 = 16w0x86dd;
-const ether_type_t ETHERTYPE_VLAN = 16w0x8100;
+const ether_type_t ETHERTYPE_DOT1Q = 16w0x8100;
 
 typedef bit<8> ip_protocol_t;
 const ip_protocol_t IP_PROTOCOLS_ICMP = 1;
@@ -47,11 +47,19 @@ header ethernet_h {
     ether_type_t ether_type;
 }
 
-header vlan_tag_h {
-    bit<3> pcp;
-    bit<1> cfi;
+/*
+  Dot1Q / 802.1Q tag format
+
+  prio : BitField(3)
+  id   : BitField(1)
+  vlan : BitField(12)
+  type : BitField(16)
+*/
+header dot1q_h {
+    bit<3> prio;
+    bit<1> is_drop;
     vlan_id_t vlan_id;
-    ether_type_t ether_type;
+    ether_type_t proto_id;
 }
 
 header efcp_h {
@@ -170,8 +178,8 @@ header gre_h {
 
 struct header_t {
     ethernet_h  ethernet;
+    dot1q_h     dot1q;
     efcp_h      efcp;
-    vlan_tag_h  vlan;
     ipv4_h      ipv4;
 }
 

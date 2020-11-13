@@ -136,15 +136,15 @@ parser SwitchIngressParser(
         packet.extract(hdr.ethernet);
         transition select (hdr.ethernet.ether_type) {
             ETHERTYPE_EFCP: parse_efcp;
-            ETHERTYPE_VLAN: parse_vlan;
-            ETHERTYPE_IPV4 : parse_ipv4;
+            ETHERTYPE_DOT1Q: parse_dot1q;
+            ETHERTYPE_IPV4: parse_ipv4;
             default : reject;
         }
     }
 
-    state parse_vlan {
-        packet.extract(hdr.vlan);
-        transition select(hdr.vlan.ether_type) {
+    state parse_dot1q {
+        packet.extract(hdr.dot1q);
+        transition select(hdr.dot1q.proto_id) {
             ETHERTYPE_EFCP: parse_efcp;
             default: accept;
         }
@@ -154,7 +154,7 @@ parser SwitchIngressParser(
         packet.extract(hdr.efcp);
         efcp_checksum.add(hdr.efcp);
         ig_md.checksum_err_efcp_igprs = efcp_checksum.verify();
-	transition accept;
+        transition accept;
     }
 
     state parse_ipv4 {
@@ -194,12 +194,12 @@ control SwitchIngress(
      * EFCP forwarding action
      */
     action efcp_forward(bit<12> vlan_id, mac_addr_t dst_mac, egress_spec dst_port) {
-        hdr.vlan.vlan_id = vlan_id;
+        hdr.dot1q.vlan_id = vlan_id;
         ig_intr_tm_md.ucast_egress_port = dst_port;
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
         hdr.ethernet.dst_addr = dst_mac;
-	ig_intr_dprsr_md.drop_ctl = 0x0;
-	efcp_counter.count(dst_port);
+        ig_intr_dprsr_md.drop_ctl = 0x0;
+        efcp_counter.count(dst_port);
     }
 
     /*
@@ -210,7 +210,7 @@ control SwitchIngress(
         hdr.ethernet.dst_addr = dst_mac;
         hdr.ethernet.src_addr = src_mac;
         ig_intr_dprsr_md.drop_ctl = 0x0;
-    	ipv4_counter.count(dst_port);
+        ipv4_counter.count(dst_port);
     }
 
     /*
@@ -222,7 +222,7 @@ control SwitchIngress(
         }
         actions = {
             efcp_forward;
-	    miss;
+            miss;
             NoAction;
         }
         size = 1024;
@@ -270,11 +270,10 @@ control SwitchIngressDeparser(
         in ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
 
     apply {
-        packet.emit(hdr);
-	//packet.emit(hdr.ethernet);
-        //packet.emit(hdr.efcp);
-        //packet.emit(hdr.ipv4);
-        //packet.emit(hdr.vlan);
+        packet.emit(hdr.ethernet);
+        packet.emit(hdr.dot1q);
+        packet.emit(hdr.efcp);
+        packet.emit(hdr.ipv4);
     }
 }
 
@@ -288,9 +287,6 @@ parser SwitchEgressParser(
         out egress_metadata_t eg_md,
         out egress_intrinsic_metadata_t eg_intr_md) {
        
-    // Checksum() efcp_checksum;
-    // Checksum() ipv4_checksum;
-
     TofinoEgressParser() tofino_parser;
 
     state start {
@@ -300,19 +296,19 @@ parser SwitchEgressParser(
         transition parse_ethernet;
      }
 
-     state parse_ethernet {
-         packet.extract(hdr.ethernet);
-         transition select (hdr.ethernet.ether_type) {
-             ETHERTYPE_EFCP: parse_efcp;
-             ETHERTYPE_VLAN: parse_vlan;
-             ETHERTYPE_IPV4 : parse_ipv4;
-             default : reject;
-         }
+    state parse_ethernet {
+        packet.extract(hdr.ethernet);
+        transition select (hdr.ethernet.ether_type) {
+            ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_DOT1Q: parse_dot1q;
+            ETHERTYPE_IPV4: parse_ipv4;
+            default : reject;
+        }
     }
 
-    state parse_vlan {
-        packet.extract(hdr.vlan);
-        transition select(hdr.vlan.ether_type) {
+    state parse_dot1q {
+        packet.extract(hdr.dot1q);
+        transition select(hdr.dot1q.proto_id) {
             ETHERTYPE_EFCP: parse_efcp;
             default: accept;
         }
@@ -352,15 +348,14 @@ control SwitchEgress(
     }
 
     apply {
-       /* if (eg_md.enq_qdepth >= ECN_THRESHOLD) {
+        if (eg_md.enq_qdepth >= ECN_THRESHOLD) {
             mark_ecn();
         }
 
-        if (hdr.vlan.vlan_id == 0) {
-            hdr.vlan.setInvalid();
-        }*/
+        if (hdr.dot1q.vlan_id == 0) {
+            hdr.dot1q.setInvalid();
+        }
     }
-
 }
 
 
@@ -380,8 +375,8 @@ control SwitchEgressDeparser(
     apply {
         // Updating and checking of the checksum is done in the deparser.
         // Checksumming units are only available in the parser sections of
-        // the program.
-	 if (eg_md.checksum_pdu_efcp) {
+        // the program. 
+        if (eg_md.checksum_pdu_efcp) {
             hdr.efcp.hdr_checksum = efcp_checksum.update({
                 hdr.efcp.ver,
                 hdr.efcp.dst_addr,
@@ -410,11 +405,10 @@ control SwitchEgressDeparser(
                  hdr.ipv4.dst_addr
             });
         }
-	packet.emit(hdr);
-	//packet.emit(hdr.ethernet);
-        //packet.emit(hdr.efcp);
-        //packet.emit(hdr.ipv4);
-        //packet.emit(hdr.vlan);
+        packet.emit(hdr.ethernet);
+        packet.emit(hdr.dot1q);
+        packet.emit(hdr.efcp);
+        packet.emit(hdr.ipv4);
     }
 }
 
