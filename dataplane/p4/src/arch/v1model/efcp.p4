@@ -183,7 +183,7 @@ the packet buffer, nor sent to egress processing.
  * EFCP forwarding action
  */
     action efcp_forward(bit<12> vlan_id, mac_addr_t dst_addr, egress_spec port) {
-        hdr.dot1q.vlan_id = dot1q_id;
+        hdr.dot1q.vlan_id = vlan_id;
         standard_metadata.egress_spec = port;
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
         hdr.ethernet.dst_addr = dst_addr;
