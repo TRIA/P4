@@ -63,6 +63,7 @@ job_efcp_tna_build:
       sudo -H -i -u ubuntu sh -e -x <<EOS
       cd ${PWD}/dataplane/p4
       make efcp-tna-build
+      rm -rf pcap_output
       EOS
   stage: build
   tags: [p4_tna]
