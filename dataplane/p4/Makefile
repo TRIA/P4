@@ -131,13 +131,13 @@ edf-dp-test-stratum: efcp-v1model-build
 
 edf-dp-test-stratum-send-pdu:
 	@touch ${PWD}/test/stratum_bmv2_test_${src_host}.log
-	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp"
-	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4"
+	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp" count="2"
+	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4" count="1"
 	@test -s ${PWD}/test/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
 		echo "Test for host ${src_host} did not pass"
 
 edf-dp-test-stratum-send-pdu-type:
-	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c 1 -w output_${iface}
+	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c ${count} -w output_${iface}
 	@docker exec ${MN_STR_NAME} m ${src_host} python scripts/${src_host}_send_${pdu}_${dst_host}.py
 	@sleep 1
 	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log

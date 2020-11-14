@@ -10,15 +10,16 @@ import readline
 import socket
 import sys
 from class_base import EFCP
-from scapy.all import Packet, XByteField, ShortField, XShortField, IntField,\
-        bind_layers, Ether, get_if_hwaddr, get_if_list, sendp, checksum, \
-        hexdump
+from scapy.all import Packet, Dot1Q, Ether
+from scapy.all import XByteField, ShortField, XShortField, IntField
+from scapy.all import bind_layers, get_if_hwaddr, get_if_list, sendp, checksum, hexdump
 from time import sleep
 
 # ScaPy initialisation
 bind_layers(Ether, EFCP, type=0xD1F)
 bind_layers(Ether, Dot1Q, type=0x8100)
 bind_layers(Dot1Q, EFCP, type=0xD1F)
+
 
 def get_if(if_name = "eth0"):
     ifs = get_if_list()
@@ -32,25 +33,25 @@ def get_if(if_name = "eth0"):
         exit(1)
     return iface
 
-def get_packet_ether(type_content):
+def get_packet_ether(iface, type_content):
     return Ether(src=get_if_hwaddr(iface), dst="00:00:00:00:00:02", type=type_content)
 
 def get_packet_efcp():
-    efcp_pkt = EFCP(dst_addr=2, pdu_type=pdu_types.DATA_TRANSFER)
-    efcp_payload = "EFCP packet #{} sent from CLI to BM :)".format(test_num)
+    efcp_pkt = EFCP(ipc_dst_addr=2, pdu_type=pdu_types.DATA_TRANSFER)
+    efcp_payload = "EFCP packet sent from CLI to BM :)"
     return efcp_pkt / efcp_payload
 
-def get_packet_dot1q():
-    return Dot1Q(prio=0, id=0, vlan=random(0, 4095), type=0xD1F)
+def get_packet_dot1q(type_content):
+    return Dot1Q(prio=0, id=0, vlan=random.randint(0, 4095), type=type_content)
 
 def main():
     iface = get_if()
     try:
         efcp_pkt = get_packet_efcp()
-        dot1q_pkt = get_packet_dot1q()
+        dot1q_pkt = get_packet_dot1q(0xD1F)
 
         # First packet: Ether / EFCP
-        eth_pkt = get_packet_ether("0xD1F")
+        eth_pkt = get_packet_ether(iface, 0xD1F)
         pkt = eth_pkt / efcp_pkt
         #srp1(pkt, iface=iface, timeout=1, verbose=True)
         sendp(pkt, iface=iface, verbose=False)
@@ -61,7 +62,7 @@ def main():
         hexdump(pkt["EFCP"])
         
         # Second packet: Ether / Dot1Q / EFCP
-        eth_pkt = get_packet_ether("0x8100")
+        eth_pkt = get_packet_ether(iface, 0x8100)
         pkt = eth_pkt / dot1q_pkt / efcp_pkt
         #srp1(pkt, iface=iface, timeout=1, verbose=True)
         sendp(pkt, iface=iface, verbose=False)
