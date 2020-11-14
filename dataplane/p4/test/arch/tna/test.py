@@ -30,7 +30,7 @@ import grpc
 
 import unittest
 from scapy.all import bind_layers, Dot1Q, Ether, hexdump, IP
-from edf_scapy_models import EFCP, VLAN
+from edf_scapy_models import EFCP
 import codecs
 from edf_pdu_types import EFCP_TYPES
 

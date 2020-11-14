@@ -2,7 +2,6 @@
 sim test script
 """
 
-from class_base import VLAN
 # Packet configuration for tests
 from config_base import *
 from test_base import BaseTest
@@ -11,7 +10,9 @@ from scapy.all import *
 
 
 # ScaPy initialisation
-bind_layers(Ether, VLAN)
+bind_layers(Ether, EFCP, type=0xD1F)
+bind_layers(Ether, Dot1Q, type=0x8100)
+bind_layers(Dot1Q, EFCP, type=0xD1F)
 
 class Test(BaseTest):
     """
@@ -20,13 +21,20 @@ class Test(BaseTest):
     """
     
     def __get_tx_packet(self, test_num, mac_src_addr, mac_dst_addr, ip_src_addr, ip_dst_addr):
-        pkt = Ether(type=0x8100)/VLAN(ethertype=0x0800)/IP()/Raw()
-        pkt[Ether].dst = mac_dst_addr
-        pkt[Ether].src = mac_src_addr
-        pkt[IP].dst = ip_dst_addr
-        pkt[IP].src = ip_src_addr
+        eth_pkt = Ether(dst=mac_dst_addr, src=mac_src_addr, type=0x8100)
+        pkt = eth_pkt
+
+        # Note Dot1Q.id is really DEI (aka CFI)
+        dot1q_pkt = Dot1Q(prio=0, id=0, vlan=random(0, 4095))
+        pkt = pkt / dot1q_pkt
+        pkt[Dot1Q:i].type = 0x8100
+        pkt.type = 0x8100
+
+        ip_pkt = IP(dst=ip_dst_addr, src=ip_src_addr)
+        pkt = pkt / ip_pkt
         pkt[IP].chksum = 0x0000
-        pkt[Raw].load = "IP + VLAN packet #{} sent from CLI to BM :)".format(test_num)
+
+        pkt[Raw].load = "IP + Dot1Q packet #{} sent from CLI to BM :)".format(test_num)
         return pkt
 
     # IMPORTANT: all tests must follow the pattern "test_*" in their names

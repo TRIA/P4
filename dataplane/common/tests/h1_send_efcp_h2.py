@@ -9,60 +9,16 @@ import re
 import readline
 import socket
 import sys
+from class_base import EFCP
 from scapy.all import Packet, XByteField, ShortField, XShortField, IntField,\
         bind_layers, Ether, get_if_hwaddr, get_if_list, sendp, checksum, \
         hexdump
 from time import sleep
 
-class EFCP(Packet):
-    name = "EFCP"
-
-    # XByteField --> 1 Byte-integer (X bc the representation of the fields
-    #                               value is in hexadecimal)
-    # ShortField --> 2 Byte-integer
-    # IntEnumField --> 4 Byte-integer
-
-    # EFCP PDU
-    #   bytes 1-1 [0:0] = version
-    #   bytes 2-3 [1:2] = dst_addr
-    #   bytes 4-5 [3:4] = src_addr
-    #   bytes 6-6 [5:5] = qos_id
-    #   bytes 7-8 [6:7] = dst_cepid
-    #   bytes 9-10 [8:9] = src_cepid
-    #   bytes 11-11 [10:10] = pdu_type
-    #   bytes 12-12 [11:11] = flags
-    #   bytes 13-14 [12:13] = length
-    #   bytes 15-18 [14:17] = seqnum
-    #   bytes 19-20 [18:19] = chksum
-    fields_desc = [ XByteField("version", 0x01),
-                    ShortField("dst_addr", 0x00),
-                    ShortField("src_addr", 1),
-                    XByteField("qos_id", 0x00),
-                    ShortField("dst_cepid", 0),
-                    ShortField("src_cepid", 0),
-                    XByteField("pdu_type", 0x00),
-                    XByteField("flags", 0x00),
-                    ShortField("length", 1),
-                    IntField("seqnum", 0),
-                    XShortField("chksum", 0x00)]
-
-    def post_build(self, p, pay):
-        # Re-compute checksum every time
-        ck = checksum(p)
-        p = p[:18] + chr(ck>>8) + chr(ck&0xff) + p[20:]
-        return p + pay
-
-#    def pre_dissect(self, s):
-#        length = s[12:14]
-#        if length != b"\x00\x01":
-#            self.length = int.from_bytes(length, "big")
-#        return s
-
-    def mysummary(self):
-        s = self.sprintf("%EFCP.src_addr% > %EFCP.dst_addr% %EFCP.pdu_type%")
-        return s
-
+# ScaPy initialisation
 bind_layers(Ether, EFCP, type=0xD1F)
+bind_layers(Ether, Dot1Q, type=0x8100)
+bind_layers(Dot1Q, EFCP, type=0xD1F)
 
 def get_if(if_name = "eth0"):
     ifs = get_if_list()
@@ -76,17 +32,45 @@ def get_if(if_name = "eth0"):
         exit(1)
     return iface
 
+def get_packet_ether(type_content):
+    return Ether(src=get_if_hwaddr(iface), dst="00:00:00:00:00:02", type=type_content)
+
+def get_packet_efcp():
+    efcp_pkt = EFCP(dst_addr=2, pdu_type=pdu_types.DATA_TRANSFER)
+    efcp_payload = "EFCP packet #{} sent from CLI to BM :)".format(test_num)
+    return efcp_pkt / efcp_payload
+
+def get_packet_dot1q():
+    return Dot1Q(prio=0, id=0, vlan=random(0, 4095), type=0xD1F)
+
 def main():
     iface = get_if()
     try:
-        pkt = Ether(src=get_if_hwaddr(iface), dst="00:00:00:00:00:02", type=0xD1F) / EFCP(dst_addr=2, pdu_type=pdu_types.DATA_TRANSFER)
-        pkt = pkt / "Hello World!"
+        efcp_pkt = get_packet_efcp()
+        dot1q_pkt = get_packet_dot1q()
+
+        # First packet: Ether / EFCP
+        eth_pkt = get_packet_ether("0xD1F")
+        pkt = eth_pkt / efcp_pkt
         #srp1(pkt, iface=iface, timeout=1, verbose=True)
         sendp(pkt, iface=iface, verbose=False)
         pkt.show()
         print("Hex dump for whole packet:")
         hexdump(pkt)
-        print("Hex dump for EFCP:")
+        print("- Hex dump for EFCP:")
+        hexdump(pkt["EFCP"])
+        
+        # Second packet: Ether / Dot1Q / EFCP
+        eth_pkt = get_packet_ether("0x8100")
+        pkt = eth_pkt / dot1q_pkt / efcp_pkt
+        #srp1(pkt, iface=iface, timeout=1, verbose=True)
+        sendp(pkt, iface=iface, verbose=False)
+        pkt.show()
+        print("Hex dump for whole packet:")
+        hexdump(pkt)
+        print("- Hex dump for Dot1Q:")
+        hexdump(pkt["Dot1Q"])
+        print("- Hex dump for EFCP:")
         hexdump(pkt["EFCP"])
     except Exception as error:
         print(error)
