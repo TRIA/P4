@@ -65,6 +65,7 @@ job_efcp_tna_build:
       make efcp-tna-build
       rm -rf pcap_output
       EOS
+    - sudo rm -rf dataplane/p4/pcap_output
   stage: build
   tags: [p4_tna]
 
