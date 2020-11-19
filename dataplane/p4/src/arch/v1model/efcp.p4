@@ -42,7 +42,7 @@ struct metadata {
 
 // Declare user-defined errors that may be signaled during parsing
 error {
-    WrongPDUtype
+    wrong_pdu_type
 }
 
 /*************************************************************************
@@ -71,6 +71,7 @@ parser SwitchIngressParser(packet_in packet,
         packet.extract(hdr.dot1q);
         transition select(hdr.dot1q.proto_id) {
             ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_IPV4: parse_ipv4;
             default: accept;
         }
     }
@@ -90,7 +91,7 @@ parser SwitchIngressParser(packet_in packet,
                 hdr.efcp.pdu_type == SELECTIVE_NACK_AND_FLOW_CONTROL ||
                 hdr.efcp.pdu_type == CONTROL_ACK ||
                 hdr.efcp.pdu_type == RENDEVOUS)
-            , error.WrongPDUtype);
+            , error.wrong_pdu_type);
         transition accept;
     }
 
@@ -162,8 +163,8 @@ control SwitchIngress(inout header_t hdr,
 /* 
  * Counters
  */
-    counter(64, CounterType.packets) count_efcp;
-    counter(64, CounterType.packets) count_ipv4;
+    counter(64, CounterType.packets) ipv4_counter;
+    counter(64, CounterType.packets) efcp_counter;
 
 /*
  *
@@ -182,23 +183,26 @@ the packet buffer, nor sent to egress processing.
 /*
  * EFCP forwarding action
  */
-    action efcp_forward(bit<12> vlan_id, mac_addr_t dst_addr, egress_spec port) {
+    action efcp_forward(bit<12> vlan_id, mac_addr_t dst_mac, egress_spec dst_port) {
         hdr.dot1q.vlan_id = vlan_id;
-        standard_metadata.egress_spec = port;
+        standard_metadata.egress_spec = dst_port;
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
-        hdr.ethernet.dst_addr = dst_addr;
-        count_efcp.count((bit<32>) standard_metadata.ingress_port);
+        hdr.ethernet.dst_addr = dst_mac;
+        //efcp_counter.count((bit<32>) standard_metadata.ingress_port);
+        efcp_counter.count(dst_port);
     }
 
 /*
  * IPv4 forwarding action
  */
-    action ipv4_forward(mac_addr_t dst_addr, egress_spec port) {
-        standard_metadata.egress_spec = port;
+    action ipv4_forward(bit<12> vlan_id, mac_addr_t dst_mac, egress_spec dst_port) {
+        hdr.dot1q.vlan_id = vlan_id;
+        standard_metadata.egress_spec = dst_port;
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
-        hdr.ethernet.dst_addr = dst_addr;
+        hdr.ethernet.dst_addr = dst_mac;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-        count_ipv4.count((bit<32>) standard_metadata.ingress_port);
+        //ipv4_counter.count((bit<32>) standard_metadata.ingress_port);
+        ipv4_counter.count(dst_port);
     }
 
 /*

@@ -29,7 +29,7 @@ import bfrt_grpc.client as gc
 import grpc
 
 import unittest
-from scapy.all import bind_layers, Dot1Q, Ether, hexdump, IP
+from scapy.all import bind_layers, Dot1Q, Ether, hexdump, IP, TCP, Raw
 from edf_scapy_models import EFCP
 import codecs
 from edf_pdu_types import EFCP_TYPES
@@ -53,36 +53,126 @@ for device, port, ifname in config["interfaces"]:
 if swports == []:
     swports = list(range(9))
 
+class BaseEDFTest(BfRuntimeTest):
 
-# TODO: review similarities between IPV4-related test classes
-# and do a base class, same as with EFCPTest
-#@unittest.skip("Filtering")
-class IPV4LpmMatchTest(BfRuntimeTest):
-    """
-    @brief Basic test for algorithmic-lpm-based lpm matches.
-    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.MINSIZE = 0
+        self.counter_test = False
+        self.counter_table = None
 
     def setUp(self):
         client_id = 0
         p4_name = "tna_efcp"
         BfRuntimeTest.setUp(self, client_id, p4_name)
 
-    def runTest(self):
+    def add_dot1q_header(self, pkt, dl_vlanid_list, dl_vlan_pcp_list, dl_vlan_cfi_list, dl_tpid_list):
+        # Note Dot1Q.id is really DEI (aka CFI)
+        for i in range(0, len(dl_vlanid_list)):
+            dot1q_pkt = Dot1Q(prio=dl_vlan_pcp_list[i], id=dl_vlan_cfi_list[i], vlan=dl_vlanid_list[i])
+            pkt = pkt / dot1q_pkt
+        for i in range(1, len(dl_tpid_list)):
+            pkt[Dot1Q:i].type=dl_tpid_list[i]
+        pkt.type=dl_tpid_list[0]
+        return pkt
+
+    def delete_rules(self, target, id_list, table, key_lambda):
+        # Delete table entries
+        for i in range(0, len(id_list)):
+            table.entry_del(
+                target,
+                [table.make_key(key_lambda(i))])
+
+
+class IPV4Test(BaseEDFTest):
+
+    # EFCP packet submission adapted from the method with a similar name (for TCP)
+    # under $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
+    def simple_tcp_packet_ext_taglist(self,
+                                  pkt=None,
+                                  pktlen=100,
+                                  ip_dst="10.10.10.10",
+                                  dl_taglist_enable=False,
+                                  dl_vlan_pcp_list=[0],
+                                  dl_vlan_cfi_list=[0],
+                                  dl_tpid_list=[0x8100],
+                                  dl_vlanid_list=[1]
+                                  ):
+
+        if self.MINSIZE > pktlen:
+            pktlen = self.MINSIZE
+        if not pkt:
+            pkt = testutils.simple_tcp_packet(ip_dst=ip_dst)
+        #exp_pkt.show()
+        eth_pkt = pkt[Ether]
+        #print(dir(eth_pkt))
+        #pkt.show()
+        #print("....")
+        ip_pkt = pkt[IP]
+        #tcp_pkt = pkt[TCP]
+        #raw_pkt = pkt[Raw]
+
+        pkt = Ether(dst = eth_pkt.dst, src = eth_pkt.src, type = eth_pkt.type)
+
+        dl_taglist_enable = True
+        if dl_taglist_enable:
+            pkt = self.add_dot1q_header(pkt, dl_vlanid_list, dl_vlan_pcp_list, dl_vlan_cfi_list, dl_tpid_list)
+
+        pkt = pkt / ip_pkt# / tcp_pkt
+        return pkt
+    
+    def simple_tcp_packet(self,
+                      pkt=None,
+                      pktlen=100,
+                      ip_dst="10.10.10.10",
+                      dl_vlan_enable=False,
+                      vlan_vid=0,
+                      vlan_pcp=0,
+                      dl_vlan_cfi=0
+                      ):
+        pcp_list = []
+        cfi_list = []
+        tpid_list = []
+        vlan_list = []
+
+        if (dl_vlan_enable):
+            pcp_list.append(vlan_pcp)
+            cfi_list.append(dl_vlan_cfi)
+            tpid_list.append(0x8100)
+            vlan_list.append(vlan_vid)
+        pkt = self.simple_tcp_packet_ext_taglist(pktlen=pktlen,
+                                        ip_dst=ip_dst,
+                                        dl_taglist_enable=dl_vlan_enable,
+                                        dl_vlan_pcp_list=pcp_list,
+                                        dl_vlan_cfi_list=cfi_list,
+                                        dl_tpid_list=tpid_list,
+                                        dl_vlanid_list=vlan_list)
+        return pkt
+
+    def _run_test(self, *args, **kwargs):
+        try:
+            self.counter_test = kwargs["counter_test"]
+        except Exception as e:
+            logger.error("Could not load \"counter_test\" flag - defaults to False. Details: {0}".format(e))
         ig_port = swports[1]
         seed = random.randint(1, 65535)
         logger.info("Seed used %d", seed)
         random.seed(seed)
         num_entries = random.randint(1, MAX_PKTS_SENT)
+        num_entries = 1
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
+        if self.counter_test:
+            self.counter_table = bfrt_info.table_get("SwitchIngress.ipv4_counter")        
         ipv4_lpm_table = bfrt_info.table_get("SwitchIngress.ipv4_lpm")
         ipv4_lpm_table.info.key_field_annotation_add("hdr.ipv4.dst_addr", "ipv4")
+        ipv4_lpm_table.info.data_field_annotation_add("vlan_id", "SwitchIngress.ipv4_forward", "bit")
         ipv4_lpm_table.info.data_field_annotation_add("src_mac", "SwitchIngress.ipv4_forward", "mac")
         ipv4_lpm_table.info.data_field_annotation_add("dst_mac", "SwitchIngress.ipv4_forward", "mac")
 
         key_random_tuple = namedtuple("key_random", "vrf dst_ip prefix_len")
-        data_random_tuple = namedtuple("data_random", "smac dmac eg_port")
+        data_random_tuple = namedtuple("data_random", "vlan_id smac dmac eg_port")
         key_tuple_list = []
         data_tuple_list = []
         unique_keys = {}
@@ -90,7 +180,9 @@ class IPV4LpmMatchTest(BfRuntimeTest):
 
         logger.info("Installing %d ALPM entries" % (num_entries))
         ip_list = self.generate_random_ip_list(num_entries, seed)
-        for i in range(0, num_entries):
+        vlan_id_list = [random.randint(0, 4095) for x in range(len(ip_list))]
+
+        for i in range(0, len(ip_list)):
             vrf = 0
             dst_ip = getattr(ip_list[i], "ip")
             p_len = getattr(ip_list[i], "prefix_len")
@@ -98,21 +190,38 @@ class IPV4LpmMatchTest(BfRuntimeTest):
             src_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
             dst_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
             eg_port = swports[random.randint(1, 4)]
+            vlan_id = vlan_id_list[i]
 
             key_tuple_list.append(key_random_tuple(vrf, dst_ip, p_len))
-            data_tuple_list.append(data_random_tuple(src_mac, dst_mac, eg_port))
+            data_tuple_list.append(data_random_tuple(vlan_id, src_mac, dst_mac, eg_port))
 
             target = gc.Target(device_id=0, pipe_id=0xffff)
             logger.info("Inserting table entry with IP address %s, prefix length %d" % (dst_ip, p_len))
             logger.info("With expected dst_mac %s, src_mac %s on port %d" % (src_mac, dst_mac, eg_port))
             key = ipv4_lpm_table.make_key([gc.KeyTuple("hdr.ipv4.dst_addr", dst_ip, prefix_len=p_len)])
-            data = ipv4_lpm_table.make_data([gc.DataTuple("dst_port", eg_port),
+            data = ipv4_lpm_table.make_data([gc.DataTuple("vlan_id", vlan_id),
                                                gc.DataTuple("src_mac", src_mac),
+                                               gc.DataTuple("dst_port", eg_port),
                                                gc.DataTuple("dst_mac", dst_mac)],
                                               "SwitchIngress.ipv4_forward")
             ipv4_lpm_table.entry_add(target, [key], [data])
             key.apply_mask()
             lpm_dict[key] = data
+            if self.counter_test:
+                # add new counter
+                self.counter_table.entry_add(target,
+                        [self.counter_table.make_key(
+                            [gc.KeyTuple("$COUNTER_INDEX", eg_port)])
+                        ],
+                        [self.counter_table.make_data(
+                            [gc.DataTuple("$COUNTER_SPEC_BYTES", 0),
+                            gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])
+                        ])
+                # default packet size is 100 bytes and model adds 4 bytes of CRC
+                pkt_size = 100 + 4
+                num_pkts = num_entries
+                num_bytes = num_pkts * pkt_size
+
 
         # check get
         resp  = ipv4_lpm_table.entry_get(target)
@@ -127,147 +236,76 @@ class IPV4LpmMatchTest(BfRuntimeTest):
         logger.info("Sending packets for the installed entries to verify")
         # send pkt and verify sent
         for key_item, data_item in test_tuple_list:
-            pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip)
-            exp_pkt = testutils.simple_tcp_packet(eth_dst=data_item.dmac,
-                                                  eth_src=data_item.smac,
-                                                  ip_dst=key_item.dst_ip)
+            vlan_enable = i % 2 == 0
+
+            tcp_pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip)
+
+            logger.info("ScaPy emitted packet")
+            pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
+                dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
+            )
+            pkt.show()
+
+            logger.info("ScaPy expected packet")
+            exp_pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
+                dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
+            )
+            exp_pkt.show()
+
             logger.info("Sending packet on port %d", ig_port)
             testutils.send_packet(self, ig_port, pkt)
 
             logger.info("Verifying entry for IP address %s, prefix_length %d" % (key_item.dst_ip, key_item.prefix_len))
             logger.info("Expecting packet on port %d", data_item.eg_port)
             testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
+            if self.counter_test:
+                resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])],{"from_hw": True},None)
+
+                # parse resp to get the counter
+                data_dict = next(resp)[0].to_dict()
+                recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
+                recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
+
+                logger.info("The counter value for port %s is %s", data_item.eg_port,str(recv_pkts))
+
 
         logger.info("All expected packets received")
         logger.info("Deleting %d ALPM entries" % (num_entries))
-
         # Delete table entries
-        for item in key_tuple_list:
-            ipv4_lpm_table.entry_del(
-                target,
-                [ipv4_lpm_table.make_key([gc.KeyTuple("hdr.ipv4.dst_addr", item.dst_ip,
-                                                          prefix_len=item.prefix_len)])])
+        key_object = [gc.KeyTuple("hdr.ipv4.dst_addr", key_item.dst_ip, prefix_len=key_item.prefix_len)]
+        self.delete_rules(target, ip_list, ipv4_lpm_table, key_object)
 
 
 #@unittest.skip("Filtering")
-class IPv4IndirectCounterTest(BfRuntimeTest):
+class IPV4LpmMatchTest(IPV4Test):
     """
-    @brief Basic test for counting IPv4 packets.
+    @brief Basic test for IPV4 lpm match.
     """
-
-    def setUp(self):
-        client_id = 0
-        p4_name = "tna_efcp"
-        BfRuntimeTest.setUp(self, client_id, p4_name)
 
     def runTest(self):
-        ig_port = swports[1]
-        seed = random.randint(1, 65535)
-        logger.info("Seed used %d", seed)
-        random.seed(seed)
-        num_entries = random.randint(1, MAX_PKTS_SENT)
-
-        # Get bfrt_info and set it as part of the test
-        bfrt_info = self.interface.bfrt_info_get("tna_efcp")
-        ipv4_lpm_table = bfrt_info.table_get("SwitchIngress.ipv4_lpm")
-        counter_table = bfrt_info.table_get("SwitchIngress.ipv4_counter")
-        ipv4_lpm_table.info.key_field_annotation_add("hdr.ipv4.dst_addr", "ipv4")
-        ipv4_lpm_table.info.data_field_annotation_add("src_mac", "SwitchIngress.ipv4_forward", "mac")
-        ipv4_lpm_table.info.data_field_annotation_add("dst_mac", "SwitchIngress.ipv4_forward", "mac")
-
-        key_random_tuple = namedtuple("key_random", "vrf dst_ip prefix_len")
-        data_random_tuple = namedtuple("data_random", "smac dmac eg_port")
-        key_tuple_list = []
-        data_tuple_list = []
-        unique_keys = {}
-        lpm_dict= {}
-
-        logger.info("Installing %d ALPM entries" % (num_entries))
-        ip_list = self.generate_random_ip_list(num_entries, seed)
-        for i in range(0, num_entries):
-            vrf = 0
-            dst_ip = getattr(ip_list[i], "ip")
-            p_len = getattr(ip_list[i], "prefix_len")
-
-            src_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
-            dst_mac = "%02x:%02x:%02x:%02x:%02x:%02x" % tuple([random.randint(0, 255) for x in range(6)])
-            eg_port = swports[random.randint(1, 4)]
-
-            key_tuple_list.append(key_random_tuple(vrf, dst_ip, p_len))
-            data_tuple_list.append(data_random_tuple(src_mac, dst_mac, eg_port))
-
-            target = gc.Target(device_id=0, pipe_id=0xffff)
-            logger.info("Inserting table entry with IP address %s, prefix length %d" % (dst_ip, p_len))
-            logger.info("With expected dst_mac %s, src_mac %s on port %d" % (src_mac, dst_mac, eg_port))
-            key = ipv4_lpm_table.make_key([gc.KeyTuple("hdr.ipv4.dst_addr", dst_ip, prefix_len=p_len)])
-            data = ipv4_lpm_table.make_data([gc.DataTuple("dst_port", eg_port),
-                                               gc.DataTuple("src_mac", src_mac),
-                                               gc.DataTuple("dst_mac", dst_mac)],
-                                              "SwitchIngress.ipv4_forward")
-            ipv4_lpm_table.entry_add(target, [key], [data])
-            key.apply_mask()
-            lpm_dict[key] = data
-
-            # add new counter
-            counter_table.entry_add(target,[counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", eg_port)])],[counter_table.make_data([gc.DataTuple("$COUNTER_SPEC_BYTES", 0),gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])])
-            # default packet size is 100 bytes and model adds 4 bytes of CRC
-            pkt_size = 100 + 4
-            num_pkts = num_entries
-            num_bytes = num_pkts * pkt_size
-
-        # check get
-        resp  = ipv4_lpm_table.entry_get(target)
-        for data, key in resp:
-            assert lpm_dict[key] == data
-            lpm_dict.pop(key)
-        assert len(lpm_dict) == 0
-
-        test_tuple_list = list(zip(key_tuple_list, data_tuple_list))
-
-        logger.info("Sending packets for the installed entries to verify")
-        # send pkt and verify sent
-        for key_item, data_item in test_tuple_list:
-            pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip)
-            exp_pkt = testutils.simple_tcp_packet(eth_dst=data_item.dmac,
-                                                  eth_src=data_item.smac,
-                                                  ip_dst=key_item.dst_ip)
-            logger.info("Sending packet on port %d", ig_port)
-            testutils.send_packet(self, ig_port, pkt)
-
-            logger.info("Verifying entry for IP address %s, prefix_length %d" % (key_item.dst_ip, key_item.prefix_len))
-            logger.info("Expecting packet on port %d", data_item.eg_port)
-            testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
-
-            resp = counter_table.entry_get(target,[counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])],{"from_hw": True},None)
-
-            # parse resp to get the counter
-            data_dict = next(resp)[0].to_dict()
-            recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
-            recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
-
-            logger.info("The counter value for port %s is %s",data_item.eg_port,str(recv_pkts))
-
-        logger.info("All expected packets received")
-        logger.info("Deleting %d ALPM entries" % (num_entries))
-
-        # Delete table entries
-        for item in key_tuple_list:
-            ipv4_lpm_table.entry_del(
-                target,
-                [ipv4_lpm_table.make_key([gc.KeyTuple("hdr.ipv4.dst_addr", item.dst_ip,
-                prefix_len=item.prefix_len)])])
+        test_options = {
+            "counter_test": False
+        }
+        self._run_test(**test_options)
 
 
-class EFCPTest(BfRuntimeTest):
+@unittest.skip("Filtering")
+class IPv4IndirectCounterTest(IPV4Test):
+    """
+    @brief Basic test for IPV4 counter test.
+    """
+
+    def runTest(self):
+        test_options = {
+            "counter_test": True
+        }
+        self._run_test(**test_options)
+
+
+class EFCPTest(BaseEDFTest):
     """
     @brief Base EFCP test.
     """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.MINSIZE = 0
-        self.counter_test = False
-        self.counter_table = None
 
     # EFCP packet submission adapted from the method with a similar name (for TCP)
     # under $SDE_INSTALL/lib/python3.6/site-packages/ptf/testutils.py
@@ -295,14 +333,8 @@ class EFCPTest(BfRuntimeTest):
         eth_pkt = Ether(dst=eth_dst, src=eth_src, type=0xD1F)
         pkt = eth_pkt
 
-        # Note Dot1Q.id is really DEI (aka CFI)
-        if (dl_taglist_enable):
-            for i in range(0, len(dl_vlanid_list)):
-                dot1q_pkt = Dot1Q(prio=dl_vlan_pcp_list[i], id=dl_vlan_cfi_list[i], vlan=dl_vlanid_list[i])
-                pkt = pkt / dot1q_pkt
-            for i in range(1, len(dl_tpid_list)):
-                pkt[Dot1Q:i].type=dl_tpid_list[i]
-            pkt.type=dl_tpid_list[0]
+        if dl_taglist_enable:
+            pkt = self.add_dot1q_header(pkt, dl_vlanid_list, dl_vlan_pcp_list, dl_vlan_cfi_list, dl_tpid_list)
         pkt = pkt / efcp_pkt
 
         codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
@@ -343,18 +375,6 @@ class EFCPTest(BfRuntimeTest):
                                         ipc_src_addr=ipc_src_addr,
                                         ipc_dst_addr=ipc_dst_addr)
         return pkt
-
-    def setUp(self):
-        client_id = 0
-        p4_name = "tna_efcp"
-        BfRuntimeTest.setUp(self, client_id, p4_name)
-
-    def delete_rules(self, key_tuple_list, efcp_exact_table, target, gc, efcp_id_list):
-        # Delete table entries
-        for i in range(0, len(efcp_id_list)):
-            efcp_exact_table.entry_del(
-                target,
-                [efcp_exact_table.make_key([gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[i])])])
 
     def _run_test(self, *args, **kwargs):
         try:
@@ -482,11 +502,11 @@ class EFCPTest(BfRuntimeTest):
         
         logger.info("All expected packets received")
         logger.info("Deleting %d Exact entries" % (len(efcp_id_list)))
-        # Delete table entries
-        self.delete_rules(key_tuple_list, efcp_exact_table, target, gc, efcp_id_list)
+        key_lambda = lambda idx: [gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[idx])]
+        self.delete_rules(target, efcp_id_list, efcp_exact_table, key_lambda)
 
 
-#@unittest.skip("Filtering")
+@unittest.skip("Filtering")
 class EFCPExactMatchTest(EFCPTest):
     """
     @brief Basic test for EFCP exact match.
@@ -499,7 +519,7 @@ class EFCPExactMatchTest(EFCPTest):
         self._run_test(**test_options)
 
 
-#@unittest.skip("Filtering")
+@unittest.skip("Filtering")
 class EFCPCounterTest(EFCPTest):
     """
     @brief Basic test for EFCP counter test.

@@ -11,7 +11,7 @@
  * and its suppliers and may be covered by U.S. and Foreign Patents, patents in
  * process, and are protected by trade secret or copyright law.  Dissemination of
  * this information or reproduction of this material is strictly forbidden unless
- * prior written permission is obtained from Barefoot Networks, Inc.
+ * prior written perdropion is obtained from Barefoot Networks, Inc.
  *
  * No warranty, explicit or implicit is provided, unless granted under a written
  * agreement with Barefoot Networks, Inc.
@@ -34,52 +34,6 @@
 #include "../../common/headers.p4"
 #include "../../common/util.p4"
 
-
-// NOTE: consider reviewing whether something can be moved into headers.p4
-
-struct egress_metadata_t {
-    // TODO: Check if all are needed
-    bit<16> checksum_efcp_tmp;
-    bit<16> checksum_ipv4_tmp;
-
-    bool checksum_pdu_efcp;
-    bool checksum_pdu_ipv4;
-
-    bool checksum_err_efcp_igprs;
-    bool checksum_err_ipv4_igprs;
-    // NOTE: egress checksum error flags may not be needed
-    // if we remove that from the egress pipeline
-    bool checksum_err_efcp_egprs;
-    bool checksum_err_ipv4_egprs;
- 
-    bit<19> enq_qdepth;
-    //srv6_metadata_t srv6;
-}
-
-/*
- * All metadata, globally used in the program, also needs to be assembed
- * into a single struct. As in the case of the headers, we only need to
- * declare the type, but there is no need to instantiate it,
- * because it is done "by the architecture", i.e. outside of P4 functions
-*/
-//struct metadata_t {}
-struct metadata_t {
-    // TODO: Check if all are needed
-    bit<16> checksum_efcp_tmp;
-    bit<16> checksum_ipv4_tmp;
-    bool checksum_pdu_efcp;
-    bool checksum_pdu_ipv4;
-    bool checksum_err_efcp_igprs;
-    bool checksum_err_ipv4_igprs;
-    // NOTE: egress checksum error flags may not be needed
-    // if we remove that from the egress pipeline
-    bool checksum_err_efcp_egprs;
-    bool checksum_err_ipv4_egprs;
- 
-    bit<16> checksum_error;
-    bit<16> parser_error;
-    bit<9>  egress_spec;
-}
 
 
 /*************************************************************************
@@ -120,10 +74,9 @@ parser SwitchIngressParser(
         out metadata_t ig_md,
         out ingress_intrinsic_metadata_t ig_intr_md) {
 
+    TofinoIngressParser() tofino_parser;
     Checksum() efcp_checksum;
     Checksum() ipv4_checksum;
-
-    TofinoIngressParser() tofino_parser;
 
     state start {
         // Note: this may be enabling the parsing altogether
@@ -146,6 +99,7 @@ parser SwitchIngressParser(
         packet.extract(hdr.dot1q);
         transition select(hdr.dot1q.proto_id) {
             ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_IPV4: parse_ipv4;
             default: accept;
         }
     }
@@ -186,7 +140,7 @@ control SwitchIngress(
     /*
      * Drop action
      */
-    action miss() {
+    action drop() {
         ig_intr_dprsr_md.drop_ctl = 0x1;
     }
 
@@ -205,10 +159,11 @@ control SwitchIngress(
     /*
      * IPv4 forwarding action
      */
-    action ipv4_forward(mac_addr_t src_mac, mac_addr_t dst_mac, PortId_t dst_port) {
+    action ipv4_forward(bit<12> vlan_id, mac_addr_t src_mac, mac_addr_t dst_mac, PortId_t dst_port) {
+        hdr.dot1q.vlan_id = vlan_id;
         ig_intr_tm_md.ucast_egress_port = dst_port;
-        hdr.ethernet.dst_addr = dst_mac;
         hdr.ethernet.src_addr = src_mac;
+        hdr.ethernet.dst_addr = dst_mac;
         ig_intr_dprsr_md.drop_ctl = 0x0;
         ipv4_counter.count(dst_port);
     }
@@ -222,11 +177,11 @@ control SwitchIngress(
         }
         actions = {
             efcp_forward;
-            miss;
+            drop;
             NoAction;
         }
         size = 1024;
-        //default_action = NoAction();
+        default_action = NoAction();
     }
 
     /*
@@ -239,7 +194,7 @@ control SwitchIngress(
 
         actions = {
             ipv4_forward;
-            miss;
+            drop;
             NoAction;
         }
 
@@ -247,13 +202,27 @@ control SwitchIngress(
         alpm = algo_lpm;
     }
 
+    // FIXME: there was missing logic
+    // - Include this as needed between the ingress and egress
+    //   processing
     apply {
-        if (hdr.efcp.isValid() && ig_md.checksum_error == 0) {
-           efcp_exact.apply();     
-        } else if (hdr.ipv4.isValid() && ig_md.checksum_error == 0) {
-            ipv4_lpm.apply();
+        if (hdr.efcp.isValid() && 
+            ig_md.checksum_error == 0 &&
+            ig_intr_prsr_md.parser_err == 0x0) {
+            //ig_md.parser_error == error.NoError) {
+                if (hdr.efcp.pdu_type == LAYER_MANAGEMENT) {
+                    ig_intr_tm_md.ucast_egress_port = CPU_PORT;
+                } else {
+                   efcp_exact.apply();     
+                }
+                /*if (hdr.efcp.pdu_type != LAYER_MANAGEMENT) {
+                   efcp_exact.apply();     
+                }*/
+        } else if (hdr.ipv4.isValid() &&
+            ig_md.checksum_error == 0) {
+                ipv4_lpm.apply();
         } else {
-            miss();
+            drop();
         }
     }
 }
@@ -310,6 +279,7 @@ parser SwitchEgressParser(
         packet.extract(hdr.dot1q);
         transition select(hdr.dot1q.proto_id) {
             ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_IPV4: parse_ipv4;
             default: accept;
         }
     }
@@ -339,15 +309,19 @@ control SwitchEgress(
         inout header_t hdr,
         inout egress_metadata_t eg_md,
         in egress_intrinsic_metadata_t eg_intr_md,
-        in egress_intrinsic_metadata_from_parser_t eg_intr_from_prsr,
-        inout egress_intrinsic_metadata_for_deparser_t eg_intr_md_for_dprsr,
-        inout egress_intrinsic_metadata_for_output_port_t eg_intr_md_for_oport) {
+        in egress_intrinsic_metadata_from_parser_t eg_intr_prsr_md,
+        inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md,
+        inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
 
     action mark_ecn() {
         hdr.efcp.flags = hdr.efcp.flags | 0x01;
     }
 
     apply {
+        //if (hdr.efcp.pdu_type == LAYER_MANAGEMENT) {
+        //    eg_intr_md.egress_spec = CPU_PORT;
+        //}
+
         if (eg_md.enq_qdepth >= ECN_THRESHOLD) {
             mark_ecn();
         }
@@ -367,7 +341,7 @@ control SwitchEgressDeparser(
         packet_out packet,
         inout header_t hdr,
         in egress_metadata_t eg_md,
-        in egress_intrinsic_metadata_for_deparser_t eg_dprsr_md) {
+        in egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
 
     Checksum() efcp_checksum;
     Checksum() ipv4_checksum;

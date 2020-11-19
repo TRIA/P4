@@ -176,6 +176,24 @@ header gre_h {
     bit<16> proto;
 }
 
+struct egress_metadata_t {
+    bool checksum_pdu_efcp;
+    bool checksum_pdu_ipv4;
+
+    bool checksum_err_efcp_egprs;
+    bool checksum_err_ipv4_egprs;
+
+    bit<19> enq_qdepth;
+}
+
+struct metadata_t {
+    bool checksum_err_efcp_igprs;
+    bool checksum_err_ipv4_igprs;
+
+    bit<16> checksum_error;
+}
+
+
 struct header_t {
     ethernet_h  ethernet;
     dot1q_h     dot1q;
