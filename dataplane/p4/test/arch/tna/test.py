@@ -191,7 +191,7 @@ class IPV4Test(BaseEDFTest):
 
             target = gc.Target(device_id=0, pipe_id=0xffff)
             logger.info("Inserting table entry with IP address %s, prefix length %d" % (dst_ip, p_len))
-            logger.info("With expected dst_mac %s, src_mac %s on port %d" % (src_mac, dst_mac, eg_port))
+            logger.info("With expected vlan_id %s, dst_mac %s, src_mac %s on port %d" % (vlan_id, src_mac, dst_mac, eg_port))
             key = ipv4_lpm_table.make_key([gc.KeyTuple("hdr.ipv4.dst_addr", dst_ip, prefix_len=p_len)])
             data = ipv4_lpm_table.make_data([gc.DataTuple("vlan_id", vlan_id),
                                                gc.DataTuple("src_mac", src_mac),
@@ -257,11 +257,15 @@ class IPV4Test(BaseEDFTest):
                                                   dl_vlan_enable=vlan_enable, vlan_vid=vlan_id)
             #exp_pkt.show()
 
-            logger.info("Sending packet on port %d", ig_port)
+            vlan_log_info = ""
+            if vlan_enable:
+                vlan_log_info = ", vlan_id %s" % vlan_id
+            logger.info("Sending packet on port %d %s", ig_port, vlan_log_info)
             testutils.send_packet(self, ig_port, pkt)
 
-            logger.info("Verifying entry for IP address %s, prefix_length %d" % (key_item.dst_ip, key_item.prefix_len))
-            logger.info("Expecting packet on port %d", data_item.eg_port)
+            logger.info("Verifying entry for IP address %s, prefix_length %d %s" % 
+                    (key_item.dst_ip, key_item.prefix_len, vlan_log_info))
+            logger.info("Expecting packet on port %d %s", data_item.eg_port, vlan_log_info)
             testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
             if self.counter_test:
                 resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])],{"from_hw": True},None)
@@ -485,10 +489,13 @@ class EFCPTest(BaseEDFTest):
                     )
             #exp_pkt.show()
 
-            logger.info("Sending packet on port %d", ig_port)
+            vlan_log_info = ""
+            if vlan_enable:
+                vlan_log_info = ", vlan_id %s" % vlan_id
+            logger.info("Sending packet on port %d %s", ig_port, vlan_log_info)
             testutils.send_packet(self, ig_port, pkt)
-            logger.info("Verifying entry for IPC ID %s" % key_item.dst_addr)
-            logger.info("Expecting packet on port %d", data_item.dst_port)
+            logger.info("Verifying entry for IPC ID %s %s" % (key_item.dst_addr, vlan_log_info))
+            logger.info("Expecting packet on port %d %s", data_item.dst_port, vlan_log_info)
             try:
                 testutils.verify_packets(self, exp_pkt, [data_item.dst_port])
             except Exception as e:
