@@ -103,14 +103,9 @@ class IPV4Test(BaseEDFTest):
             pktlen = self.MINSIZE
         if not pkt:
             pkt = testutils.simple_tcp_packet(ip_dst=ip_dst)
-        #exp_pkt.show()
         eth_pkt = pkt[Ether]
-        #print(dir(eth_pkt))
-        #pkt.show()
-        #print("....")
+        # IP packet contains IP, TCP, Raw headers
         ip_pkt = pkt[IP]
-        #tcp_pkt = pkt[TCP]
-        #raw_pkt = pkt[Raw]
 
         pkt = Ether(dst = eth_pkt.dst, src = eth_pkt.src, type = eth_pkt.type)
 
@@ -118,7 +113,7 @@ class IPV4Test(BaseEDFTest):
         if dl_taglist_enable:
             pkt = self.add_dot1q_header(pkt, dl_vlanid_list, dl_vlan_pcp_list, dl_vlan_cfi_list, dl_tpid_list)
 
-        pkt = pkt / ip_pkt# / tcp_pkt
+        pkt = pkt / ip_pkt
         return pkt
     
     def simple_tcp_packet(self,
@@ -159,7 +154,6 @@ class IPV4Test(BaseEDFTest):
         logger.info("Seed used %d", seed)
         random.seed(seed)
         num_entries = random.randint(1, MAX_PKTS_SENT)
-        num_entries = 1
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
@@ -235,22 +229,33 @@ class IPV4Test(BaseEDFTest):
 
         logger.info("Sending packets for the installed entries to verify")
         # send pkt and verify sent
+        i = 0
         for key_item, data_item in test_tuple_list:
+            vlan_id = vlan_id_list[i]
+            #vlan_id = data_item.vlan_id
             vlan_enable = i % 2 == 0
+            i += 1
 
-            tcp_pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip)
+            #tcp_pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip)
+            #pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
+            #    dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
+            #)
+            #exp_pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
+            #    dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
+            #)
+            
+            #logger.info("ScaPy emitted packet")
+            pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip, \
+                    dl_vlan_enable=vlan_enable, vlan_vid=vlan_id)
 
-            logger.info("ScaPy emitted packet")
-            pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
-                dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
-            )
-            pkt.show()
+            #pkt.show()
 
-            logger.info("ScaPy expected packet")
-            exp_pkt = self.simple_tcp_packet(pkt=tcp_pkt, ip_dst=key_item.dst_ip, \
-                dl_vlan_enable=vlan_enable, vlan_vid=vlan_id, \
-            )
-            exp_pkt.show()
+            #logger.info("ScaPy expected packet")
+            exp_pkt = testutils.simple_tcp_packet(eth_dst=data_item.dmac,
+                                                  eth_src=data_item.smac,
+                                                  ip_dst=key_item.dst_ip,
+                                                  dl_vlan_enable=vlan_enable, vlan_vid=vlan_id)
+            #exp_pkt.show()
 
             logger.info("Sending packet on port %d", ig_port)
             testutils.send_packet(self, ig_port, pkt)
@@ -271,9 +276,9 @@ class IPV4Test(BaseEDFTest):
 
         logger.info("All expected packets received")
         logger.info("Deleting %d ALPM entries" % (num_entries))
-        # Delete table entries
-        key_object = [gc.KeyTuple("hdr.ipv4.dst_addr", key_item.dst_ip, prefix_len=key_item.prefix_len)]
-        self.delete_rules(target, ip_list, ipv4_lpm_table, key_object)
+        key_lambda = lambda idx: [gc.KeyTuple("hdr.ipv4.dst_addr", key_tuple_list[idx].dst_ip,
+            prefix_len=key_tuple_list[idx].prefix_len)]
+        self.delete_rules(target, key_tuple_list, ipv4_lpm_table, key_lambda)
 
 
 #@unittest.skip("Filtering")
@@ -289,7 +294,7 @@ class IPV4LpmMatchTest(IPV4Test):
         self._run_test(**test_options)
 
 
-@unittest.skip("Filtering")
+#@unittest.skip("Filtering")
 class IPv4IndirectCounterTest(IPV4Test):
     """
     @brief Basic test for IPV4 counter test.
@@ -506,7 +511,7 @@ class EFCPTest(BaseEDFTest):
         self.delete_rules(target, efcp_id_list, efcp_exact_table, key_lambda)
 
 
-@unittest.skip("Filtering")
+#@unittest.skip("Filtering")
 class EFCPExactMatchTest(EFCPTest):
     """
     @brief Basic test for EFCP exact match.
@@ -519,7 +524,7 @@ class EFCPExactMatchTest(EFCPTest):
         self._run_test(**test_options)
 
 
-@unittest.skip("Filtering")
+#@unittest.skip("Filtering")
 class EFCPCounterTest(EFCPTest):
     """
     @brief Basic test for EFCP counter test.
