@@ -52,12 +52,12 @@ job_efcp_v1model_dp_test:
   script:
     - cd dataplane/p4
     - make edf-dp-test-v1model-stratum
-    - cat test/stratum_bmv2_test_h1.log
-    - cat test/stratum_bmv2_test_h2.log
+    - cat test/arch/v1model/stratum_bmv2_test_h1.log
+    - cat test/arch/v1model/stratum_bmv2_test_h2.log
   artifacts:
     name: edf_dp_test_${CI_COMMIT_REF_SLUG}
     paths:
-      - dataplane/p4/test/stratum_bmv2_test_h*.log
+      - dataplane/p4/test/arch/v1model/stratum_bmv2_test_h*.log
     when: always
     expire_in: 1 week
   dependencies:
