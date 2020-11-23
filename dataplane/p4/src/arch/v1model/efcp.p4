@@ -188,8 +188,7 @@ the packet buffer, nor sent to egress processing.
         standard_metadata.egress_spec = dst_port;
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
         hdr.ethernet.dst_addr = dst_mac;
-        //efcp_counter.count((bit<32>) standard_metadata.ingress_port);
-        efcp_counter.count(dst_port);
+        efcp_counter.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
@@ -201,8 +200,7 @@ the packet buffer, nor sent to egress processing.
         hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
         hdr.ethernet.dst_addr = dst_mac;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-        //ipv4_counter.count((bit<32>) standard_metadata.ingress_port);
-        ipv4_counter.count(dst_port);
+        ipv4_counter.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
