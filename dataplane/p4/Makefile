@@ -119,7 +119,7 @@ mn-stop:
 
 edf-dp-test-stratum: efcp-v1model-build
 	make env-v1model-restart
-	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
+	@rm -rf ${PWD}/test/arch/v1model
 	@sleep 1
 	@echo "Starting test for host1"
 	make edf-dp-test-stratum-send-pdu iface="eth1" src_host="h1" dst_host="h2"
@@ -130,7 +130,8 @@ edf-dp-test-stratum: efcp-v1model-build
 	make env-v1model-stop
 
 edf-dp-test-stratum-send-pdu:
-	@touch ${PWD}/test/stratum_bmv2_test_${src_host}.log
+	@mkdir -p ${PWD}/test/arch/v1model
+	@touch ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
 	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp" count="2"
 	make edf-dp-test-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4" count="2"
 	@test -s ${PWD}/test/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
@@ -140,8 +141,10 @@ edf-dp-test-stratum-send-pdu-type:
 	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c ${count} -w output_${iface}
 	@docker exec ${MN_STR_NAME} m ${src_host} python scripts/${src_host}_send_${pdu}_${dst_host}.py
 	@sleep 1
-	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
-	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
+	@mkdir -p ${PWD}/test/arch/v1model
+	@echo "${pdu} test" >> ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
+	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> \
+		${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
 
 edf-dp-test-tna-bfmodel-clean:
 	@echo "Terminating any running Tofino model or switch instance"

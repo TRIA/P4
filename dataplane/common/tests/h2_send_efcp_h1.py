@@ -16,6 +16,7 @@ from scapy.all import bind_layers, get_if_hwaddr, get_if_list, sendp, checksum, 
 from time import sleep
 
 # ScaPy initialisation
+## EFCP (untagged and tagged)
 bind_layers(Ether, EFCP, type=0xD1F)
 bind_layers(Ether, Dot1Q, type=0x8100)
 bind_layers(Dot1Q, EFCP, type=0xD1F)

@@ -13,9 +13,11 @@ from scapy.all import Ether, Dot1Q, IP, get_if_hwaddr, bind_layers, get_if_list,
 from time import sleep
 
 # ScaPy initialisation
+## IPv4 (untagged and tagged)
 bind_layers(Ether, IP, type=0x0800)
 bind_layers(Ether, Dot1Q, type=0x8100)
 bind_layers(Dot1Q, IP, type=0x0800)
+
 
 def get_if(if_name = "eth0"):
     ifs = get_if_list()

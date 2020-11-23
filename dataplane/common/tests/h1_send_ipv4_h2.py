@@ -15,6 +15,7 @@ from scapy.all import bind_layers, get_if_hwaddr, get_if_list, sendp, checksum, 
 from time import sleep
 
 # ScaPy initialisation
+## IPv4 (untagged and tagged)
 bind_layers(Ether, IP, type=0x0800)
 bind_layers(Ether, Dot1Q, type=0x8100)
 bind_layers(Dot1Q, IP, type=0x0800)
@@ -34,7 +35,6 @@ def get_if(if_name = "eth0"):
 
 def get_packet_dot1q(type_content):
     return Dot1Q(prio=0, id=0, vlan=random.randint(0, 4095), type=type_content)
-
 
 def main():
     iface = get_if()
