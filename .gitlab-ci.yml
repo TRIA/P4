@@ -52,8 +52,11 @@ job_efcp_v1model_dp_test:
   script:
     - cd dataplane/p4
     - make edf-dp-test-v1model-stratum
-    - cat test/arch/v1model/stratum_bmv2_test_h1.log
-    - cat test/arch/v1model/stratum_bmv2_test_h2.log
+    - ls -lah ${PWD}
+    - ls -lah ${PWD}/test/arch
+    - ls -lah ${PWD}/test/arch/v1model
+    - cat ${PWD}/test/arch/v1model/stratum_bmv2_test_h1.log
+    - cat ${PWD}/test/arch/v1model/stratum_bmv2_test_h2.log
   artifacts:
     name: edf_dp_test_${CI_COMMIT_REF_SLUG}
     paths:
@@ -96,25 +99,8 @@ job_efcp_tna_dp_test:
 job_cleanup:
   script:
     - echo "Cleaning up some intermediate results"
-    - sudo rm -rf $CI_PROJECT_DIR
-    - sudo rm -rf $BUILD_DIR
-    - |
-      sudo -H -i sh -e -x <<EOS
-      sudo rm -rf ${PWD}/dataplane/p4/pcap_output
-      sudo rm -rf ${PWD}/build
-      sudo rm -rf $CI_PROJECT_DIR
-      sudo rm -rf $CI_PROJECT_DIR
-      sudo rm -rf $BUILD_DIR
-      EOS
   after_script:
-    - sudo rm -rf $CI_PROJECT_DIR
-    - sudo rm -rf $BUILD_DIR
-    - |
-      sudo -H -i sh -e -x <<EOS
-      sudo rm -rf ${PWD}/dataplane/p4/pcap_output
-      sudo rm -rf ${PWD}/build
-      sudo rm -rf $CI_PROJECT_DIR
-      sudo rm -rf $BUILD_DIR
-      EOS
+    - sudo rm -rf ${PWD}/dataplane/p4/pcap_output
+    - sudo rm -rf ${PWD}/builds
   stage: cleanup
   tags: [p4_v1model, p4_tna]
