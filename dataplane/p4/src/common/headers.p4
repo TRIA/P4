@@ -1,6 +1,9 @@
 #ifndef _HEADERS_
 #define _HEADERS_
 
+/*
+ * Header types
+ */
 typedef bit<48> mac_addr_t;
 typedef bit<32> ipv4_addr_t;
 typedef bit<128> ipv6_addr_t;
@@ -201,6 +204,34 @@ struct header_t {
     ipv4_h      ipv4;
 }
 
+struct egress_metadata_t {
+    bit<16> checksum_ipv4_tmp;
+    bit<16> checksum_efcp_tmp;
+
+    bool checksum_upd_ipv4;
+    bool checksum_upd_efcp;
+
+    bool checksum_err_ipv4_igprs;
+    bool checksum_err_efcp_igprs;
+ 
+    bit<19> enq_qdepth;
+}
+
+
+struct metadata_t {
+    bit<16> checksum_ipv4_tmp;
+    bit<16> checksum_efcp_tmp;
+
+    bool checksum_upd_ipv4;
+    bool checksum_upd_efcp;
+
+    bool checksum_err_ipv4_igprs;
+    bool checksum_err_efcp_igprs;
+    bit<16> checksum_error;
+    bit<16> parser_error;
+    bit<9>  egress_spec;
+
+}
 struct empty_header_t {}
 
 struct empty_metadata_t {}

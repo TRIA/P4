@@ -37,6 +37,12 @@ job_efcp_v1model_cp_test:
     - make edf-cp-test-stratum
     - cat test/edf-dp-server.log
     - cat test/edf-cp-client.log
+  artifacts:
+    name: edf_cp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - controlplane/p4/test/edf-*.log
+    when: always
+    expire_in: 1 week
   dependencies:
     - job_efcp_v1model_build
   stage: test
@@ -45,9 +51,15 @@ job_efcp_v1model_cp_test:
 job_efcp_v1model_dp_test:
   script:
     - cd dataplane/p4
-    - make edf-dp-test-stratum
+    - make edf-dp-test-v1model-stratum
     - cat test/stratum_bmv2_test_h1.log
     - cat test/stratum_bmv2_test_h2.log
+  artifacts:
+    name: edf_dp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - dataplane/p4/test/stratum_bmv2_test_h*.log
+    when: always
+    expire_in: 1 week
   dependencies:
     - job_efcp_v1model_build
   stage: test

@@ -137,7 +137,7 @@ control SwitchIngressVerifyChecksum(inout header_t hdr,
 */
             verify_checksum(hdr.ipv4.isValid(),
             { hdr.ipv4.version,
-              hdr.ipv4.ihl,
+	          hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
               hdr.ipv4.total_len,
               hdr.ipv4.identification,
