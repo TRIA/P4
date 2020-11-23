@@ -100,8 +100,8 @@ job_cleanup:
   script:
     - echo "Cleaning up some intermediate results"
   after_script:
-    - sudo rm -rf ${PWD}/dataplane/env/mininet/tmp
-    - sudo rm -rf ${PWD}/dataplane/p4/pcap_output
-    - sudo rm -rf ${PWD}/builds
+    - sudo rm -rf ${PWD}/dataplane/env/mininet/tmp || true
+    - sudo rm -rf ${PWD}/dataplane/p4/pcap_output || true
+    - sudo rm -rf ${PWD}/builds || true
   stage: cleanup
   tags: [p4_v1model, p4_tna]
