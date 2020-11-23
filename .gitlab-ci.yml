@@ -95,11 +95,26 @@ job_efcp_tna_dp_test:
 
 job_cleanup:
   script:
-    - echo "Cleaning up most intermediate results"
-  after_script:
+    - echo "Cleaning up some intermediate results"
+    - sudo rm -rf $CI_PROJECT_DIR
+    - sudo rm -rf $BUILD_DIR
     - |
-      sudo -H -i -u ubuntu sh -e -x <<EOS
+      sudo -H -i sh -e -x <<EOS
       sudo rm -rf ${PWD}/dataplane/p4/pcap_output
+      sudo rm -rf ${PWD}/build
+      sudo rm -rf $CI_PROJECT_DIR
+      sudo rm -rf $CI_PROJECT_DIR
+      sudo rm -rf $BUILD_DIR
+      EOS
+  after_script:
+    - sudo rm -rf $CI_PROJECT_DIR
+    - sudo rm -rf $BUILD_DIR
+    - |
+      sudo -H -i sh -e -x <<EOS
+      sudo rm -rf ${PWD}/dataplane/p4/pcap_output
+      sudo rm -rf ${PWD}/build
+      sudo rm -rf $CI_PROJECT_DIR
+      sudo rm -rf $BUILD_DIR
       EOS
   stage: cleanup
   tags: [p4_v1model, p4_tna]
