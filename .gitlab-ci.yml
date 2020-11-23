@@ -17,7 +17,7 @@ workflow:
 stages:
   - build
   - test
-  - clean
+  - cleanup
 
 #
 # v1model arch
@@ -92,3 +92,14 @@ job_efcp_tna_dp_test:
     - job_efcp_tna_build
   stage: test
   tags: [p4_tna]
+
+job_cleanup:
+  script:
+    - echo "Cleaning up most intermediate results"
+  after_script:
+    - |
+      sudo -H -i -u ubuntu sh -e -x <<EOS
+      sudo rm -rf ${PWD}/dataplane/p4/pcap_output
+      EOS
+  stage: cleanup
+  tags: [p4_v1model, p4_tna]
