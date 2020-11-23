@@ -35,15 +35,17 @@ import codecs
 from edf_pdu_types import EFCP_TYPES
 
 # ScaPy initialisation
-bind_layers(Ether, EFCP, type=0xD1F)
 bind_layers(Ether, Dot1Q, type=0x8100)
+## EFCP (untagged and tagged)
+bind_layers(Ether, EFCP, type=0xD1F)
 bind_layers(Dot1Q, EFCP, type=0xD1F)
+## IPv4 (untagged and tagged)
+bind_layers(Ether, IP, type=0x0800)
+bind_layers(Dot1Q, IP, type=0x0800)
 
 logger = logging.getLogger("Test")
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler())
-
-MAX_PKTS_SENT = 15
 
 swports = []
 for device, port, ifname in config["interfaces"]:
@@ -53,13 +55,44 @@ for device, port, ifname in config["interfaces"]:
 if swports == []:
     swports = list(range(9))
 
+
+class SingleRandomSeed(object):
+    """
+    Unique class (using singleton) to ensure the same
+    random seed and num_entries are in use for all classes.
+    """
+    __instance = None
+
+    def __new__(self, *args, **kwargs):
+        if SingleRandomSeed.__instance is None:
+            SingleRandomSeed.__instance = object.__new__(self)
+            # Variables defined only during the (first and only) instantiation
+            SingleRandomSeed.__instance.seed = random.randint(1, 65535)
+            logger.info("Seed used %d", SingleRandomSeed.__instance.seed)
+            random.seed(SingleRandomSeed.__instance.seed)
+            # Note: values must be passed as kwargs
+            if "MAX_PKTS_SENT" not in kwargs.keys():
+                raise Exception("SingleRandomSeed missing initialisation variables")
+            for k, v in kwargs.items():
+                setattr(SingleRandomSeed.__instance, k, v)
+            SingleRandomSeed.__instance.num_entries = random.randint(1, 
+                    SingleRandomSeed.__instance.MAX_PKTS_SENT)
+            logger.info("Number of entries to be tested %d", 
+                    SingleRandomSeed.__instance.num_entries)
+        return SingleRandomSeed.__instance
+
+
 class BaseEDFTest(BfRuntimeTest):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.MINSIZE = 0
+        self.MAX_PKTS_SENT = 15
         self.counter_test = False
         self.counter_table = None
+        self.single_rand = SingleRandomSeed(MAX_PKTS_SENT=self.MAX_PKTS_SENT)
+        self.seed = self.single_rand.seed
+        self.num_entries = self.single_rand.num_entries
 
     def setUp(self):
         client_id = 0
@@ -75,6 +108,55 @@ class BaseEDFTest(BfRuntimeTest):
             pkt[Dot1Q:i].type=dl_tpid_list[i]
         pkt.type=dl_tpid_list[0]
         return pkt
+
+    def insert_counter_entries(self, target, gc, eg_port):
+        if self.counter_test:
+            # Add new counter
+            self.counter_table.entry_add(target,
+                    [self.counter_table.make_key(
+                        [gc.KeyTuple("$COUNTER_INDEX", eg_port)])
+                    ],
+                    [self.counter_table.make_data(
+                        [gc.DataTuple("$COUNTER_SPEC_BYTES", 0),
+                        gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])
+                    ])
+            # Default packet size is 100 bytes and model adds 4 bytes of CRC
+            pkt_size = 100 + 4
+            num_pkts = self.num_entries
+            num_bytes = num_pkts * pkt_size
+
+    def check_entries_have_proper_keys(self, table, target, table_dict):
+        # Check get
+        resp  = table.entry_get(target)
+        for data, key in resp:
+            lpm_dict_keys = [ _ for _ in table_dict.keys() ]
+            assert table_dict[key] == data
+            table_dict.pop(key)
+        assert len(table_dict) == 0
+
+    def send_packet(self, ig_port, pkt, exp_pkt, target, type_log,
+            gc, vlan_enable, vlan_id, key_item, data_item):
+        vlan_log_info = ""
+        if vlan_enable:
+            vlan_log_info = ", vlan_id %s" % vlan_id
+        logger.info("Sending packet on port %d%s", ig_port, vlan_log_info)
+        testutils.send_packet(self, ig_port, pkt)
+
+        logger.info("Verifying entry for %s%s" % (type_log, vlan_log_info))
+        logger.info("Expecting packet on port %d%s", data_item.eg_port, vlan_log_info)
+        try:
+            testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
+        except Exception as e:
+            logger.error("Error on packet verification")
+            raise e
+
+        if self.counter_test:
+            resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])], {"from_hw": True}, None)
+            # parse resp to get the counter
+            data_dict = next(resp)[0].to_dict()
+            recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
+            recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
+            logger.info("The counter value for port %s is %s", data_item.eg_port, str(recv_pkts))
 
     def delete_rules(self, target, id_list, table, key_lambda):
         # Delete table entries
@@ -150,10 +232,6 @@ class IPV4Test(BaseEDFTest):
         except Exception as e:
             logger.error("Could not load \"counter_test\" flag - defaults to False. Details: {0}".format(e))
         ig_port = swports[1]
-        seed = random.randint(1, 65535)
-        logger.info("Seed used %d", seed)
-        random.seed(seed)
-        num_entries = random.randint(1, MAX_PKTS_SENT)
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
@@ -172,8 +250,8 @@ class IPV4Test(BaseEDFTest):
         unique_keys = {}
         lpm_dict= {}
 
-        logger.info("Installing %d ALPM entries" % (num_entries))
-        ip_list = self.generate_random_ip_list(num_entries, seed)
+        logger.info("Installing %d ALPM entries" % (self.num_entries))
+        ip_list = self.generate_random_ip_list(self.num_entries, self.seed)
         vlan_id_list = [random.randint(0, 4095) for x in range(len(ip_list))]
 
         for i in range(0, len(ip_list)):
@@ -201,29 +279,10 @@ class IPV4Test(BaseEDFTest):
             ipv4_lpm_table.entry_add(target, [key], [data])
             key.apply_mask()
             lpm_dict[key] = data
-            if self.counter_test:
-                # add new counter
-                self.counter_table.entry_add(target,
-                        [self.counter_table.make_key(
-                            [gc.KeyTuple("$COUNTER_INDEX", eg_port)])
-                        ],
-                        [self.counter_table.make_data(
-                            [gc.DataTuple("$COUNTER_SPEC_BYTES", 0),
-                            gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])
-                        ])
-                # default packet size is 100 bytes and model adds 4 bytes of CRC
-                pkt_size = 100 + 4
-                num_pkts = num_entries
-                num_bytes = num_pkts * pkt_size
 
+            self.insert_counter_entries(target, gc, eg_port)
 
-        # check get
-        resp  = ipv4_lpm_table.entry_get(target)
-        for data, key in resp:
-            lpm_dict_keys = [ _ for _ in lpm_dict.keys() ]
-            assert lpm_dict[key] == data
-            lpm_dict.pop(key)
-        assert len(lpm_dict) == 0
+        self.check_entries_have_proper_keys(ipv4_lpm_table, target, lpm_dict)
 
         test_tuple_list = list(zip(key_tuple_list, data_tuple_list))
 
@@ -232,7 +291,6 @@ class IPV4Test(BaseEDFTest):
         i = 0
         for key_item, data_item in test_tuple_list:
             vlan_id = vlan_id_list[i]
-            #vlan_id = data_item.vlan_id
             vlan_enable = i % 2 == 0
             i += 1
 
@@ -247,7 +305,6 @@ class IPV4Test(BaseEDFTest):
             #logger.info("ScaPy emitted packet")
             pkt = testutils.simple_tcp_packet(ip_dst=key_item.dst_ip, \
                     dl_vlan_enable=vlan_enable, vlan_vid=vlan_id)
-
             #pkt.show()
 
             #logger.info("ScaPy expected packet")
@@ -257,32 +314,21 @@ class IPV4Test(BaseEDFTest):
                                                   dl_vlan_enable=vlan_enable, vlan_vid=vlan_id)
             #exp_pkt.show()
 
-            vlan_log_info = ""
-            if vlan_enable:
-                vlan_log_info = ", vlan_id %s" % vlan_id
-            logger.info("Sending packet on port %d%s", ig_port, vlan_log_info)
-            testutils.send_packet(self, ig_port, pkt)
-
-            logger.info("Verifying entry for IP address %s, prefix_length %d%s" % 
-                    (key_item.dst_ip, key_item.prefix_len, vlan_log_info))
-            logger.info("Expecting packet on port %d%s", data_item.eg_port, vlan_log_info)
-            testutils.verify_packets(self, exp_pkt, [data_item.eg_port])
-            if self.counter_test:
-                resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.eg_port)])],{"from_hw": True},None)
-
-                # parse resp to get the counter
-                data_dict = next(resp)[0].to_dict()
-                recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
-                recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
-
-                logger.info("The counter value for port %s is %s", data_item.eg_port,str(recv_pkts))
-
+            type_log = "Verifying entry for %s IP address, prefix_length %d" % \
+                (key_item.dst_ip, key_item.prefix_len)
+            self.send_packet(ig_port, pkt, exp_pkt, target, type_log,
+                    gc, vlan_enable, vlan_id, key_item, data_item)
 
         logger.info("All expected packets received")
-        logger.info("Deleting %d ALPM entries" % (num_entries))
+        logger.info("Deleting %d ALPM entries" % (self.num_entries))
         key_lambda = lambda idx: [gc.KeyTuple("hdr.ipv4.dst_addr", key_tuple_list[idx].dst_ip,
             prefix_len=key_tuple_list[idx].prefix_len)]
         self.delete_rules(target, key_tuple_list, ipv4_lpm_table, key_lambda)
+        # Whilst syntactically correct, this is a non-supported operations: counter tables are always there
+        #if self.counter_test:
+        #    logger.info("Deleting %d counter entries" % (self.num_entries))
+        #    key_lambda = lambda idx: [gc.KeyTuple("$COUNTER_INDEX", data_tuple_list[idx].eg_port)]
+        #    self.delete_rules(target, data_tuple_list, self.counter_table, key_lambda)
 
 
 #@unittest.skip("Filtering")
@@ -391,10 +437,6 @@ class EFCPTest(BaseEDFTest):
         except Exception as e:
             logger.error("Could not load \"counter_test\" flag - defaults to False. Details: {0}".format(e))
         ig_port = swports[1]
-        seed = random.randint(1, 65535)
-        logger.info("Seed used %d", seed)
-        random.seed(seed)
-        num_entries = random.randint(1, MAX_PKTS_SENT)
 
         # Get bfrt_info and set it as part of the test
         bfrt_info = self.interface.bfrt_info_get("tna_efcp")
@@ -407,13 +449,13 @@ class EFCPTest(BaseEDFTest):
         efcp_exact_table.info.data_field_annotation_add("dst_port", "SwitchIngress.efcp_forward", "bit")
 
         key_random_tuple = namedtuple("key_random", "dst_addr")
-        data_random_tuple = namedtuple("data_random", "vlan_id dst_mac dst_port")
+        data_random_tuple = namedtuple("data_random", "vlan_id dst_mac eg_port")
         key_tuple_list = []
         data_tuple_list = []
         unique_keys = {}
         exact_dict= {}
 
-        efcp_id_list = list(set([random.randint(0, 255) for x in range(num_entries)]))
+        efcp_id_list = list(set([random.randint(0, 255) for x in range(self.num_entries)]))
         vlan_id_list = [random.randint(0, 4095) for x in range(len(efcp_id_list))]
         logger.info("Installing %d exact entries" % (len(efcp_id_list)))
 
@@ -439,28 +481,9 @@ class EFCPTest(BaseEDFTest):
             key.apply_mask()
             exact_dict[key] = data
 
-            if self.counter_test:
-                # add new counter
-                self.counter_table.entry_add(target,
-                        [self.counter_table.make_key(
-                            [gc.KeyTuple("$COUNTER_INDEX", eg_port)])
-                        ],
-                        [self.counter_table.make_data(
-                            [gc.DataTuple("$COUNTER_SPEC_BYTES", 0),
-                            gc.DataTuple("$COUNTER_SPEC_PKTS", 0)])
-                        ])
-                # default packet size is 100 bytes and model adds 4 bytes of CRC
-                pkt_size = 100 + 4
-                num_pkts = num_entries
-                num_bytes = num_pkts * pkt_size
+            self.insert_counter_entries(target, gc, eg_port)
 
-        # check get
-        resp = efcp_exact_table.entry_get(target)
-        for data, key in resp:
-            exact_dict_keys = [ _ for _ in exact_dict.keys() ]
-            assert exact_dict[key] == data
-            exact_dict.pop(key)
-        assert len(exact_dict) == 0
+        self.check_entries_have_proper_keys(efcp_exact_table, target, exact_dict)
 
         test_tuple_list = list(zip(key_tuple_list, data_tuple_list))
         
@@ -489,33 +512,19 @@ class EFCPTest(BaseEDFTest):
                     )
             #exp_pkt.show()
 
-            vlan_log_info = ""
-            if vlan_enable:
-                vlan_log_info = ", vlan_id %s" % vlan_id
-            logger.info("Sending packet on port %d%s", ig_port, vlan_log_info)
-            testutils.send_packet(self, ig_port, pkt)
-            logger.info("Verifying entry for IPC ID %s%s" % (key_item.dst_addr, vlan_log_info))
-            logger.info("Expecting packet on port %d%s", data_item.dst_port, vlan_log_info)
-            try:
-                testutils.verify_packets(self, exp_pkt, [data_item.dst_port])
-            except Exception as e:
-                logger.error("Error on packet verification")
-                raise e
-
-            if self.counter_test:
-                resp = self.counter_table.entry_get(target,[self.counter_table.make_key([gc.KeyTuple("$COUNTER_INDEX", data_item.dst_port)])],{"from_hw": True},None)
-
-                # parse resp to get the counter
-                data_dict = next(resp)[0].to_dict()
-                recv_pkts = data_dict["$COUNTER_SPEC_PKTS"]
-                recv_bytes = data_dict["$COUNTER_SPEC_BYTES"]
-
-                logger.info("The counter value for port %s is %s",data_item.dst_port,str(recv_pkts))
+            type_log = "Verifying entry for IPC ID %s" % key_item.dst_addr
+            self.send_packet(ig_port, pkt, exp_pkt, target, type_log,
+                    gc, vlan_enable, vlan_id, key_item, data_item)
         
         logger.info("All expected packets received")
         logger.info("Deleting %d Exact entries" % (len(efcp_id_list)))
         key_lambda = lambda idx: [gc.KeyTuple("hdr.efcp.dst_addr", efcp_id_list[idx])]
         self.delete_rules(target, efcp_id_list, efcp_exact_table, key_lambda)
+        # Whilst syntactically correct, this is a non-supported operations: counter tables are always there
+        #if self.counter_test:
+        #    logger.info("Deleting %d counter entries" % (self.num_entries))
+        #    key_lambda = lambda idx: [gc.KeyTuple("$COUNTER_INDEX", data_tuple_list[idx].eg_port)]
+        #    self.delete_rules(target, data_tuple_list, self.counter_table, key_lambda)
 
 
 #@unittest.skip("Filtering")
