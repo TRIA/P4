@@ -140,6 +140,7 @@ edf-dp-test-tna-bfmodel-clean:
 	@echo "Terminating any running Tofino model or switch instance"
 	@${PWD}/test/arch/tna/tofino_model_terminate.sh
 	@${PWD}/test/arch/tna/tofino_switch_terminate.sh
+	-sudo rm -rf ${PWD}/pcap_output
 
 edf-dp-test-tna-bfmodel: efcp-tna-build edf-dp-test-tna-bfmodel-clean
 	@echo "Copying test files"

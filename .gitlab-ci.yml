@@ -17,20 +17,28 @@ workflow:
 stages:
   - build
   - test
-  - cleanup
+
+before_script:
+  - |
+    sudo -H -u root sh -e -x <<EOS
+    rm -rf ${CI_PROJECT_DIR}/builds
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/dataplane/p4/pcap_output
+    EOS
+
 
 #
 # v1model arch
 #
 
 job_efcp_v1model_build:
+  stage: build
   script:
     - cd dataplane/p4
     - make efcp-v1model-build
-  stage: build
   tags: [p4_v1model]
 
 job_efcp_v1model_cp_test:
+  stage: test
   script:
     - sudo -S su
     - cd controlplane/p4
@@ -45,10 +53,10 @@ job_efcp_v1model_cp_test:
     expire_in: 1 week
   dependencies:
     - job_efcp_v1model_build
-  stage: test
   tags: [p4_v1model]
 
 job_efcp_v1model_dp_test:
+  stage: test
   script:
     - cd dataplane/p4
     - make edf-dp-test-v1model-stratum
@@ -65,7 +73,6 @@ job_efcp_v1model_dp_test:
     expire_in: 1 week
   dependencies:
     - job_efcp_v1model_build
-  stage: test
   tags: [p4_v1model]
 
 #
@@ -73,6 +80,7 @@ job_efcp_v1model_dp_test:
 #
 
 job_efcp_tna_build:
+  stage: build
   script:
     - |
       sudo -H -i -u ubuntu sh -e -x <<EOS
@@ -80,11 +88,10 @@ job_efcp_tna_build:
       make efcp-tna-build
       rm -rf pcap_output
       EOS
-    - sudo rm -rf dataplane/p4/pcap_output
-  stage: build
   tags: [p4_tna]
 
 job_efcp_tna_dp_test:
+  stage: test
   script:
     - |
       sudo -H -i -u ubuntu sh -e -x <<EOS
@@ -93,15 +100,4 @@ job_efcp_tna_dp_test:
       EOS
   dependencies:
     - job_efcp_tna_build
-  stage: test
   tags: [p4_tna]
-
-job_cleanup:
-  script:
-    - echo "Cleaning up some intermediate results"
-  after_script:
-    - sudo rm -rf ${PWD}/dataplane/env/mininet/tmp || true
-    - sudo rm -rf ${PWD}/dataplane/p4/pcap_output || true
-    - sudo rm -rf ${PWD}/builds || true
-  stage: cleanup
-  tags: [p4_v1model, p4_tna]
