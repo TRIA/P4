@@ -100,6 +100,7 @@ job_cleanup:
   script:
     - echo "Cleaning up some intermediate results"
   after_script:
+    - sudo rm -rf ${PWD}/dataplane/env/mininet/tmp
     - sudo rm -rf ${PWD}/dataplane/p4/pcap_output
     - sudo rm -rf ${PWD}/builds
   stage: cleanup
