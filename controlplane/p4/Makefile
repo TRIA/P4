@@ -113,6 +113,7 @@ edf-cp-client-clean:
 	@echo "Clean-up any related image and container"
 	docker rm -f ${EDF_CONTROL_C_NAME} || true
 	docker image rm ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} || true
+	-sudo rm -rf ${PWD}/env/tmp/ || true
 	make edf-cp-docker-net-rm
 
 edf-cp-client-test-clean:
@@ -122,7 +123,6 @@ edf-cp-client-test-clean:
 
 edf-cp-client-build: edf-cp-setup
 	@echo "Building and tagging image ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE}"
-	sudo rm -rf ${PWD}/env/tmp/ || true
 	docker build --build-arg GRPC_RELEASE=${GRPC_RELEASE} -f Dockerfile -t ${EDF_CONTROL_C_NAME}:${GRPC_RELEASE} .
 
 edf-cp-client-start: edf-cp-client-build edf-cp-docker-net-create

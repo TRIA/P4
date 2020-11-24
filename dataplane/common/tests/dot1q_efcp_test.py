@@ -3,17 +3,17 @@ sim test script
 """
 
 from class_base import EFCP
-from class_base import VLAN
 # Packet configuration for tests
 from config_base import *
 from test_base import BaseTest
 from test_base import _test_run
 from scapy.all import *
-
+import pdu_types
 
 # ScaPy initialisation
-bind_layers(Ether, VLAN)
-bind_layers(VLAN, EFCP, type=0x8100)
+bind_layers(Ether, EFCP, type=0xD1F)
+bind_layers(Ether, Dot1Q, type=0x8100)
+bind_layers(Dot1Q, EFCP, type=0xD1F)
 
 
 class Test(BaseTest):
@@ -23,10 +23,23 @@ class Test(BaseTest):
     """
 
     def __get_tx_packet(self, test_num, ipc_dst_addr, ipc_src_addr):
-        pkt = Ether(type=0x8100) / VLAN(ethertype=0xD1F) / EFCP(ipc_dst_addr=ipc_dst_addr, ipc_src_addr=ipc_src_addr, pdutype=0x8001)
-        pkt[Ether].dst = mac_dst_addr
-        pkt[Ether].src = mac_src_addr
-        pkt = pkt/"EFCP packet #{} sent from CLI to BM :)".format(test_num)
+        eth_pkt = Ether(dst=mac_dst_addr, src=mac_src_addr, type=0x8100)
+        pkt = eth_pkt
+
+        # Note Dot1Q.id is really DEI (aka CFI)
+        dot1q_pkt = Dot1Q(prio=0, id=0, vlan=random(0, 4095))
+        pkt = pkt / dot1q_pkt
+        pkt[Dot1Q:i].type = 0x8100
+        pkt.type = 0x8100
+
+        efcp_pkt = EFCP(ipc_src_addr=ipc_src_addr, ipc_dst_addr=ipc_dst_addr, pdu_type=pdu_types.DATA_TRANSFER)
+        efcp_payload = "EFCP packet #{} sent from CLI to BM :)".format(test_num)
+        pkt = pkt / efcp_pkt / efcp_payload
+
+        codecs_decode_range = [ x for x in range(pktlen - len(pkt)) ]
+        codecs_decode_str = "".join(["%02x"%(x%256) for x in range(pktlen - len(pkt)) ])
+        codecs_decode = codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
+        pkt = pkt / codecs.decode("".join(["%02x"%(x%256) for x in range(pktlen - len(pkt))]), "hex")
         return pkt
 
     # IMPORTANT: all tests must follow the pattern "test_*" in their names

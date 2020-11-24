@@ -8,17 +8,14 @@ typedef bit<48> mac_addr_t;
 typedef bit<32> ipv4_addr_t;
 typedef bit<128> ipv6_addr_t;
 typedef bit<12> vlan_id_t;
-typedef bit<9>  egress_spec;
+typedef bit<9> egress_spec;
 
-/*
- * Ether Types
- */
-typedef bit<16> etherType;
-const etherType IPV4_ETYPE = 16w0x0800;
-const etherType ETHERTYPE_ARP = 16w0x0806;
-const etherType ETHERTYPE_IPV6 = 16w0x86dd;
-const etherType VLAN_ETYPE = 16w0x8100;
-const etherType EFCP_ETYPE = 16w0xD1F;
+typedef bit<16> ether_type_t;
+const ether_type_t ETHERTYPE_ARP = 16w0x0806;
+const ether_type_t ETHERTYPE_EFCP = 16w0xD1F;
+const ether_type_t ETHERTYPE_IPV4 = 16w0x0800;
+const ether_type_t ETHERTYPE_IPV6 = 16w0x86dd;
+const ether_type_t ETHERTYPE_DOT1Q = 16w0x8100;
 
 typedef bit<8> ip_protocol_t;
 const ip_protocol_t IP_PROTOCOLS_ICMP = 1;
@@ -48,26 +45,34 @@ const bit<8> RENDEVOUS = 0xCF;
 const bit<19> ECN_THRESHOLD = 1;
 
 header ethernet_h {
-    mac_addr_t dstAddr;
-    mac_addr_t srcAddr;
-    bit<16> etherType;
+    mac_addr_t dst_addr;
+    mac_addr_t src_addr;
+    ether_type_t ether_type;
 }
 
-header vlan_tag_h {
-    bit<3> pcp;
-    bit<1> cfi;
+/*
+  Dot1Q / 802.1Q tag format
+
+  prio : BitField(3)
+  id   : BitField(1)
+  vlan : BitField(12)
+  type : BitField(16)
+*/
+header dot1q_h {
+    bit<3> prio;
+    bit<1> is_drop;
     vlan_id_t vlan_id;
-    bit<16> etherType;
+    ether_type_t proto_id;
 }
 
 header efcp_h {
     bit<8>  ver;
-    bit<16> dstAddr; 
-    bit<16> srcAddr;
-    bit<8>  qosID;
-    bit<16> dstCEPID;
-    bit<16> srcCEPID;
-    bit<8> pduType;
+    bit<16> dst_addr; 
+    bit<16> src_addr;
+    bit<8>  qos_id;
+    bit<16> dst_cep_id;
+    bit<16> src_cep_id;
+    bit<8> pdu_type;
     bit<8> flags;
     bit<16> len;
     bit<32> seqnum;
@@ -92,8 +97,8 @@ header ipv4_h {
     bit<8> ttl;
     bit<8> protocol;
     bit<16> hdr_checksum;
-    ipv4_addr_t srcAddr;
-    ipv4_addr_t dstAddr;
+    ipv4_addr_t src_addr;
+    ipv4_addr_t dst_addr;
 }
 
 header ipv6_h {
@@ -174,44 +179,32 @@ header gre_h {
     bit<16> proto;
 }
 
-struct header_t {
-    ethernet_h  ethernet;
-    efcp_h      efcp;
-    vlan_tag_h  vlan;
-    ipv4_h      ipv4;
-}
-
 struct egress_metadata_t {
-    bit<16> checksum_ipv4_tmp;
-    bit<16> checksum_efcp_tmp;
+    bool checksum_pdu_efcp;
+    bool checksum_pdu_ipv4;
 
-    bool checksum_upd_ipv4;
-    bool checksum_upd_efcp;
+    bool checksum_err_efcp_egprs;
+    bool checksum_err_ipv4_egprs;
 
-    bool checksum_err_ipv4_igprs;
-    bool checksum_err_efcp_igprs;
- 
     bit<19> enq_qdepth;
 }
 
-
 struct metadata_t {
-    bit<16> checksum_ipv4_tmp;
-    bit<16> checksum_efcp_tmp;
-
-    bool checksum_upd_ipv4;
-    bool checksum_upd_efcp;
-
-    bool checksum_err_ipv4_igprs;
     bool checksum_err_efcp_igprs;
-    bit<16> checksum_error;
-    bit<16> parser_error;
-    bit<9>  egress_spec;
+    bool checksum_err_ipv4_igprs;
 
+    bit<16> checksum_error;
 }
+
+struct header_t {
+    ethernet_h  ethernet;
+    dot1q_h     dot1q;
+    efcp_h      efcp;
+    ipv4_h      ipv4;
+}
+
 struct empty_header_t {}
 
 struct empty_metadata_t {}
 
 #endif /* _HEADERS_ */
-

@@ -3,7 +3,11 @@ DOCKER_NET := rina-controlplane
 MN_STR_NAME := mn-stratum
 P4R_STR_NAME := p4runtime-sh
 
-efcp_build_arch_v1model := build/arch/v1model
+EDF_DP_BUILD_ARCH_V1MODEL := build/arch/v1model
+EDF_DP_P4_TNA_NAME := tna_efcp
+EDF_DP_BUILD_ARCH_TNA := ${SDE}/pkgsrc/p4-examples/p4_16_programs/${EDF_DP_P4_TNA_NAME}
+EDF_DP_INSTALL_ARCH_TNA := ${SDE_INSTALL}/share/tofinopd/${EDF_DP_P4_TNA_NAME}
+EDF_DP_BUILD_SDE_ARCH_TNA := ${SDE}/build/p4-build/${EDF_DP_P4_TNA_NAME}/tofino/${EDF_DP_P4_TNA_NAME}
 
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 curr_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
@@ -68,14 +72,29 @@ p4runtime-log:
 clean:
 	-rm -rf build
 
-efcp-v1model-build: p4src/arch/v1model/efcp.p4
+efcp-v1model-build: src/arch/v1model/efcp.p4
 	$(info *** Building P4 program \(arch=v1model\)...)
-	@mkdir -p ${efcp_build_arch_v1model}
+	@mkdir -p ${EDF_DP_BUILD_ARCH_V1MODEL}
 	docker run --rm -v ${curr_dir}:/workdir -w /workdir ${P4C_IMG} \
-		p4c-bm2-ss --arch v1model -o ${efcp_build_arch_v1model}/bmv2.json \
-		--p4runtime-files ${efcp_build_arch_v1model}/p4info.txt --Wdisable=unsupported \
-		p4src/arch/v1model/efcp.p4
-	@echo "*** P4 program compiled successfully! Output files are in ${efcp_build_arch_v1model}"
+		p4c-bm2-ss --arch v1model -o ${EDF_DP_BUILD_ARCH_V1MODEL}/bmv2.json \
+		--p4runtime-files ${EDF_DP_BUILD_ARCH_V1MODEL}/p4info.txt --Wdisable=unsupported \
+		src/arch/v1model/efcp.p4
+	@echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_V1MODEL}"
+
+efcp-tna-build: src/arch/tna
+	$(info *** Building P4 program \(arch=tna\)...)
+	@(if [ ! -f ${SDE}/../p4_build-9.2.0.sh ]; then echo "Missing SDE or p4_build-9.2.0.sh script" && exit 1; fi)
+	@(current=${PWD} && cd $< && \
+		${SDE}/../p4_build-9.2.0.sh --with-p4c --with-graphs -I${PWD}/common efcp.p4 \
+		P4_VERSION=p4_16 P4_ARCHITECTURE=tna P4_NAME=${EDF_DP_P4_TNA_NAME} && \
+		mkdir -p ${EDF_DP_BUILD_ARCH_TNA} && mkdir -p ${EDF_DP_INSTALL_ARCH_TNA} && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/${EDF_DP_P4_TNA_NAME}.conf ${SDE_INSTALL}/share/p4/targets/tofino/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/bf-rt.json ${EDF_DP_INSTALL_ARCH_TNA}/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/context.json ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
+		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/tofino.bin ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
+		cp -Rp ${EDF_DP_BUILD_SDE_ARCH_TNA}/* ${EDF_DP_BUILD_ARCH_TNA}/ && \
+		cd ${current} && \
+	 	echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_TNA} and ${EDF_DP_INSTALL_ARCH_TNA}")
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
@@ -89,8 +108,9 @@ mn-stop:
 	@make docker_net_rm
 
 edf-dp-test-v1model-stratum: efcp-v1model-build
+	@mkdir -p ${PWD}/test/arch/v1model
+	@rm -rf ${PWD}/test/arch/v1model/stratum_bmv2_test_*.log
 	make env-v1model-restart
-	@rm -rf ${PWD}/test && mkdir -p ${PWD}/test
 	@sleep 3
 	@echo "Starting test for host1"
 	make edf-dp-test-v1model-stratum-send-pdu iface="eth1" src_host="h1" dst_host="h2"
@@ -101,15 +121,37 @@ edf-dp-test-v1model-stratum: efcp-v1model-build
 	make env-v1model-stop
 
 edf-dp-test-v1model-stratum-send-pdu:
-	@touch ${PWD}/test/stratum_bmv2_test_${src_host}.log
-	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp"
-	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4"
-	@test -s ${PWD}/test/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
+	@touch ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
+	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp" count="2"
+	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4" count="2"
+	@test -s ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
 		echo "Test for host ${src_host} did not pass"
 
 edf-dp-test-v1model-stratum-send-pdu-type:
-	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c 1 -w output_${iface}
+	@docker exec -d ${MN_STR_NAME} tcpdump -i s1-${iface} -c ${count} -w output_${iface}
 	@docker exec ${MN_STR_NAME} m ${src_host} python scripts/${src_host}_send_${pdu}_${dst_host}.py
 	@sleep 1
-	@echo "${pdu} test" >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
-	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> ${PWD}/test/stratum_bmv2_test_${src_host}.log
+	@mkdir -p ${PWD}/test/arch/v1model
+	@echo "${pdu} test" >> ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
+	@docker exec ${MN_STR_NAME} tcpdump -XX -r output_${iface} >> \
+		${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
+
+edf-dp-test-tna-bfmodel-clean:
+	@echo "Terminating any running Tofino model or switch instance"
+	@${PWD}/test/arch/tna/tofino_model_terminate.sh
+	@${PWD}/test/arch/tna/tofino_switch_terminate.sh
+	-sudo rm -rf ${PWD}/pcap_output
+
+edf-dp-test-tna-bfmodel: efcp-tna-build edf-dp-test-tna-bfmodel-clean
+	@echo "Copying test files"
+	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA}/
+	@echo "Running Tofino model"
+	${SDE}/run_tofino_model.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
+	@sleep 30
+	@echo "Running Tofino switch"
+	${SDE}/run_switchd.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
+	@sleep 60
+	@echo "Running ${EDF_DP_P4_TNA_NAME} test"
+	# Target fails if test fails
+	${SDE}/run_p4_tests.sh -p ${EDF_DP_P4_TNA_NAME} 2>&1
+	@make edf-dp-test-tna-bfmodel-clean

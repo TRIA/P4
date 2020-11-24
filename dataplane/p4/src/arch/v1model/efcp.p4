@@ -42,7 +42,7 @@ struct metadata {
 
 // Declare user-defined errors that may be signaled during parsing
 error {
-    WrongPDUtype
+    wrong_pdu_type
 }
 
 /*************************************************************************
@@ -59,38 +59,39 @@ parser SwitchIngressParser(packet_in packet,
 
     state parse_ethernet {
         packet.extract(hdr.ethernet);
-        transition select(hdr.ethernet.etherType) {
-            EFCP_ETYPE: parse_efcp;
-            VLAN_ETYPE: parse_vlan;
-            IPV4_ETYPE: parse_ipv4;
+        transition select(hdr.ethernet.ether_type) {
+            ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_DOT1Q: parse_dot1q;
+            ETHERTYPE_IPV4: parse_ipv4;
             default: accept;
         }
     }
 
-    state parse_vlan {
-        packet.extract(hdr.vlan);
-        transition select(hdr.vlan.etherType) {
-            EFCP_ETYPE: parse_efcp;
+    state parse_dot1q {
+        packet.extract(hdr.dot1q);
+        transition select(hdr.dot1q.proto_id) {
+            ETHERTYPE_EFCP: parse_efcp;
+            ETHERTYPE_IPV4: parse_ipv4;
             default: accept;
         }
     }
 
     state parse_efcp {
         packet.extract(hdr.efcp);
-        verify((hdr.efcp.pduType == DATA_TRANSFER ||
-                hdr.efcp.pduType == LAYER_MANAGEMENT ||
-                hdr.efcp.pduType == ACK_ONLY ||
-                hdr.efcp.pduType == NACK_ONLY ||
-                hdr.efcp.pduType == ACK_AND_FLOW_CONTROL ||
-                hdr.efcp.pduType == NACK_AND_FLOW_CONTROL ||
-                hdr.efcp.pduType == FLOW_CONTROL_ONLY ||
-                hdr.efcp.pduType == SELECTIVE_ACK ||
-                hdr.efcp.pduType == SELECTIVE_NACK ||
-                hdr.efcp.pduType == SELECTIVE_ACK_AND_FLOW_CONTROL ||
-                hdr.efcp.pduType == SELECTIVE_NACK_AND_FLOW_CONTROL ||
-                hdr.efcp.pduType == CONTROL_ACK ||
-                hdr.efcp.pduType == RENDEVOUS)
-            , error.WrongPDUtype);
+        verify((hdr.efcp.pdu_type == DATA_TRANSFER ||
+                hdr.efcp.pdu_type == LAYER_MANAGEMENT ||
+                hdr.efcp.pdu_type == ACK_ONLY ||
+                hdr.efcp.pdu_type == NACK_ONLY ||
+                hdr.efcp.pdu_type == ACK_AND_FLOW_CONTROL ||
+                hdr.efcp.pdu_type == NACK_AND_FLOW_CONTROL ||
+                hdr.efcp.pdu_type == FLOW_CONTROL_ONLY ||
+                hdr.efcp.pdu_type == SELECTIVE_ACK ||
+                hdr.efcp.pdu_type == SELECTIVE_NACK ||
+                hdr.efcp.pdu_type == SELECTIVE_ACK_AND_FLOW_CONTROL ||
+                hdr.efcp.pdu_type == SELECTIVE_NACK_AND_FLOW_CONTROL ||
+                hdr.efcp.pdu_type == CONTROL_ACK ||
+                hdr.efcp.pdu_type == RENDEVOUS)
+            , error.wrong_pdu_type);
         transition accept;
     }
 
@@ -119,12 +120,12 @@ control SwitchIngressVerifyChecksum(inout header_t hdr,
 */
             verify_checksum(hdr.efcp.isValid(),
             { hdr.efcp.ver,
-	      hdr.efcp.dstAddr,
-              hdr.efcp.srcAddr,
-              hdr.efcp.qosID,
-              hdr.efcp.dstCEPID,
-              hdr.efcp.srcCEPID,
-              hdr.efcp.pduType,
+              hdr.efcp.dst_addr,
+              hdr.efcp.src_addr,
+              hdr.efcp.qos_id,
+              hdr.efcp.dst_cep_id,
+              hdr.efcp.src_cep_id,
+              hdr.efcp.pdu_type,
               hdr.efcp.flags,
               hdr.efcp.len,
               hdr.efcp.seqnum },
@@ -144,8 +145,8 @@ control SwitchIngressVerifyChecksum(inout header_t hdr,
               hdr.ipv4.frag_offset,
               hdr.ipv4.ttl,
               hdr.ipv4.protocol,
-              hdr.ipv4.srcAddr,
-              hdr.ipv4.dstAddr
+              hdr.ipv4.src_addr,
+              hdr.ipv4.dst_addr
               },
             hdr.ipv4.hdr_checksum,
             HashAlgorithm.csum16);
@@ -162,8 +163,8 @@ control SwitchIngress(inout header_t hdr,
 /* 
  * Counters
  */
-     counter(64, CounterType.packets) count_efcp;
-     counter(64, CounterType.packets) count_ipv4;
+    counter(64, CounterType.packets) ipv4_counter;
+    counter(64, CounterType.packets) efcp_counter;
 
 /*
  *
@@ -182,23 +183,24 @@ the packet buffer, nor sent to egress processing.
 /*
  * EFCP forwarding action
  */
-    action efcp_forward(bit<12> vlan_id, mac_addr_t dstAddr, egress_spec port) {
-        hdr.vlan.vlan_id = vlan_id;
-        standard_metadata.egress_spec = port;
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = dstAddr;
-	count_efcp.count((bit<32>) standard_metadata.ingress_port);
+    action efcp_forward(bit<12> vlan_id, mac_addr_t dst_mac, egress_spec dst_port) {
+        hdr.dot1q.vlan_id = vlan_id;
+        standard_metadata.egress_spec = dst_port;
+        hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
+        hdr.ethernet.dst_addr = dst_mac;
+        efcp_counter.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
  * IPv4 forwarding action
  */
-    action ipv4_forward(mac_addr_t dstAddr, egress_spec port) {
-        standard_metadata.egress_spec = port;
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = dstAddr;
+    action ipv4_forward(bit<12> vlan_id, mac_addr_t dst_mac, egress_spec dst_port) {
+        hdr.dot1q.vlan_id = vlan_id;
+        standard_metadata.egress_spec = dst_port;
+        hdr.ethernet.src_addr = hdr.ethernet.dst_addr;
+        hdr.ethernet.dst_addr = dst_mac;
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
-	count_ipv4.count((bit<32>) standard_metadata.ingress_port);
+        ipv4_counter.count((bit<32>) standard_metadata.ingress_port);
     }
 
 /*
@@ -206,7 +208,7 @@ the packet buffer, nor sent to egress processing.
  */
     table efcp_exact {
         key = {
-            hdr.efcp.dstAddr: exact;
+            hdr.efcp.dst_addr: exact;
         }
         actions = {
             efcp_forward;
@@ -222,7 +224,7 @@ the packet buffer, nor sent to egress processing.
  */
     table ipv4_lpm {
         key = {
-            hdr.ipv4.dstAddr: lpm;
+            hdr.ipv4.dst_addr: lpm;
         }
         actions = {
             ipv4_forward;
@@ -237,7 +239,7 @@ the packet buffer, nor sent to egress processing.
         if (hdr.efcp.isValid() &&
             standard_metadata.checksum_error == 0 &&
             standard_metadata.parser_error == error.NoError) {
-                if (hdr.efcp.pduType == LAYER_MANAGEMENT) {
+                if (hdr.efcp.pdu_type == LAYER_MANAGEMENT) {
                     standard_metadata.egress_spec = CPU_PORT;
                 } else {
                     efcp_exact.apply();
@@ -267,8 +269,8 @@ control SwitchEgress(inout header_t hdr,
             mark_ecn();
         }
 
-        if (hdr.vlan.vlan_id == 0) {
-            hdr.vlan.setInvalid();
+        if (hdr.dot1q.vlan_id == 0) {
+            hdr.dot1q.setInvalid();
         }
     }
 }
@@ -282,15 +284,15 @@ control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
 /*
 * Compute checksum for EFCP packets
 */
-	update_checksum(
-	    hdr.efcp.isValid(),
+    update_checksum(
+        hdr.efcp.isValid(),
             { hdr.efcp.ver,
-	      hdr.efcp.dstAddr,
-              hdr.efcp.srcAddr,
-              hdr.efcp.qosID,
-              hdr.efcp.dstCEPID,
-              hdr.efcp.srcCEPID,
-              hdr.efcp.pduType,
+              hdr.efcp.dst_addr,
+              hdr.efcp.src_addr,
+              hdr.efcp.qos_id,
+              hdr.efcp.dst_cep_id,
+              hdr.efcp.src_cep_id,
+              hdr.efcp.pdu_type,
               hdr.efcp.flags,
               hdr.efcp.len,
               hdr.efcp.seqnum },
@@ -300,10 +302,10 @@ control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
 /*
 * Compute checksum for IPv4 packets
 */
-	update_checksum(
-	    hdr.ipv4.isValid(),
+    update_checksum(
+        hdr.ipv4.isValid(),
             { hdr.ipv4.version,
-	      hdr.ipv4.ihl,
+              hdr.ipv4.ihl,
               hdr.ipv4.diffserv,
               hdr.ipv4.total_len,
               hdr.ipv4.identification,
@@ -311,8 +313,8 @@ control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
               hdr.ipv4.frag_offset,
               hdr.ipv4.ttl,
               hdr.ipv4.protocol,
-              hdr.ipv4.srcAddr,
-              hdr.ipv4.dstAddr },
+              hdr.ipv4.src_addr,
+              hdr.ipv4.dst_addr },
             hdr.ipv4.hdr_checksum,
             HashAlgorithm.csum16);
    }
@@ -325,10 +327,9 @@ control SwitchEgressComputeChecksum(inout header_t hdr, inout metadata meta) {
 control SwitchEgressDeparser(packet_out packet, in header_t hdr) {
     apply {
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.dot1q);
         packet.emit(hdr.efcp);
         packet.emit(hdr.ipv4);
-        packet.emit(hdr.vlan);
-
     }
 }
 
