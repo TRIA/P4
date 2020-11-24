@@ -23,6 +23,10 @@ before_script:
     sudo -H -u root sh -e -x <<EOS
     rm -rf ${CI_PROJECT_DIR}/builds
     rm -rf ${CI_PROJECT_DIR}/*/project-0/dataplane/p4/pcap_output
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/dataplane/p4/env/mininet/tmp
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/controlplane/p4/env/tmp
+    chmod 777 -R ${CI_PROJECT_DIR}/*/project-0/controlplane/p4/src/common/grpc_out
+    chmod 777 -R {CI_PROJECT_DIR}/*/project-0/controlplane/p4/src/server/stratum
     EOS
 
 
