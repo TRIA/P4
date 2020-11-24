@@ -124,7 +124,7 @@ edf-dp-test-v1model-stratum-send-pdu:
 	@touch ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log
 	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="efcp" count="2"
 	make edf-dp-test-v1model-stratum-send-pdu-type iface="${iface}" src_host="${src_host}" dst_host="${dst_host}" pdu="ipv4" count="2"
-	@test -s ${PWD}/test/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
+	@test -s ${PWD}/test/arch/v1model/stratum_bmv2_test_${src_host}.log && echo "Test for host ${src_host} passed" || \
 		echo "Test for host ${src_host} did not pass"
 
 edf-dp-test-v1model-stratum-send-pdu-type:
