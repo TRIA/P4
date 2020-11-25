@@ -146,12 +146,17 @@ int main(int argc, char** argv) {
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
   param.id = 1;
+  // VLAN = 14
+  param.value = 14;
+  param.bitwidth = 12;
+  entry.action.parameters.push_back(param);
+  param.id = 2;
   // 48 bits / 6 bytes
   // MAC value = "00:00:00:00:00:01" to integer
   param.value = 1;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
-  param.id = 2;
+  param.id = 3;
   // 9 bits / 2 bytes
   param.value = 1;
   param.bitwidth = 9;
@@ -177,12 +182,16 @@ int main(int argc, char** argv) {
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
   param.id = 1;
+  param.value = 0;
+  param.bitwidth = 12;
+  entry.action.parameters.push_back(param);
+  param.id = 2;
   // 48 bits / 6 bytes
   // MAC value = "00:00:00:00:00:02" to integer
   param.value = 2;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
-  param.id = 2;
+  param.id = 3;
   // 9 bits / 2 bytes
   param.value = 2;
   param.bitwidth = 9;
@@ -206,7 +215,8 @@ int main(int argc, char** argv) {
   match.bitwidth = 16;
   entry.matches.push_back(match);
   param.id = 1;
-  param.value = 0;
+  // VLAN = 14
+  param.value = 14;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
   // 48 bits / 6 bytes
