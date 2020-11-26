@@ -107,11 +107,13 @@ edf-dp-tna-build:
 	mkdir -p ${EDF_CFG_PATH}/arch/tna
 	current=${PWD} && cd ${EDF_DATA_PATH} && \
 	make efcp-tna-build && cd ${current}
-	cp -Rp ${EDF_DATA_PATH}/build/arch/tna/* ${EDF_CFG_PATH}/arch/tna/
 	python ${EDF_UTILS_PATH}/tofino_cfg_builder.py \
-		--ctx-json ${EDF_CFG_PATH}/arch/tna/efcp.tofino/pipe/context.json \
-		--tofino-bin ${EDF_CFG_PATH}/arch/tna/efcp.tofino/pipe/tofino.bin \
-		- p "efcp" -o ${EDF_CFG_PATH}/arch/tna/efcp.tofino/pipe/tofino_cp.bin 
+		--ctx-json ${EDF_DATA_PATH}/build/arch/tna/efcp.tofino/pipe/context.json \
+		--tofino-bin ${EDF_DATA_PATH}/build/arch/tna/efcp.tofino/pipe/tofino.bin \
+		--name "efcp" --out ${EDF_DATA_PATH}/build/arch/tna/efcp.tofino/pipe/tofino_cp.bin
+	-cp -Rp ${EDF_DATA_PATH}/build/arch/tna/* ${EDF_CFG_PATH}/arch/tna/
+	@echo "*** Tofino binary generated successfully! Output file \
+	       	in ${EDF_CFG_PATH}/arch/tna/efcp.tofino/pipe/tofino_cp.bin"
 
 # Client environment setup
 
