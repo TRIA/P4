@@ -264,8 +264,8 @@ int main(int argc, char** argv) {
   param.value = 1;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
-  param.id = 3;
   // 9 bits / 2 bytes . Param . Port = 2
+  param.id = 3;
   param.value = 2;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -293,14 +293,14 @@ int main(int argc, char** argv) {
   param.value = 0;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
-  param.id = 2;
   // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:02" to integer
   // (updated last inserted rule. As described above, this is just for testing rule edition)
+  param.id = 2;
   param.value = 2;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
-  param.id = 3;
   // 9 bits / 2 bytes . Param . Port = 2
+  param.id = 3;
   param.value = 2;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -314,6 +314,7 @@ int main(int argc, char** argv) {
   std::cout << "\n-------------- ReadTableEntry --------------\n" << std::endl;
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:02" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
   match.value = 2;
@@ -423,6 +424,7 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.ipv4_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 32 bits / 4 bytes . Match . Dst IPv4 value = "10.0.0.1" to integer
   match.field_id = 1;
   match.type = P4MatchType::lpm;
   match.value = 1;
@@ -440,6 +442,7 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.ipv4_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 32 bits / 4 bytes . Match . Dst IPv4 value = "10.0.0.2" to integer
   match.field_id = 1;
   match.type = P4MatchType::lpm;
   match.value = 2;
@@ -457,6 +460,7 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:01" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
   match.value = 1;
@@ -474,6 +478,7 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:02" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
   match.value = 2;
