@@ -103,12 +103,11 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "\n-------------- SetFwdPipeConfig --------------\n" << std::endl;
-  if (p4Info.tables_size() == 0) {
-    status = p4RuntimeClient.SetFwdPipeConfig();
-    handle_status(status);
-  } else {
+  if (p4Info.tables_size() > 0) {
     std::cout << "Warning: forwarding pipeline configuration already pushed" << std::endl;
   }
+  status = p4RuntimeClient.SetFwdPipeConfig();
+  handle_status(status);
 
   std::cout << "\n-------------- GetP4Info (after pushing pipeline) --------------\n" << std::endl;
   p4Info = p4RuntimeClient.GetP4Info();

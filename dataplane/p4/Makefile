@@ -5,7 +5,8 @@ P4R_STR_NAME := p4runtime-sh
 
 EDF_DP_BUILD_ARCH_V1MODEL := build/arch/v1model
 EDF_DP_P4_TNA_NAME := tna_efcp
-EDF_DP_BUILD_ARCH_TNA := ${SDE}/pkgsrc/p4-examples/p4_16_programs/${EDF_DP_P4_TNA_NAME}
+EDF_DP_BUILD_ARCH_TNA := build/arch/tna
+EDF_DP_BUILD_ARCH_TNA2 := ${SDE}/pkgsrc/p4-examples/p4_16_programs/${EDF_DP_P4_TNA_NAME}
 EDF_DP_INSTALL_ARCH_TNA := ${SDE_INSTALL}/share/tofinopd/${EDF_DP_P4_TNA_NAME}
 EDF_DP_BUILD_SDE_ARCH_TNA := ${SDE}/build/p4-build/${EDF_DP_P4_TNA_NAME}/tofino/${EDF_DP_P4_TNA_NAME}
 
@@ -87,14 +88,20 @@ efcp-tna-build: src/arch/tna
 	@(current=${PWD} && cd $< && \
 		${SDE}/../p4_build-9.2.0.sh --with-p4c --with-graphs -I${PWD}/common efcp.p4 \
 		P4_VERSION=p4_16 P4_ARCHITECTURE=tna P4_NAME=${EDF_DP_P4_TNA_NAME} && \
-		mkdir -p ${EDF_DP_BUILD_ARCH_TNA} && mkdir -p ${EDF_DP_INSTALL_ARCH_TNA} && \
+		mkdir -p ${EDF_DP_BUILD_ARCH_TNA2} && mkdir -p ${EDF_DP_INSTALL_ARCH_TNA} && \
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/${EDF_DP_P4_TNA_NAME}.conf ${SDE_INSTALL}/share/p4/targets/tofino/ && \
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/bf-rt.json ${EDF_DP_INSTALL_ARCH_TNA}/ && \
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/context.json ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
 		cp -p ${EDF_DP_BUILD_SDE_ARCH_TNA}/pipe/tofino.bin ${EDF_DP_INSTALL_ARCH_TNA}/pipe/ && \
-		cp -Rp ${EDF_DP_BUILD_SDE_ARCH_TNA}/* ${EDF_DP_BUILD_ARCH_TNA}/ && \
+		cp -Rp ${EDF_DP_BUILD_SDE_ARCH_TNA}/* ${EDF_DP_BUILD_ARCH_TNA2}/ && \
+		bf-p4c --std p4-16 --arch tna --p4runtime-force-std-externs --p4runtime-files \
+		    ../../../${EDF_DP_BUILD_ARCH_TNA}/efcp.p4info.pb.txt \
+		    --p4runtime-format text -D TOFINO -o ../../../${EDF_DP_BUILD_ARCH_TNA}/ efcp.p4 && \
 		cd ${current} && \
-	 	echo "*** P4 program compiled successfully! Output files are in ${EDF_DP_BUILD_ARCH_TNA} and ${EDF_DP_INSTALL_ARCH_TNA}")
+		echo ${current}/${EDF_DP_BUILD_ARCH_TNA} && \
+		cp -Rp ${EDF_DP_INSTALL_ARCH_TNA}/* ${PWD}/${EDF_DP_BUILD_ARCH_TNA}/ && \
+		cd ${current} && \
+	 	echo "*** P4 program compiled successfully! Output files are in ${PWD}/${EDF_DP_BUILD_ARCH_TNA}, as well as in ${EDF_DP_BUILD_ARCH_TNA2} and ${EDF_DP_INSTALL_ARCH_TNA}")
 
 mn-start: docker_net_create
 	docker run --privileged --rm -it -v ${PWD}/env/mininet:/mininet \
@@ -144,7 +151,7 @@ edf-dp-test-tna-bfmodel-clean:
 
 edf-dp-test-tna-bfmodel: efcp-tna-build edf-dp-test-tna-bfmodel-clean
 	@echo "Copying test files"
-	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA}/
+	@cp -Rp ${PWD}/test/arch/tna/*.py ${EDF_DP_BUILD_ARCH_TNA2}/
 	@echo "Running Tofino model"
 	${SDE}/run_tofino_model.sh -p ${EDF_DP_P4_TNA_NAME} > /dev/null 2>&1 &
 	@sleep 30
