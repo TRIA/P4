@@ -72,9 +72,10 @@ Run the program, providing any suitable argument. If none is provided, defaults 
 
 ```bash
 make edf-cp-client-attach
-
 cd p4
 make edf-cp-client
+
+# v1model architecture: use with bmv2-enabled Mininet
 CFG_V1MODEL="cfg/arch/v1model/p4info.txt,cfg/arch/v1model/bmv2.json"
 # Option 1 for data plane server
 ./bin/edf-cp-client --grpc-addr=mn-stratum:50001 --config=${CFG_V1MODEL} --election-id=0,1
@@ -82,6 +83,10 @@ CFG_V1MODEL="cfg/arch/v1model/p4info.txt,cfg/arch/v1model/bmv2.json"
 ./bin/edf-cp-client --grpc-addr=edf-dp-server:28000 --config=${CFG_V1MODEL} --election-id=0,1
 # Option 3 for data plane server (deprecated)
 ./bin/edf-cp-client --grpc-addr=localhost:50051 --config=${CFG_V1MODEL} --election-id=0,1
+
+# TNA: use with the Tofino-enabled target
+CFG_TNA="cfg/arch/tna/efcp.p4info.pb.txt,cfg/arch/tna/tofino_out.bin"
+./bin/edf-cp-client --grpc-addr=172.18.1.242:28000 --config=${CFG_TNA} --election-id=0,1
 ```
 
 ### Extra: all-in-one testing

@@ -9,6 +9,7 @@ EDF_CFG_PATH := ${PWD}/cfg
 EDF_CLIENT_SRC_PATH := ${PWD}/src/client
 EDF_REFERENCE_SRC_PATH := ${PWD}/src/reference
 EDF_SERVER_SRC_PATH := ${PWD}/src/server
+EDF_UTILS_PATH := ${PWD}/utils
 GRPC_BUILDDIR := ${EDF_COMMON_SRC_PATH}/grpc_out
 GRPC_BUILDDIR_EXISTS := $(shell test -d ${GRPC_BUILDDIR} && echo "true" || echo "false")
 ifeq (${GRPC_BUILDDIR_EXISTS},true)
@@ -101,6 +102,18 @@ edf-dp-v1model-build:
 	current=${PWD} && cd ${EDF_DATA_PATH} && \
 	make efcp-v1model-build && cd ${current}
 	cp -Rp ${EDF_DATA_PATH}/build/arch/v1model/* ${EDF_CFG_PATH}/arch/v1model/
+
+edf-dp-tna-build:
+	mkdir -p ${EDF_CFG_PATH}/arch/tna
+	current=${PWD} && cd ${EDF_DATA_PATH} && \
+	make efcp-tna-build && cd ${current}
+	python ${EDF_UTILS_PATH}/tofino_cfg_builder.py \
+		--ctx-json ${EDF_DATA_PATH}/build/arch/tna/context.json \
+		--tofino-bin ${EDF_DATA_PATH}/build/arch/tna/tofino.bin \
+		--name "efcp" --out ${EDF_DATA_PATH}/build/arch/tna/tofino_out.bin
+	-sudo cp -Rp ${EDF_DATA_PATH}/build/arch/tna/* ${EDF_CFG_PATH}/arch/tna/
+	@echo "*** Tofino binary generated successfully! Output files located \
+		in ${EDF_CFG_PATH}/arch/tna/{efcp.p4info.pb.txt,tofino_out.bin}"
 
 # Client environment setup
 
