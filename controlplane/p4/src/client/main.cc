@@ -136,27 +136,30 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.ipv4_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 32 bits / 4 bytes . Match . Dst IPv4 value = "10.0.0.1" to integer
   match.field_id = 1;
   match.type = P4MatchType::lpm;
-  // 32 bits / 4 bytes
-  // IP value = "10.0.0.1" to integer
   match.value = 167772161;
   match.bitwidth = 32;
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
+  // 12 bits / 2 bytes . Param . VLAN = 14
   param.id = 1;
-  // VLAN = 14
   param.value = 14;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
+  // 48 bits / 6 bytes . Param . Src MAC value = "00:00:00:00:00:01" to integer
   param.id = 2;
-  // 48 bits / 6 bytes
-  // MAC value = "00:00:00:00:00:01" to integer
   param.value = 1;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
+  // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:02" to integer
   param.id = 3;
-  // 9 bits / 2 bytes
+  param.value = 1;
+  param.bitwidth = 48;
+  entry.action.parameters.push_back(param);
+  // 9 bits / 2 bytes . Param . Port = 1
+  param.id = 4;
   param.value = 1;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -172,26 +175,30 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.ipv4_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 32 bits / 4 bytes . Match . Dst IPv4 value = "10.0.0.2" to integer
   match.field_id = 1;
   match.type = P4MatchType::lpm;
-  // 32 bits / 4 bytes
-  // IP value = "10.0.0.2" to integer
   match.value = 167772162;
   match.bitwidth = 32;
   match.lpm_prefix = 32;
   entry.matches.push_back(match);
+  // 12 bits / 2 bytes . Param . VLAN = 0
   param.id = 1;
   param.value = 0;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
+  // 48 bits / 6 bytes . Param . Src MAC value = "00:00:00:00:00:02" to integer
   param.id = 2;
-  // 48 bits / 6 bytes
-  // MAC value = "00:00:00:00:00:02" to integer
   param.value = 2;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
+  // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:01" to integer
   param.id = 3;
-  // 9 bits / 2 bytes
+  param.value = 1;
+  param.bitwidth = 48;
+  entry.action.parameters.push_back(param);
+  // 9 bits / 2 bytes . Param . Port = 2
+  param.id = 4;
   param.value = 2;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -207,25 +214,24 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:01" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
-  // 16 bits / 2 bytes
   match.value = 1;
   match.bitwidth = 16;
   entry.matches.push_back(match);
+  // 12 bits / 2 bytes . Param . VLAN = 14
   param.id = 1;
-  // VLAN = 14
   param.value = 14;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
-  // 48 bits / 6 bytes
-  // MAC value = "00:00:00:00:00:1" to integer
+  // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:01" to integer
   param.id = 2;
   param.value = 1;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
+  // 9 bits / 2 bytes . Param . Port = 1
   param.id = 3;
-  // 9 bits / 2 bytes
   param.value = 1;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -241,24 +247,25 @@ int main(int argc, char** argv) {
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
   entry.timeout_ns = 0;
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:02" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
-  // 16 bits / 2 bytes
   match.value = 2;
   match.bitwidth = 16;
   entry.matches.push_back(match);
+  // 12 bits / 2 bytes . Param . VLAN = 0
   param.id = 1;
   param.value = 0;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
-  // 48 bits / 6 bytes
-  // MAC value = "00:00:00:00:00:01" to integer (should be "00:00:00:00:00:02", will be changed later)
+  // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:01" to integer
+  // (should be "00:00:00:00:00:02", but :01 is introduced because a row edition is performer later, as a test, to update it)
   param.id = 2;
   param.value = 1;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
   param.id = 3;
-  // 9 bits / 2 bytes
+  // 9 bits / 2 bytes . Param . Port = 2
   param.value = 2;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
@@ -274,24 +281,26 @@ int main(int argc, char** argv) {
   entry.table_id = p4RuntimeClient.GetP4TableIdFromName(p4Info, "SwitchIngress.efcp_exact");
   entry.action.action_id = p4RuntimeClient.GetP4ActionIdFromName(p4Info, "SwitchIngress.efcp_forward");
   entry.action.default_action = false;
+  // 16 bits / 2 bytes . Match . Dst EFCP ID value = "00:00:00:00:00:02" to integer
   match.field_id = 1;
   match.type = P4MatchType::exact;
   // Match value cannot be changed (search process matches against it)
   match.value = 2;
   match.bitwidth = 16;
   entry.matches.push_back(match);
+  // 12 bits / 2 bytes . Param . VLAN = 0
   param.id = 1;
   param.value = 0;
   param.bitwidth = 12;
   entry.action.parameters.push_back(param);
   param.id = 2;
-  // 48 bits / 6 bytes
-  // MAC value = "00:00:00:00:00:02" to integer
+  // 48 bits / 6 bytes . Param . Dst MAC value = "00:00:00:00:00:02" to integer
+  // (updated last inserted rule. As described above, this is just for testing rule edition)
   param.value = 2;
   param.bitwidth = 48;
   entry.action.parameters.push_back(param);
   param.id = 3;
-  // 9 bits / 2 bytes
+  // 9 bits / 2 bytes . Param . Port = 2
   param.value = 2;
   param.bitwidth = 9;
   entry.action.parameters.push_back(param);
