@@ -8,10 +8,18 @@ ENV RELEASE_TAG $GRPC_RELEASE
 ENV BASE_PATH_GRPC /opt/grpc
 ENV BASE_PATH_P4R /opt/p4runtime
 ENV GOOGLE_PROTO_DIR ${BASE_PATH_P4R}/googleapis
+ENV TZ=America/Montreal
+
+#
+# Preinitialize the timezone so that installing 'tzdata' won't freeze
+# the docker setup.
+#
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 ##
 # Install requirements
 #
+
 RUN apt-get update
 RUN apt-get install -y sudo build-essential cmake gcc git pkg-config
 ## Install openssl (to use instead of boringssl)
