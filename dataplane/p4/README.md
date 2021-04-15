@@ -10,7 +10,7 @@ The _model_ folder contains the data plane code for the P4 target.
 **Note**: the following environment and tests are based on the *v1model* architecture only.
 
 # Automatic verification of EFCP and IPv4 transmission
-make edf-dp-test-stratum
+make edf-dp-test-v1model-stratum
 
 # Manual verification of EFCP and IPv4 transmission
 
