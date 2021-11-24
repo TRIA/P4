@@ -3,8 +3,8 @@ import os
 import time
 
 this_file = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(this_file, '..'))
-sys.path.append(os.path.join(this_file, '../../common/python/utils'))
+sys.path.append(os.path.join(this_file, '../config'))
+sys.path.append(os.path.join(this_file, '../common/python/utils'))
 
 import p4runtime_lib.tofino
 from p4runtime_lib.switch import ShutdownAllSwitchConnections
