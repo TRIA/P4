@@ -8,6 +8,10 @@
 #define CPU_PORT 255
 #define CPU_CLONE_SESSION_ID 99
 
+#define CNT_DROP 0
+#define CNT_FWD  1
+#define CNT_ERR  2
+
 error {
     wrong_pdu_type
 }
@@ -185,8 +189,12 @@ control IPToDMAC(inout ethernet_h ethernet,
                  in    ingress_intrinsic_metadata_t ig_intr_md,
                  inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
 
+    Counter<bit<32>, bit<2>>(2, CounterType_t.PACKETS) cnt;
+
     action drop() {
         ig_intr_dprsr_md.drop_ctl = 0x1;
+
+        cnt.count(CNT_DROP);
     }
 
     // IP forwarding action
@@ -194,6 +202,8 @@ control IPToDMAC(inout ethernet_h ethernet,
         ethernet.src_addr = ethernet.dst_addr;
         ethernet.dst_addr = dmac;
         ipv4.ttl = ipv4.ttl - 1;
+
+        cnt.count(CNT_FWD);
     }
 
     // Prefix IP routing
@@ -209,7 +219,6 @@ control IPToDMAC(inout ethernet_h ethernet,
         size = 1024;
         default_action = NoAction;
     }
-
 
     apply {
         if (ipv4.isValid()) {
@@ -229,8 +238,13 @@ control RINAToDMAC(inout ethernet_h ethernet,
                    in    metadata_t ig_md,
                    in    ingress_intrinsic_metadata_t ig_intr_md,
                    inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+
+    Counter<bit<32>, bit<2>>(2, CounterType_t.PACKETS) cnt;
+
     action drop() {
         ig_intr_dprsr_md.drop_ctl = 0x1;
+
+        cnt.count(CNT_DROP);
     }
 
     // EFCP forwarding action
@@ -238,6 +252,8 @@ control RINAToDMAC(inout ethernet_h ethernet,
         //hdr.dot1q.vlan_id = vlan_id;
         ethernet.src_addr = ethernet.dst_addr;
         ethernet.dst_addr = dmac;
+
+        cnt.count(CNT_FWD);
     }
 
     table map {
@@ -276,10 +292,6 @@ control SwitchIngress(
     DMACToPort() dmac_to_port;
     IPToDMAC() ip_to_dmac;
     RINAToDMAC() rina_to_dmac;
-
-    // Counter<bit<32>, PortId_t>(64, CounterType_t.PACKETS_AND_BYTES) ipv4_counter;
-    // Counter<bit<32>, PortId_t>(64, CounterType_t.PACKETS_AND_BYTES) efcp_counter;
-    // Counter<bit<32>, PortId_t>(64, CounterType_t.PACKETS_AND_BYTES) eth_counter;
 
     action drop() {
         ig_intr_dprsr_md.drop_ctl = 0x1;
@@ -496,4 +508,5 @@ Pipeline(SwitchIngressParser(),
          SwitchEgressDeparser()) pipe;
 
 Switch(pipe) main;
+
 
