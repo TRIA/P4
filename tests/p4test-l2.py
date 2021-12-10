@@ -40,7 +40,7 @@ class TestICMP(unittest.TestCase):
             / IP(dst=EDF9_IP, src=EDF10_IP) \
             / ICMP(type=0)
         t = AsyncSniffer(iface=PORT_A_VETH, count=2, timeout=2)
-        t.start()
+        t.start()X
         time.sleep(1)
         sendp(icmp_reply, count=1, iface=PORT_B_VETH, verbose=False)
         t.join()
@@ -48,6 +48,18 @@ class TestICMP(unittest.TestCase):
         self.assertIsNotNone(pkts)
         self.assertEqual(EDF9_REAL_MAC, pkts[0].dst)
         self.assertEqual(EDF10_FAKE_MAC, pkts[0].src)
+
+    def test_broadcast(self):
+        icmp_bcast = Ether(dst="FF:FF:FF:FF:FF:FF", src=EDF9_REAL_MAC)
+        t = AsyncSniffer(iface=PORT_B_VETH, count=1, timeout=2)
+        t.start()
+        time.sleep(1)
+        sendp(icmp_bcast, count=1, iface=PORT_A_VETH, verbose=False)
+        t.join()
+        pkts = t.results
+        self.assertIsNotNone(pkts)
+        self.assertTrue(len(pkts) == 1)
+        self.assertEqual("ff:ff:ff:ff:ff:ff", pkts[0].dst)
 
 # Test EFCP packets embedded in Ethernet packet... This is L2
 # switching so it shouldn't matter anyway. The check that we have

@@ -12,10 +12,11 @@ typedef bit<9> egress_spec;
 
 typedef bit<16> ether_type_t;
 const ether_type_t ETHERTYPE_ARP = 16w0x0806;
-const ether_type_t ETHERTYPE_EFCP = 16w0xD1F;
+const ether_type_t ETHERTYPE_EFCP = 16w0xD1F0;
 const ether_type_t ETHERTYPE_IPV4 = 16w0x0800;
 const ether_type_t ETHERTYPE_IPV6 = 16w0x86dd;
 const ether_type_t ETHERTYPE_DOT1Q = 16w0x8100;
+const ether_type_t ETHERTYPE_RINARP = 16w0x4305;
 
 typedef bit<8> ip_protocol_t;
 const ip_protocol_t IP_PROTOCOLS_ICMP = 1;

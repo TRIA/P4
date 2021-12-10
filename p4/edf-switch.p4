@@ -8,9 +8,20 @@
 #define CPU_PORT 255
 #define CPU_CLONE_SESSION_ID 99
 
+// L3 Forwarding counters, for IP and RINA.
 #define CNT_DROP 0
 #define CNT_FWD  1
 #define CNT_ERR  2
+
+// Raw ingress packet counters
+#define CNT_IN_IPV4   0
+#define CNT_IN_IPV6   1
+#define CNT_IN_EFCP   2
+#define CNT_IN_ARP    3
+#define CNT_IN_VLAN   4
+#define CNT_IN_RINARP 5
+#define CNT_IN_OTHER  6
+#define CNT_IN_MAX    7
 
 error {
     wrong_pdu_type
@@ -99,23 +110,23 @@ parser SwitchIngressParser(
 
 // Control that deals with changing the spoofed MACs for the right
 // address so that the packet goes to the right place.
-control TranslateMAC(inout mac_addr_t mac) {
-    action translate(mac_addr_t new_mac) {
+control SpoofMAC(inout mac_addr_t mac) {
+    action spoof(mac_addr_t new_mac) {
         mac = new_mac;
     }
 
-    table changeTo {
+    table spoof_map {
         key = {
             mac: exact;
         }
         actions = {
-            translate;
+            spoof;
         }
         size = 1024;
     }
 
     apply {
-        changeTo.apply();
+        spoof_map.apply();
     }
 }
 
@@ -282,6 +293,40 @@ control RINAToDMAC(inout ethernet_h ethernet,
     }
 }
 
+// Counter of the types of ingress packets we're seeing. This is
+// mostly for diagnostic purposes.
+control IngressCounter(in ether_type_t ether_type) {
+    // Ingress packet counter.
+    Counter<bit<32>, bit<3>>(CNT_IN_MAX, CounterType_t.PACKETS) per_type;
+
+    // Raw ethernet counter.
+    Counter<bit<32>, bit<1>>(1, CounterType_t.PACKETS) eth;
+
+    apply {
+        // Count inbound ethernet packets. The P4 compiler does not want us
+        // to have this counter in the same counter object as the other.
+        // Try it and you'll see!
+        eth.count(0);
+
+        // Count inbound packets by each type.
+        if (ether_type == ETHERTYPE_IPV6) {
+            per_type.count(CNT_IN_IPV6);
+        } else if (ether_type == ETHERTYPE_IPV4) {
+            per_type.count(CNT_IN_IPV4);
+        } else if (ether_type == ETHERTYPE_EFCP) {
+            per_type.count(CNT_IN_EFCP);
+        } else if (ether_type == ETHERTYPE_ARP) {
+            per_type.count(CNT_IN_ARP);
+        } else if (ether_type == ETHERTYPE_DOT1Q) {
+            per_type.count(CNT_IN_VLAN);
+        } else if (ether_type == ETHERTYPE_RINARP) {
+            per_type.count(CNT_IN_RINARP);
+        } else {
+            per_type.count(CNT_IN_OTHER);
+        }
+    }
+}
+
 control SwitchIngress(
         inout header_t hdr,
         inout metadata_t ig_md,
@@ -292,16 +337,36 @@ control SwitchIngress(
     DMACToPort() dmac_to_port;
     IPToDMAC() ip_to_dmac;
     RINAToDMAC() rina_to_dmac;
+    IngressCounter() ingress_cnt;
 
     action drop() {
         ig_intr_dprsr_md.drop_ctl = 0x1;
+    }
+
+    // Ethernet broadcast. Don't configure this one if you use VLANs.
+    action broadcast(MulticastGroupId_t mcast_gid) {
+        ig_intr_tm_md.mcast_grp_a = mcast_gid;
+
+        hdr.bridged.is_broadcast = 1;
     }
 
     // VLAN forwarding.
     action vlan_forward(MulticastGroupId_t mcast_gid) {
         ig_intr_tm_md.mcast_grp_a = mcast_gid;
 
-        hdr.bridged.is_replicated = 1;
+        hdr.bridged.is_vlan = 1;
+    }
+
+    table broadcast_map {
+        key = {
+            hdr.ethernet.dst_addr: exact;
+        }
+        actions = {
+            broadcast;
+            NoAction;
+        }
+        size = 1;
+        const default_action = NoAction();
     }
 
     // VLAN IDs
@@ -314,12 +379,14 @@ control SwitchIngress(
             NoAction;
         }
         size = 1024;
-        default_action = NoAction();
+        const default_action = NoAction();
     }
 
     apply {
         // Deal with L2 routing if its configured.
         if (hdr.ethernet.isValid()) {
+
+            ingress_cnt.apply(hdr.ethernet.ether_type);
 
             // VLAN routing.
             if (hdr.dot1q.isValid()) {
@@ -327,6 +394,7 @@ control SwitchIngress(
             }
             // L3 routing otherwise.
             else {
+                broadcast_map.apply();
 
                 // RINA routing.
                 rina_to_dmac.apply(hdr.ethernet, hdr.efcp, ig_md, ig_intr_md, ig_intr_dprsr_md);
@@ -424,8 +492,8 @@ control SwitchEgress(
         in egress_intrinsic_metadata_from_parser_t eg_intr_prsr_md,
         inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md,
         inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
-    TranslateMAC() dmac;
-    TranslateMAC() smac;
+    SpoofMAC() dmac;
+    SpoofMAC() smac;
     PortToDMAC() port_to_dmac;
 
     action drop() {
@@ -435,13 +503,14 @@ control SwitchEgress(
     apply {
         // This is specific to VLANs. This prevents a multicast packet
         // from going back to its source port.
+        if (hdr.bridged.ingress_port == eg_intr_md.egress_port) {
+            drop();
+        }
 
-        if (hdr.bridged.is_replicated == 1) {
-            if (hdr.bridged.ingress_port == eg_intr_md.egress_port) {
-                drop();
-            } else {
-                port_to_dmac.apply(eg_intr_md.egress_port, hdr.ethernet, eg_intr_dprsr_md);
-            }
+        // FIXME: This is for VLANs and I'm really not sure this is the right
+        // way to proceed.
+        if (hdr.bridged.is_vlan == 1) {
+            port_to_dmac.apply(eg_intr_md.egress_port, hdr.ethernet, eg_intr_dprsr_md);
         }
 
         // Change the source MAC if necessary

@@ -11,9 +11,33 @@ class L2ControlPlane(ControlPlane):
     def __init__(self):
         self.name = "L2"
         self.setup_ops = [
+            ("L2 broadcast", self.setupBroadcasting),
             ("Fake MACs translation", self.setupFakeMacs),
             ("L2 switching to ports", self.setupL2Forwarding)
         ]
+
+    def setupBroadcasting(self):
+        # Multicast group for broadcasting.
+        ge = self.p4helper.buildMulticastGroupEntry(1, [{
+            "egress_port": PORT_A_NO,
+            "instance": 1
+        },{
+            "egress_port": PORT_B_NO,
+            "instance": 1
+        }])
+        self.conn.WritePREEntry(ge)
+
+        # VLAN to multicast-group table
+        te = self.p4helper.buildTableEntry(
+            table_name="SwitchIngress.broadcast_map",
+            match_fields={
+                "hdr.ethernet.dst_addr": "ff:ff:ff:ff:ff:ff"
+            },
+            action_name="SwitchIngress.broadcast",
+            action_params={
+                "mcast_gid": 1
+            })
+        self.conn.WriteTableEntry(te)
 
     def setupL2Forwarding(self):
         # Destination forwarding
@@ -39,11 +63,11 @@ class L2ControlPlane(ControlPlane):
         # Destination MAC translations
         for i in translations:
             te = self.p4helper.buildTableEntry(
-                table_name="SwitchEgress.dmac.changeTo",
+                table_name="SwitchEgress.dmac.spoof_map",
                 match_fields={
                     "mac": i[0]
                 },
-                action_name="SwitchEgress.dmac.translate",
+                action_name="SwitchEgress.dmac.spoof",
                 action_params={
                     "new_mac": i[1]
                 })
@@ -53,11 +77,11 @@ class L2ControlPlane(ControlPlane):
         # Source MAC translations
         for i in translations:
             te = self.p4helper.buildTableEntry(
-                table_name="SwitchEgress.smac.changeTo",
+                table_name="SwitchEgress.smac.spoof_map",
                 match_fields={
                     "mac": i[1]
                 },
-                action_name="SwitchEgress.smac.translate",
+                action_name="SwitchEgress.smac.spoof",
                 action_params={
                     "new_mac": i[0]
                 })

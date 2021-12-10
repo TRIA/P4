@@ -21,9 +21,13 @@ struct metadata_t {
 // Header bridged between Ingress and Egress. Not to be emitted out of
 // egress.
 header bridged_h {
-    bit<6> _pad;
+    bit<5> _pad;
 
-    bit<1> is_replicated;
+    // VLAN
+    bit<1> is_vlan;
+
+    // Just plain old broadcast
+    bit<1> is_broadcast;
 
     // Port on which the packet has been received.
     PortId_t ingress_port;
