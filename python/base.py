@@ -45,8 +45,50 @@ class ControlPlane(object):
             op[1]()
         print("END of switch setup")
 
+    def _getCounterData(self, ids, sw, index):
+        for response in sw.ReadCounters(ids, index):
+            entity = response.entities[0]
+            return entity.counter_entry.data
+
+    def getFwdDropCounter(self, p4helper, sw, counter_name):
+        nb_fwd = 0
+        nb_drop = 0
+        ids = p4helper.get_counters_id(counter_name)
+        nb_fwd = self._getCounterData(ids, sw, 0).packet_count
+        nb_drop = self._getCounterData(ids, sw, 1).packet_count
+        return ("FWD: %d DROP: %d" % (nb_fwd, nb_drop))
+
+    def formatIngressCounters(self, p4helper, sw, eth_cnt_name, type_cnt_name):
+        eth_ids = p4helper.get_counters_id(eth_cnt_name)
+        nb_eth = self._getCounterData(eth_ids, sw, 0) # Ethernet packets
+        type_ids = p4helper.get_counters_id(type_cnt_name)
+        nb_ipv4   = self._getCounterData(type_ids, sw, 0) # CNT_IN_IPV4
+        nb_ipv6   = self._getCounterData(type_ids, sw, 1) # CNT_IN_IPV6
+        nb_efcp   = self._getCounterData(type_ids, sw, 2) # CNT_IN_EFCP
+        nb_arp    = self._getCounterData(type_ids, sw, 3) # CNT_IN_ARP
+        nb_vlan   = self._getCounterData(type_ids, sw, 4) # CNT_IN_VLAN
+        nb_rinarp = self._getCounterData(type_ids, sw, 5) # CNT_IN_RINARP
+        nb_oth    = self._getCounterData(type_ids, sw, 6) # CNT_IN_OTHER
+        return ("ETH: %d IPV4: %d IPV6: %d EFCP: %d ARP: %d VLAN: %d RINARP: %d OTH: %d" % \
+                (nb_eth.packet_count, nb_ipv4.packet_count, nb_ipv6.packet_count,
+                 nb_efcp.packet_count, nb_arp.packet_count, nb_vlan.packet_count,
+                 nb_rinarp.packet_count, nb_oth.packet_count))
+
     def waitLoop(self):
         while True:
+            try:
+                print("----------------------------------------------------------------------")
+                print("IP Packets\t " \
+                      + self.getFwdDropCounter(self.p4helper, self.conn, "SwitchIngress.ip_to_dmac.cnt"))
+                print("RINA Packets\t " \
+                      + self.getFwdDropCounter(self.p4helper, self.conn, "SwitchIngress.rina_to_dmac.cnt"))
+                print(self.formatIngressCounters(self.p4helper, self.conn,
+                                                 "SwitchIngress.ingress_cnt.eth",
+                                                 "SwitchIngress.ingress_cnt.per_type"))
+                print("----------------------------------------------------------------------")
+
+            except Exception as e:
+                print("Error reading counters: ", e)
             time.sleep(10)
 
 def ControlPlaneMain(control_plane):
