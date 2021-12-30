@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package routerctl;
+
+import "status.proto";
+
+message ReqAddMACToPort {
+    string mac = 1;
+    uint32 port = 2;
+}
+
+message ReqDelMACToPort {
+    string mac = 1;
+}
+
+message ReqAddSpoofedMAC {
+    string mac = 1;
+    string spoofed_mac = 2;
+}
+
+message ReqDelSpoofedMAC {
+    string mac = 1;
+}
+
+service L2RouterControl {
+    rpc AddMACToPort(ReqAddMACToPort) returns (ciena.dfd.StatusReply) {}
+    rpc DelMACToPort(ReqDelMACToPort) returns (ciena.dfd.StatusReply) {}
+
+    rpc AddSpoofedMAC(ReqAddSpoofedMAC) returns (ciena.dfd.StatusReply) {}
+    rpc DelSpoofedMAC(ReqDelSpoofedMAC) returns (ciena.dfd.StatusReply) {}
+}
