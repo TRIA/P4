@@ -359,14 +359,21 @@ control SwitchIngress(
 
     table broadcast_map {
         key = {
-            hdr.ethernet.dst_addr: exact;
+            hdr.ethernet.dst_addr: ternary;
         }
         actions = {
             broadcast;
             NoAction;
         }
-        size = 1;
+        size = 2;
         const default_action = NoAction();
+        const entries = {
+            // This is for broadcasts!
+            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFFF: broadcast(1);
+
+            // This is the multicast mask.
+            0x01005E000000 &&& 0x1FFFFFF000000: broadcast(1);
+        }
     }
 
     // VLAN IDs
