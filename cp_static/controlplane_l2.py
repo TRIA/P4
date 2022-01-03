@@ -27,18 +27,6 @@ class L2ControlPlane(ControlPlane):
         }])
         self.conn.WritePREEntry(ge)
 
-        # VLAN to multicast-group table
-        te = self.p4helper.buildTableEntry(
-            table_name="SwitchIngress.broadcast_map",
-            match_fields={
-                "hdr.ethernet.dst_addr": "ff:ff:ff:ff:ff:ff"
-            },
-            action_name="SwitchIngress.broadcast",
-            action_params={
-                "mcast_gid": 1
-            })
-        self.conn.WriteTableEntry(te)
-
     def setupL2Forwarding(self):
         # Destination forwarding
         for i in [(EDF9_FAKE_MAC, PORT_A_NO),
