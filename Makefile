@@ -75,11 +75,11 @@ bf-shell: $(TOFINO_B4R_BIN)
 
 # P4Runtime program to start on the tofino-model
 model-controlplane_%: $(TOFINO_P4R_BIN)
-	python/$(subst model-,,$@).py $(MODEL_ADDR) $(MODEL_PORT) $(MODEL_DEVICE_ID)
+	cp_static/$(subst model-,,$@).py $(MODEL_ADDR) $(MODEL_PORT) $(MODEL_DEVICE_ID)
 
 # P4Runtime program to start on the Edgecore switch
 bf-controlplane_%: $(TOFINO_P4R_BIN)
-	python/$(subst bf-,,$@).py $(BF_ADDR) $(BF_PORT) $(BF_DEVICE_ID)
+	cp_static/$(subst bf-,,$@).py $(BF_ADDR) $(BF_PORT) $(BF_DEVICE_ID)
 
 # SDE tools
 
