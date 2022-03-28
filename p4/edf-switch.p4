@@ -1,3 +1,9 @@
+// Much of that code was copied from the old version of the P4
+// implementation first designed @ i2cat. If you find that some
+// things, constants, code, etc, is not being used in the code,
+// you're probably right but I didn't remove anything that did
+// not hurt to keep.
+
 #include <core.p4>
 #include <tna.p4>
 
@@ -343,14 +349,19 @@ control SwitchIngress(
         ig_intr_dprsr_md.drop_ctl = 0x1;
     }
 
-    // Ethernet broadcast. Don't configure this one if you use VLANs.
+    // Ethernet broadcast. Don't configure this one if you use VLANs,
+    // as it will not work as you expect. This might be due to my
+    // implemention of VLANs here being iffy. I've tried looking for a
+    // reference implementation written in P4 but could not find a simple
+    // implementation I could partially reuse. The default "switch.p4" is
+    // fairly complex.
     action broadcast(MulticastGroupId_t mcast_gid) {
         ig_intr_tm_md.mcast_grp_a = mcast_gid;
 
         hdr.bridged.is_broadcast = 1;
     }
 
-    // VLAN forwarding.
+    // VLAN forwarding. This maps a switch port to a multicast group.
     action vlan_forward(MulticastGroupId_t mcast_gid) {
         ig_intr_tm_md.mcast_grp_a = mcast_gid;
 
@@ -403,17 +414,27 @@ control SwitchIngress(
             else {
                 broadcast_map.apply();
 
+                // The 2 following actions were NOT tested on a real
+                // network. They work with the Tofino model, but it is
+                // not clear they make sense on an actual network. In any
+                // case, they are an interesting learning exercise.
+
                 // RINA routing.
                 rina_to_dmac.apply(hdr.ethernet, hdr.efcp, ig_md, ig_intr_md, ig_intr_dprsr_md);
 
                 // IPv4 routing.
                 ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, ig_md, ig_intr_md, ig_intr_dprsr_md);
 
+                // Back here we're back in the normal operation of a
+                // L2 switch.
+
                 // We should have an destination MAC address by this point...
                 dmac_to_port.apply(hdr.ethernet, ig_intr_tm_md, ig_intr_dprsr_md);
             }
         } else {
-            // FIXME: Register an error here.
+            // FIXME: Register an error here although it's really not
+            // clear how we'll get there. How will a bad Ethernet will
+            // reach this point, really?
         }
     }
 }
