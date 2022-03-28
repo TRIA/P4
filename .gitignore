@@ -29,3 +29,6 @@ controlplane/p4/src/server/stratum
 bfrt.json
 *.p4pp
 pcap_output
+
+*.pb2.py
+*.pb2_grpc.py
