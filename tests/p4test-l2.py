@@ -40,7 +40,7 @@ class TestICMP(unittest.TestCase):
             / IP(dst=EDF9_IP, src=EDF10_IP) \
             / ICMP(type=0)
         t = AsyncSniffer(iface=PORT_A_VETH, count=2, timeout=2)
-        t.start()X
+        t.start()
         time.sleep(1)
         sendp(icmp_reply, count=1, iface=PORT_B_VETH, verbose=False)
         t.join()
