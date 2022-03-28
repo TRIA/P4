@@ -1,8 +1,12 @@
 syntax = "proto3";
 
-package routerctl;
+package rinaRouterCtl;
 
 import "status.proto";
+
+message ReqPort {
+    uint32 port = 1;
+}
 
 message ReqAddMACToPort {
     string mac = 1;
@@ -22,7 +26,15 @@ message ReqDelSpoofedMAC {
     string mac = 1;
 }
 
+
+message Empty {}
+
 service L2RouterControl {
+    rpc GetStatus (Empty) returns (ciena.dfd.StatusReply) {}
+
+    rpc AddPort(ReqPort) returns (ciena.dfd.StatusReply) {}
+    rpc DelPort(ReqPort) returns (ciena.dfd.StatusReply) {}
+
     rpc AddMACToPort(ReqAddMACToPort) returns (ciena.dfd.StatusReply) {}
     rpc DelMACToPort(ReqDelMACToPort) returns (ciena.dfd.StatusReply) {}
 
