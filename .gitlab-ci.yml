@@ -1,0 +1,112 @@
+# Allow job execution when:
+workflow:
+  rules:
+    # There is a Merge Request against the master branch
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+    # The master branch is building
+    - if: $CI_COMMIT_BRANCH == "master"
+    # A building process is running
+    - if: $CI_JOB_NAME =~ /_build$/
+    # The "CRON_AUTO" variable is set (used in scheduled pipelines)
+    - if: $CRON_AUTO == "true"
+    # ... And do not run automatically if the branch being built is
+    # other than master and cron is not running it
+    - if: $CI_COMMIT_BRANCH != "master" && $CRON_AUTO != "true"
+      when: never
+
+stages:
+  - build
+  - test
+
+before_script:
+  - |
+    sudo -H -u root sh -e -x <<EOS
+    rm -rf ${CI_PROJECT_DIR}/builds
+    rm -rf ${CI_PROJECT_DIR}/*/dataplane/p4/pcap_output
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/dataplane/p4/pcap_output
+    rm -rf ${CI_PROJECT_DIR}/*/dataplane/p4/env/mininet/tmp
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/dataplane/p4/env/mininet/tmp
+    rm -rf ${CI_PROJECT_DIR}/*/controlplane/p4/env/tmp
+    rm -rf ${CI_PROJECT_DIR}/*/project-0/controlplane/p4/env/tmp
+    chmod 777 -R ${CI_PROJECT_DIR}/controlplane/p4/src/common/grpc_out || true
+    chmod 777 -R ${CI_PROJECT_DIR}/*/project-0/controlplane/p4/src/common/grpc_out || true
+    chmod 777 -R {CI_PROJECT_DIR}/controlplane/p4/src/server/stratum || true
+    chmod 777 -R {CI_PROJECT_DIR}/*/project-0/controlplane/p4/src/server/stratum || true
+    EOS
+
+
+#
+# v1model arch
+#
+
+job_efcp_v1model_build:
+  stage: build
+  script:
+    - cd dataplane/p4
+    - make efcp-v1model-build
+  tags: [p4_v1model]
+
+job_efcp_v1model_cp_test:
+  stage: test
+  script:
+    - sudo -S su
+    - cd controlplane/p4
+    - make edf-cp-test-stratum
+    - cat test/edf-dp-server.log
+    - cat test/edf-cp-client.log
+  artifacts:
+    name: edf_cp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - controlplane/p4/test/edf-*.log
+    when: always
+    expire_in: 1 week
+  dependencies:
+    - job_efcp_v1model_build
+  tags: [p4_v1model]
+
+job_efcp_v1model_dp_test:
+  stage: test
+  script:
+    - cd dataplane/p4
+    - make edf-dp-test-v1model-stratum
+    - ls -lah ${PWD}
+    - ls -lah ${PWD}/test/arch
+    - ls -lah ${PWD}/test/arch/v1model
+    - cat ${PWD}/test/arch/v1model/stratum_bmv2_test_h1.log
+    - cat ${PWD}/test/arch/v1model/stratum_bmv2_test_h2.log
+  artifacts:
+    name: edf_dp_test_${CI_COMMIT_REF_SLUG}
+    paths:
+      - dataplane/p4/test/arch/v1model/stratum_bmv2_test_h*.log
+    when: always
+    expire_in: 1 week
+  dependencies:
+    - job_efcp_v1model_build
+  tags: [p4_v1model]
+
+#
+# Tofino arch
+#
+
+job_efcp_tna_build:
+  stage: build
+  script:
+    - |
+      sudo -H -i -u ubuntu sh -e -x <<EOS
+      cd ${PWD}/dataplane/p4
+      make efcp-tna-build
+      rm -rf pcap_output
+      EOS
+  tags: [p4_tna]
+
+job_efcp_tna_dp_test:
+  stage: test
+  script:
+    - |
+      sudo -H -i -u ubuntu sh -e -x <<EOS
+      cd ${PWD}/dataplane/p4
+      make edf-dp-test-tna-bfmodel
+      EOS
+  dependencies:
+    - job_efcp_tna_build
+  tags: [p4_tna]

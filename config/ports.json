@@ -1,0 +1,14 @@
+{
+    "PortToVeth": [
+        {
+            "device_port":132,
+            "veth1":0,
+            "veth2":1
+        },
+        {
+            "device_port":148,
+            "veth1":2,
+            "veth2":3
+        }
+    ]
+}
