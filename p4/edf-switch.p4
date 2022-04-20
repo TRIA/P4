@@ -1,15 +1,29 @@
-// Much of that code was copied from the old version of the P4
-// implementation first designed @ i2cat. If you find that some
-// things, constants, code, etc, is not being used in the code,
-// you're probably right but I didn't remove anything that did
-// not hurt to keep.
-
+#define V1MODEL_VERSION 20200408
 #include <core.p4>
+#if defined(__TARGET_TOFINO__)
 #include <tna.p4>
+#elif defined(__TARGET_PSA__)
+#include <bmv2/psa.p4>
+#else
+#error Unsupported targed!
+#endif
 
 #include "proto.p4"
 #include "headers.p4"
 #include "util.p4"
+
+error {
+      Checksum
+}
+
+#ifndef __TOFINO_MODEL__
+
+//#define Counter counter
+//#define Checksum Checksum16
+
+//typedef MulticastGroupUint_t MulticastGroupId_t;
+//#define MulticastGroupId_t MulticastGroupUint_t
+#endif
 
 #define CPU_PORT 255
 #define CPU_CLONE_SESSION_ID 99
@@ -28,91 +42,6 @@
 #define CNT_IN_RINARP 5
 #define CNT_IN_OTHER  6
 #define CNT_IN_MAX    7
-
-error {
-    wrong_pdu_type
-}
-
-parser SwitchIngressParser(
-         packet_in packet,
-         out header_t hdr,
-         out metadata_t ig_md,
-         out ingress_intrinsic_metadata_t ig_intr_md,
-         out ingress_intrinsic_metadata_for_tm_t ig_intr_md_for_tm,
-         out ingress_intrinsic_metadata_from_parser_t ig_intr_md_from_prsr) {
-    TofinoIngressParser() tofino_parser;
-    Checksum() ipv4_checksum;
-    Checksum() efcp_checksum;
-
-    state start {
-        // Note: this may be enabling the parsing altogether
-        // since, without it, the program will not work (tests will fail)
-        tofino_parser.apply(packet, ig_intr_md);
-
-        // Since there is nothing to parse for this header right now,
-        // set it as valid and be done with it.
-        hdr.bridged.setValid();
-
-        // Save the ingress port immediately.
-        hdr.bridged.ingress_port = ig_intr_md.ingress_port;
-
-        transition parse_ethernet;
-    }
-
-    // Ethernet parsing
-    state parse_ethernet {
-        packet.extract(hdr.ethernet);
-        transition select (hdr.ethernet.ether_type) {
-            EFCP_ETYPE: parse_efcp;
-            VLAN_ETYPE: parse_vlan;
-            ETHERTYPE_IPV4: parse_ipv4;
-            default : reject;
-        }
-    }
-
-    // VLAN packets parsing
-    state parse_vlan {
-        packet.extract(hdr.dot1q);
-
-        // Parse the inner packets..
-        transition select(hdr.dot1q.ether_type) {
-            EFCP_ETYPE: parse_efcp;
-            ETHERTYPE_IPV4: parse_ipv4;
-            default: accept;
-        }
-    }
-
-    state parse_efcp {
-        packet.extract(hdr.efcp);
-        efcp_checksum.add(hdr.efcp);
-        ig_md.checksum_err_efcp_igprs = efcp_checksum.verify();
-
-        // Validate the EFCP packet type.
-        transition select(hdr.efcp.pdu_type) {
-            DATA_TRANSFER:         accept;
-            LAYER_MANAGEMENT:      accept;
-            ACK_ONLY:              accept;
-            NACK_ONLY:             accept;
-            ACK_AND_FLOW_CONTROL:  accept;
-            NACK_AND_FLOW_CONTROL: accept;
-            FLOW_CONTROL_ONLY:     accept;
-            CONTROL_ACK:           accept;
-            RENDEVOUS:             accept;
-            SELECTIVE_ACK:         accept;
-            SELECTIVE_NACK:        accept;
-            SELECTIVE_ACK_AND_FLOW_CONTROL:  accept;
-            SELECTIVE_NACK_AND_FLOW_CONTROL: accept;
-            default: reject;
-        }
-   }
-
-    state parse_ipv4 {
-        packet.extract(hdr.ipv4);
-        ipv4_checksum.add(hdr.ipv4);
-        ig_md.checksum_err_ipv4_igprs = ipv4_checksum.verify();
-        transition accept;
-    }
-}
 
 // Control that deals with changing the spoofed MACs for the right
 // address so that the packet goes to the right place.
@@ -138,11 +67,24 @@ control SpoofMAC(inout mac_addr_t mac) {
 
 // Sets a destination MAC given a certain port. Used for VLANs, when
 // the port the port is going through determines the next hop address.
-control PortToDMAC(in PortId_t dport,
-                   inout ethernet_h eth,
-                   inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
+#ifdef __TARGET_TOFINO__
+ control PortToDMAC(
+        in PortId_t dport,
+        inout ethernet_h eth,
+        inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
+#else
+control PortToDMAC(
+        in PortId_t dport,
+        inout ethernet_h eth,
+        inout psa_egress_output_metadata_t ostd) {
+#endif
+
     action drop() {
+#ifdef __TARGET_TOFINO__
         eg_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
     }
 
     action set_dmac(mac_addr_t dmac) {
@@ -170,15 +112,31 @@ control PortToDMAC(in PortId_t dport,
 
 // Sets an egress port given a destination Ethernet address. This is
 // for regular unicast switching, and is to be done in ingress.
-control DMACToPort(in ethernet_h eth,
-                   inout ingress_intrinsic_metadata_for_tm_t ig_intr_tm_md,
-                   inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+#ifdef __TARGET_TOFINO__
+control DMACToPort(
+        in ethernet_h eth,
+        inout ingress_intrinsic_metadata_for_tm_t ig_intr_tm_md,
+        inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+#else
+control DMACToPort(
+        in ethernet_h eth,
+        inout psa_ingress_output_metadata_t ostd) {
+#endif
+
     action drop() {
+#ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
     }
 
     action set_dport(PortId_t dport) {
+#ifdef __TARGET_TOFINO__
         ig_intr_tm_md.ucast_egress_port = dport;
+#else
+        ostd.egress_port = dport;
+#endif
     }
 
     table map {
@@ -200,16 +158,31 @@ control DMACToPort(in ethernet_h eth,
 }
 
 // Select a destination MAC given a certain IP address.
+#ifdef __TARGET_TOFINO__
 control IPToDMAC(inout ethernet_h ethernet,
                  inout ipv4_h ipv4,
                  in    metadata_t ig_md,
                  in    ingress_intrinsic_metadata_t ig_intr_md,
                  inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+#else
+control IPToDMAC(inout ethernet_h ethernet,
+                 inout ipv4_h ipv4,
+                 in    metadata_t ig_md,
+                 inout psa_ingress_output_metadata_t ostd) {
+#endif
 
+#ifdef __TARGET_TOFINO__
     Counter<bit<32>, bit<2>>(2, CounterType_t.PACKETS) cnt;
+#else
+    Counter<bit<32>, bit<2>>(2, PSA_CounterType_t.PACKETS) cnt;
+#endif
 
     action drop() {
+#ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
 
         cnt.count(CNT_DROP);
     }
@@ -250,16 +223,33 @@ control IPToDMAC(inout ethernet_h ethernet,
     }
 }
 
-control RINAToDMAC(inout ethernet_h ethernet,
-                   inout efcp_h efcp,
-                   in    metadata_t ig_md,
-                   in    ingress_intrinsic_metadata_t ig_intr_md,
-                   inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+#ifdef __TARGET_TOFINO__
+control RINAToDMAC(
+        inout ethernet_h ethernet,
+        inout efcp_h efcp,
+        in    metadata_t ig_md,
+        in    ingress_intrinsic_metadata_t ig_intr_md,
+        inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+#else
+control RINAToDMAC(
+        inout ethernet_h ethernet,
+        inout efcp_h efcp,
+        in    metadata_t ig_md,
+        inout psa_ingress_output_metadata_t ostd) {
+#endif
 
+#ifdef __TARGET_TOFINO__
     Counter<bit<32>, bit<2>>(2, CounterType_t.PACKETS) cnt;
+#else
+    Counter<bit<32>, bit<2>>(2, PSA_CounterType_t.PACKETS) cnt;
+#endif
 
     action drop() {
+#ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
 
         cnt.count(CNT_DROP);
     }
@@ -302,11 +292,19 @@ control RINAToDMAC(inout ethernet_h ethernet,
 // Counter of the types of ingress packets we're seeing. This is
 // mostly for diagnostic purposes.
 control IngressCounter(in ether_type_t ether_type) {
+#ifdef __TARGET_TOFINO__
     // Ingress packet counter.
     Counter<bit<32>, bit<3>>(CNT_IN_MAX, CounterType_t.PACKETS) per_type;
 
     // Raw ethernet counter.
     Counter<bit<32>, bit<1>>(1, CounterType_t.PACKETS) eth;
+#else
+    // Ingress packet counter.
+    Counter<bit<32>, bit<3>>(CNT_IN_MAX, PSA_CounterType_t.PACKETS) per_type;
+
+    // Raw ethernet counter.
+    Counter<bit<32>, bit<1>>(1, PSA_CounterType_t.PACKETS) eth;
+#endif
 
     apply {
         // Count inbound ethernet packets. The P4 compiler does not want us
@@ -333,37 +331,160 @@ control IngressCounter(in ether_type_t ether_type) {
     }
 }
 
+// INGRESS
+
+#if __TARGET_TOFINO__
+parser SwitchIngressParser(packet_in buffer,
+                           out header_t parsed_hdr,
+                           inout metadata_t ig_md,
+                           out ingress_intrinsic_metadata_t ig_intr_md,
+                           out ingress_intrinsic_metadata_for_tm_t ig_intr_md_for_tm) {
+#else
+parser LocalIngressParser(packet_in buffer,
+                          out   header_t parsed_hdr,
+                          inout metadata_t meta,
+                          in    psa_ingress_parser_input_metadata_t istd,
+                          in    empty_metadata_t resubmit_meta,
+                          in    empty_metadata_t recirculate_meta) {
+#endif
+#ifdef __TARGET_TOFINO__
+    TofinoIngressParser() tofino_parser;
+    Checksum() ipv4_checksum;
+    Checksum() efcp_checksum;
+#else
+    InternetChecksum() ipv4_checksum;
+    InternetChecksum() efcp_checksum;
+#endif
+
+    state start {
+#ifdef __TARGET_TOFINO__
+        // Note: this may be enabling the parsing altogether
+        // since, without it, the program will not work (tests will fail)
+        tofino_parser.apply(packet, ig_intr_md);
+#endif
+
+        // Since there is nothing to parse for this header right now,
+        // set it as valid and be done with it.
+        parsed_hdr.bridged.setValid();
+
+        // Save the ingress port immediately.
+#ifdef __TARGET_TOFINO__
+        parsed_hdr.bridged.ingress_port = ig_intr_md.ingress_port;
+#else
+        parsed_hdr.bridged.ingress_port = istd.ingress_port;
+#endif
+
+        transition parse_ethernet;
+    }
+
+    // Ethernet parsing
+    state parse_ethernet {
+        buffer.extract(parsed_hdr.ethernet);
+        transition select (parsed_hdr.ethernet.ether_type) {
+            EFCP_ETYPE: parse_efcp;
+            VLAN_ETYPE: parse_vlan;
+            ETHERTYPE_IPV4: parse_ipv4;
+            //default : reject;
+        }
+    }
+
+    // VLAN packets parsing
+    state parse_vlan {
+        buffer.extract(parsed_hdr.dot1q);
+
+        // Parse the inner packets..
+        transition select(parsed_hdr.dot1q.ether_type) {
+            EFCP_ETYPE: parse_efcp;
+            ETHERTYPE_IPV4: parse_ipv4;
+            default: accept;
+        }
+    }
+
+    state parse_efcp {
+        buffer.extract(parsed_hdr.efcp);
+        efcp_checksum.add(parsed_hdr.efcp);
+#ifdef __TARGET_TOFINO__
+        ig_md.checksum_err_efcp_igprs = efcp_checksum.verify();
+#else
+        verify(efcp_checksum.get() == parsed_hdr.efcp.hdr_checksum, error.Checksum);
+#endif
+
+        // Validate the EFCP packet type.
+        transition select(parsed_hdr.efcp.pdu_type) {
+            DATA_TRANSFER:         accept;
+            LAYER_MANAGEMENT:      accept;
+            ACK_ONLY:              accept;
+            NACK_ONLY:             accept;
+            ACK_AND_FLOW_CONTROL:  accept;
+            NACK_AND_FLOW_CONTROL: accept;
+            FLOW_CONTROL_ONLY:     accept;
+            CONTROL_ACK:           accept;
+            RENDEVOUS:             accept;
+            SELECTIVE_ACK:         accept;
+            SELECTIVE_NACK:        accept;
+            SELECTIVE_ACK_AND_FLOW_CONTROL:  accept;
+            SELECTIVE_NACK_AND_FLOW_CONTROL: accept;
+            //default: reject;
+        }
+   }
+
+   state parse_ipv4 {
+        buffer.extract(parsed_hdr.ipv4);
+        ipv4_checksum.add(parsed_hdr.ipv4);
+#ifdef __TARGET_TOFINO__
+        ig_md.checksum_err_ipv4_igprs = ipv4_checksum.verify();
+#else
+        verify(efcp_checksum.get() == parsed_hdr.efcp.hdr_checksum, error.Checksum);
+#endif
+        transition accept;
+    }
+}
+
+#if __TOFINO_MODEL__
 control SwitchIngress(
         inout header_t hdr,
-        inout metadata_t ig_md,
+        inout metadata_t user_meta,
         in ingress_intrinsic_metadata_t ig_intr_md,
         in ingress_intrinsic_metadata_from_parser_t ig_intr_prsr_md,
         inout ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md,
         inout ingress_intrinsic_metadata_for_tm_t ig_intr_tm_md) {
+#else
+control LocalIngress(
+        inout header_t hdr,
+        inout metadata_t user_meta,
+        in    psa_ingress_input_metadata_t istd,
+        inout psa_ingress_output_metadata_t ostd) {
+#endif
     DMACToPort() dmac_to_port;
     IPToDMAC() ip_to_dmac;
     RINAToDMAC() rina_to_dmac;
     IngressCounter() ingress_cnt;
 
     action drop() {
+#ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
     }
 
-    // Ethernet broadcast. Don't configure this one if you use VLANs,
-    // as it will not work as you expect. This might be due to my
-    // implemention of VLANs here being iffy. I've tried looking for a
-    // reference implementation written in P4 but could not find a simple
-    // implementation I could partially reuse. The default "switch.p4" is
-    // fairly complex.
-    action broadcast(MulticastGroupId_t mcast_gid) {
+    // Ethernet broadcast. Don't configure this one if you use VLANs.
+    action broadcast(bit<32> mcast_gid) {
+#ifdef __TOFINO_MODEL__
         ig_intr_tm_md.mcast_grp_a = mcast_gid;
-
+#else
+        ostd.multicast_group = (MulticastGroup_t) mcast_gid;
+#endif
         hdr.bridged.is_broadcast = 1;
     }
 
-    // VLAN forwarding. This maps a switch port to a multicast group.
-    action vlan_forward(MulticastGroupId_t mcast_gid) {
+    // VLAN forwarding.
+    action vlan_forward(MulticastGroup_t mcast_gid) {
+#ifdef __TOFINO_MODEL__
         ig_intr_tm_md.mcast_grp_a = mcast_gid;
+#else
+        ostd.multicast_group = mcast_gid;
+#endif
 
         hdr.bridged.is_vlan = 1;
     }
@@ -380,10 +501,10 @@ control SwitchIngress(
         const default_action = NoAction();
         const entries = {
             // This is for broadcasts!
-            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFFF: broadcast(1);
+            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFFF: broadcast(32w1);
 
             // This is the multicast mask.
-            0x01005E000000 &&& 0x1FFFFFF000000: broadcast(1);
+            0x01005E000000 &&& 0x1FFFFFF000000: broadcast(32w1);
         }
     }
 
@@ -414,82 +535,108 @@ control SwitchIngress(
             else {
                 broadcast_map.apply();
 
-                // The 2 following actions were NOT tested on a real
-                // network. They work with the Tofino model, but it is
-                // not clear they make sense on an actual network. In any
-                // case, they are an interesting learning exercise.
-
+#ifdef __TOFINO_MODEL__
                 // RINA routing.
                 rina_to_dmac.apply(hdr.ethernet, hdr.efcp, ig_md, ig_intr_md, ig_intr_dprsr_md);
 
                 // IPv4 routing.
                 ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, ig_md, ig_intr_md, ig_intr_dprsr_md);
 
-                // Back here we're back in the normal operation of a
-                // L2 switch.
-
                 // We should have an destination MAC address by this point...
                 dmac_to_port.apply(hdr.ethernet, ig_intr_tm_md, ig_intr_dprsr_md);
+#else
+                // RINA routing.
+                rina_to_dmac.apply(hdr.ethernet, hdr.efcp, user_meta, ostd);
+
+                // IPv4 routing.
+                ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, user_meta, ostd);
+
+                // We should have an destination MAC address by this point...
+                dmac_to_port.apply(hdr.ethernet, ostd);
+#endif
             }
         } else {
-            // FIXME: Register an error here although it's really not
-            // clear how we'll get there. How will a bad Ethernet will
-            // reach this point, really?
+            // FIXME: Register an error here.
         }
     }
 }
 
-
+#ifdef __TARGET_TOFINO__
 control SwitchIngressDeparser(
-        packet_out packet,
+        packet_out buffer,
+        inout header_t hdr) {
+#else
+control LocalIngressDeparser(
+        packet_out buffer,
+        out empty_metadata_t clone_i2e_meta,
+        out empty_metadata_t resubmit_meta,
+        out empty_metadata_t normal_meta,
         inout header_t hdr,
-        in metadata_t ig_md,
-        in ingress_intrinsic_metadata_for_deparser_t ig_intr_dprsr_md) {
+        in  metadata_t meta,
+        in  psa_ingress_output_metadata_t istd) {
+#endif
     apply {
-        packet.emit(hdr.bridged);
-     	packet.emit(hdr.ethernet);
-        packet.emit(hdr.dot1q);
-        packet.emit(hdr.efcp);
-        packet.emit(hdr.ipv4);
+        buffer.emit(hdr.bridged);
+     	buffer.emit(hdr.ethernet);
+        buffer.emit(hdr.dot1q);
+        buffer.emit(hdr.efcp);
+        buffer.emit(hdr.ipv4);
     }
 }
 
+// EGRESS
+
+#ifdef __TOFINO_MODEL__
 parser SwitchEgressParser(
-        packet_in packet,
-        out header_t hdr,
+        packet_in buffer,
+        out header_t parsed_hdr,
         out egress_metadata_t eg_md,
         out egress_intrinsic_metadata_t eg_intr_md) {
+#else
+parser LocalEgressParser(
+        packet_in buffer,
+        out   header_t parsed_hdr,
+        inout metadata_t user_meta,
+        in    psa_egress_parser_input_metadata_t istd,
+        in    empty_metadata_t normal_meta,
+        in    empty_metadata_t clone_i2e_meta,
+        in    empty_metadata_t clone_e2e_meta) {
+#endif
 
+#ifdef __TOFINO_MODEL__
     TofinoEgressParser() tofino_parser;
+#endif
 
     state start {
+#ifdef __TOFINO_MODEL__
         tofino_parser.apply(packet, eg_intr_md);
-        packet.extract(hdr.bridged);
+#endif
+        buffer.extract(parsed_hdr.bridged);
         transition parse_ethernet;
      }
 
     state parse_ethernet {
-        packet.extract(hdr.ethernet);
-        transition select (hdr.ethernet.ether_type) {
+        buffer.extract(parsed_hdr.ethernet);
+        transition select (parsed_hdr.ethernet.ether_type) {
             EFCP_ETYPE: parse_efcp;
             VLAN_ETYPE: parse_vlan;
             ETHERTYPE_IPV4: parse_ipv4;
-            default : reject;
+            //default : reject;
         }
     }
 
     state parse_vlan {
-        packet.extract(hdr.dot1q);
-        transition select(hdr.dot1q.ether_type) {
+        buffer.extract(parsed_hdr.dot1q);
+        transition select(parsed_hdr.dot1q.ether_type) {
             EFCP_ETYPE: parse_efcp;
             ETHERTYPE_IPV4: parse_ipv4;
-            default: reject;
+            //default: reject;
         }
     }
 
     state parse_efcp {
-        packet.extract(hdr.efcp);
-        transition select(hdr.efcp.pdu_type) {
+        buffer.extract(parsed_hdr.efcp);
+        transition select(parsed_hdr.efcp.pdu_type) {
             DATA_TRANSFER:         accept;
             LAYER_MANAGEMENT:      accept;
             ACK_ONLY:              accept;
@@ -503,16 +650,17 @@ parser SwitchEgressParser(
             SELECTIVE_NACK:        accept;
             SELECTIVE_ACK_AND_FLOW_CONTROL:  accept;
             SELECTIVE_NACK_AND_FLOW_CONTROL: accept;
-            default: reject;
+            //default: reject;
         }
     }
 
     state parse_ipv4 {
-        packet.extract(hdr.ipv4);
+        buffer.extract(parsed_hdr.ipv4);
         transition accept;
     }
 }
 
+#if __TOFINO_MODEL__
 control SwitchEgress(
         inout header_t hdr,
         inout egress_metadata_t eg_md,
@@ -520,41 +668,95 @@ control SwitchEgress(
         in egress_intrinsic_metadata_from_parser_t eg_intr_prsr_md,
         inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md,
         inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
+#else
+control LocalEgress(
+        inout header_t hdr,
+        inout metadata_t meta,
+        in    psa_egress_input_metadata_t istd,
+        inout psa_egress_output_metadata_t ostd) {
+#endif
     SpoofMAC() dmac;
     SpoofMAC() smac;
     PortToDMAC() port_to_dmac;
 
+    Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) ipv4_checksum;
+    Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) efcp_checksum;
+
+
     action drop() {
+#ifdef __TOFINO_MODEL__
         eg_intr_dprsr_md.drop_ctl = 0x1;
+#else
+        ostd.drop = true;
+#endif
     }
 
     apply {
         // This is specific to VLANs. This prevents a multicast packet
         // from going back to its source port.
+#ifdef __TOFINO_MODEL__
         if (hdr.bridged.ingress_port == eg_intr_md.egress_port) {
             drop();
         }
+#else
+        if (hdr.bridged.ingress_port == istd.egress_port) {
+            drop();
+        }
+#endif
 
+#ifdef __TOFINO_MODEL__
         // FIXME: This is for VLANs and I'm really not sure this is the right
         // way to proceed.
         if (hdr.bridged.is_vlan == 1) {
             port_to_dmac.apply(eg_intr_md.egress_port, hdr.ethernet, eg_intr_dprsr_md);
         }
+#else
+        if (hdr.bridged.is_vlan == 1) {
+            port_to_dmac.apply(istd.egress_port, hdr.ethernet, ostd);
+        }
+#endif
 
         // Change the source MAC if necessary
         smac.apply(hdr.ethernet.src_addr);
 
         // Change the target MAC if necessary
         dmac.apply(hdr.ethernet.dst_addr);
+
+
+
+        ipv4_checksum.update({
+            hdr.ipv4.version,
+            hdr.ipv4.ihl,
+            hdr.ipv4.diffserv,
+            hdr.ipv4.total_len,
+            hdr.ipv4.identification,
+            hdr.ipv4.flags,
+            hdr.ipv4.frag_offset,
+            hdr.ipv4.ttl,
+            hdr.ipv4.protocol,
+            hdr.ipv4.src_addr,
+            hdr.ipv4.dst_addr});
+
+        efcp_checksum.update({
+            hdr.efcp.ver,
+   	        hdr.efcp.dst_addr,
+            hdr.efcp.src_addr,
+            hdr.efcp.qos_id,
+            hdr.efcp.dst_cep_id,
+            hdr.efcp.src_cep_id,
+            hdr.efcp.pdu_type,
+            hdr.efcp.flags,
+            hdr.efcp.len,
+            hdr.efcp.seqnum});
     }
 }
 
+#ifdef __TOFINO_MODEL__
 control SwitchEgressDeparser(
         packet_out packet,
         inout header_t hdr,
-        in egress_metadata_t eg_md,
-        in egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
-
+        in    egress_metadata_t eg_md,
+        in    egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
     Checksum() ipv4_checksum;
     Checksum() efcp_checksum;
 
@@ -573,7 +775,6 @@ control SwitchEgressDeparser(
                 hdr.ipv4.src_addr,
                 hdr.ipv4.dst_addr});
         }
-
         if (hdr.efcp.isValid()) {
             hdr.efcp.hdr_checksum = efcp_checksum.update({
                 hdr.efcp.ver,
@@ -594,9 +795,57 @@ control SwitchEgressDeparser(
         packet.emit(hdr.ipv4);
     }
 }
+#else
+// PSA
+control LocalEgressDeparser(
+        packet_out packet,
+        out   empty_metadata_t clone_e2e_meta,
+        out   empty_metadata_t recirculate_meta,
+        inout header_t hdr,
+        in    metadata_t meta,
+        in    psa_egress_output_metadata_t istd,
+        in    psa_egress_deparser_input_metadata_t edstd) {
 
+    Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) ipv4_checksum;
+    Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) efcp_checksum;
 
+    apply {
+        //ipv4_checksum.update({
+        //    hdr.ipv4.version,
+        //    hdr.ipv4.ihl,
+        //    hdr.ipv4.diffserv,
+        //    hdr.ipv4.total_len,
+        //    hdr.ipv4.identification,
+        //    hdr.ipv4.flags,
+        //    hdr.ipv4.frag_offset,
+        //    hdr.ipv4.ttl,
+        //    hdr.ipv4.protocol,
+        //    hdr.ipv4.src_addr,
+        //    hdr.ipv4.dst_addr});
+        //hdr.ipv4.hdr_checksum = ipv4_checksum.get();
 
+        //efcp_checksum.add({
+        //    hdr.efcp.ver,
+   	    //    hdr.efcp.dst_addr,
+        //    hdr.efcp.src_addr,
+        //    hdr.efcp.qos_id,
+        //    hdr.efcp.dst_cep_id,
+        //    hdr.efcp.src_cep_id,
+         //   hdr.efcp.pdu_type,
+        //    hdr.efcp.flags,
+        //    hdr.efcp.len,
+        //    hdr.efcp.seqnum});
+        //hdr.efcp.hdr_checksum = efcp_checksum.get();
+
+        packet.emit(hdr.ethernet);
+        packet.emit(hdr.dot1q);
+        packet.emit(hdr.efcp);
+        packet.emit(hdr.ipv4);
+    }
+}
+#endif
+
+#ifdef __TOFINO_MODEL__
 Pipeline(SwitchIngressParser(),
          SwitchIngress(),
          SwitchIngressDeparser(),
@@ -606,4 +855,18 @@ Pipeline(SwitchIngressParser(),
 
 Switch(pipe) main;
 
+#else
+IngressPipeline(LocalIngressParser(),
+                LocalIngress(),
+                LocalIngressDeparser()) ingressPipeline;
+EgressPipeline(LocalEgressParser(),
+               LocalEgress(),
+               LocalEgressDeparser()) egressPipeline;
+PacketReplicationEngine() pre;
+BufferingQueueingEngine() bqe;
 
+PSA_Switch(ingressPipeline,
+           pre,
+           egressPipeline,
+           bqe) main;
+#endif
