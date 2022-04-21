@@ -79,12 +79,12 @@ class ControlPlane(object):
             try:
                 print("----------------------------------------------------------------------")
                 print("IP Packets\t " \
-                      + self.getFwdDropCounter(self.p4helper, self.conn, "SwitchIngress.ip_to_dmac.cnt"))
+                      + self.getFwdDropCounter(self.p4helper, self.conn, "LocalIngress.ip_to_dmac.cnt"))
                 print("RINA Packets\t " \
-                      + self.getFwdDropCounter(self.p4helper, self.conn, "SwitchIngress.rina_to_dmac.cnt"))
+                      + self.getFwdDropCounter(self.p4helper, self.conn, "LocalIngress.rina_to_dmac.cnt"))
                 print(self.formatIngressCounters(self.p4helper, self.conn,
-                                                 "SwitchIngress.ingress_cnt.eth",
-                                                 "SwitchIngress.ingress_cnt.per_type"))
+                                                 "LocalIngress.ingress_cnt.eth",
+                                                 "LocalIngress.ingress_cnt.per_type"))
                 print("----------------------------------------------------------------------")
 
             except Exception as e:
@@ -93,16 +93,18 @@ class ControlPlane(object):
 
 def ControlPlaneMain(control_plane):
     if len(sys.argv) < 3:
-        print("Usage: ./p4runtime.py <address> <port> <device id>")
+        print("Usage: ./p4runtime.py <p4 output> <p4info output> <address> <port> <device id>")
         sys.exit(1)
     else:
-        sw_address = sys.argv[1]
-        sw_port = sys.argv[2]
-        dev_id = sys.argv[3]
+        p4_output = sys.argv[1]
+        p4info_output = sys.argv[2]
+        sw_address = sys.argv[3]
+        sw_port = sys.argv[4]
+        dev_id = sys.argv[5]
 
         control_plane = control_plane()
         try:
-            control_plane.connect(sw_address, sw_port, dev_id, P4INFO_FILE_PATH, TOFINO_BIN_PATH)
+            control_plane.connect(sw_address, sw_port, dev_id, p4info_output, p4_output)
             print("Connected to switch")
         except Exception as e:
             print("Connection to switch failed")

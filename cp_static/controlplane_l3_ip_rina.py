@@ -25,11 +25,11 @@ class IPRINAControlPlane(L3IPControlPlane):
 
         for i in mappings:
             te = self.p4helper.buildTableEntry(
-                table_name="SwitchIngress.rina_to_dmac.map",
+                table_name="LocalIngress.rina_to_dmac.map",
                 match_fields={
                     "efcp.dst_addr": i[0]
                 },
-                action_name="SwitchIngress.rina_to_dmac.forward",
+                action_name="LocalIngress.rina_to_dmac.forward",
                 action_params={
                     "dmac": i[1]
                 })

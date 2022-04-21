@@ -1,7 +1,3 @@
-# Files
-P4INFO_FILE_PATH='out/edf-switch.tofino/p4info.txt'
-TOFINO_BIN_PATH='out/edf-switch.tofino/pipe/tofino-packed.bin'
-
 # Ports configuration.
 #
 # Those numbers aren't random. They were picked to mimic what we have

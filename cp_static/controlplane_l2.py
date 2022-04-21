@@ -32,11 +32,11 @@ class L2ControlPlane(ControlPlane):
         for i in [(EDF9_FAKE_MAC, PORT_A_NO),
                   (EDF10_FAKE_MAC, PORT_B_NO)]:
             tdest=self.p4helper.buildTableEntry(
-                table_name="SwitchIngress.dmac_to_port.map",
+                table_name="LocalIngress.dmac_to_port.map",
                 match_fields={
                     "eth.dst_addr": i[0]
                 },
-                action_name="SwitchIngress.dmac_to_port.set_dport",
+                action_name="LocalIngress.dmac_to_port.set_dport",
                 action_params={
                     "dport": i[1]
                 })
@@ -51,11 +51,11 @@ class L2ControlPlane(ControlPlane):
         # Destination MAC translations
         for i in translations:
             te = self.p4helper.buildTableEntry(
-                table_name="SwitchEgress.dmac.spoof_map",
+                table_name="LocalEgress.dmac.spoof_map",
                 match_fields={
                     "mac": i[0]
                 },
-                action_name="SwitchEgress.dmac.spoof",
+                action_name="LocalEgress.dmac.spoof",
                 action_params={
                     "new_mac": i[1]
                 })
@@ -65,11 +65,11 @@ class L2ControlPlane(ControlPlane):
         # Source MAC translations
         for i in translations:
             te = self.p4helper.buildTableEntry(
-                table_name="SwitchEgress.smac.spoof_map",
+                table_name="LocalEgress.smac.spoof_map",
                 match_fields={
                     "mac": i[1]
                 },
-                action_name="SwitchEgress.smac.spoof",
+                action_name="LocalEgress.smac.spoof",
                 action_params={
                     "new_mac": i[0]
                 })

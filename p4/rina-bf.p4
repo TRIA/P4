@@ -4,6 +4,8 @@
 #include <tna.p4>
 #elif defined(__TARGET_PSA__)
 #include <bmv2/psa.p4>
+#elif defined(__TARGET_V1MODEL__)
+#include <v1model.p4>
 #else
 #error Unsupported targed!
 #endif
@@ -65,27 +67,20 @@ control SpoofMAC(inout mac_addr_t mac) {
     }
 }
 
-// Sets a destination MAC given a certain port. Used for VLANs, when
-// the port the port is going through determines the next hop address.
-#ifdef __TARGET_TOFINO__
- control PortToDMAC(
-        in PortId_t dport,
-        inout ethernet_h eth,
-        inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md) {
-#else
-control PortToDMAC(
-        in PortId_t dport,
-        inout ethernet_h eth,
-        inout psa_egress_output_metadata_t ostd) {
+#if defined(__TARGET_TOFINO__)
+action drop(inout egress_intrinsic_metadata_for_deparser_t eg_intr_dprsr_md md) {
+       T.drop_ctl = 0x1;
+}
+#elif defined(__TARGET_PSA__)
+action drop(inout psa_egress_output_metadata_t ostd) {
+       ostd.drop = true;
+}
 #endif
 
-    action drop() {
-#ifdef __TARGET_TOFINO__
-        eg_intr_dprsr_md.drop_ctl = 0x1;
-#else
-        ostd.drop = true;
-#endif
-    }
+control PortToDMAC<T>(
+        in PortId_t dport,
+        inout ethernet_h eth,
+        inout T n) {
 
     action set_dmac(mac_addr_t dmac) {
         eth.dst_addr = dmac;
@@ -102,7 +97,7 @@ control PortToDMAC(
             drop;
         }
         size = 512;
-        default_action = drop;
+        default_action = drop(n);
     }
 
     apply {
@@ -123,6 +118,7 @@ control DMACToPort(
         inout psa_ingress_output_metadata_t ostd) {
 #endif
 
+#if 0
     action drop() {
 #ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
@@ -130,6 +126,7 @@ control DMACToPort(
         ostd.drop = true;
 #endif
     }
+#endif
 
     action set_dport(PortId_t dport) {
 #ifdef __TARGET_TOFINO__
@@ -177,6 +174,7 @@ control IPToDMAC(inout ethernet_h ethernet,
     Counter<bit<32>, bit<2>>(2, PSA_CounterType_t.PACKETS) cnt;
 #endif
 
+#if 0
     action drop() {
 #ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
@@ -186,6 +184,7 @@ control IPToDMAC(inout ethernet_h ethernet,
 
         cnt.count(CNT_DROP);
     }
+#endif
 
     // IP forwarding action
     action forward(mac_addr_t dmac) {
@@ -244,6 +243,7 @@ control RINAToDMAC(
     Counter<bit<32>, bit<2>>(2, PSA_CounterType_t.PACKETS) cnt;
 #endif
 
+#if 0
     action drop() {
 #ifdef __TARGET_TOFINO__
         ig_intr_dprsr_md.drop_ctl = 0x1;
@@ -253,6 +253,7 @@ control RINAToDMAC(
 
         cnt.count(CNT_DROP);
     }
+#endif
 
     // EFCP forwarding action
     action forward(mac_addr_t dmac) {
@@ -677,19 +678,14 @@ control LocalEgress(
 #endif
     SpoofMAC() dmac;
     SpoofMAC() smac;
-    PortToDMAC() port_to_dmac;
+#ifdef __TOFINO_MODEL__
+    PortToDMAC<egress_intrinsic_metadata_for_deparser_t>() port_to_dmac;
+#else
+    PortToDMAC<psa_egress_output_metadata_t>() port_to_dmac;
+#endif
 
     Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) ipv4_checksum;
     Checksum<bit<16>>(PSA_HashAlgorithm_t.ONES_COMPLEMENT16) efcp_checksum;
-
-
-    action drop() {
-#ifdef __TOFINO_MODEL__
-        eg_intr_dprsr_md.drop_ctl = 0x1;
-#else
-        ostd.drop = true;
-#endif
-    }
 
     apply {
         // This is specific to VLANs. This prevents a multicast packet

@@ -1,6 +1,7 @@
 #ifndef _UTIL_
 #define _UTIL_
 
+#ifdef __TARGET_TOFINO__
 parser TofinoIngressParser(
         packet_in pkt,
         out ingress_intrinsic_metadata_t ig_intr_md) {
@@ -31,7 +32,9 @@ parser TofinoEgressParser(
         transition accept;
     }
 }
+#endif
 
+#if 0
 // Skip egress
 control BypassEgress(inout ingress_intrinsic_metadata_for_tm_t ig_tm_md) {
 
@@ -50,7 +53,9 @@ control BypassEgress(inout ingress_intrinsic_metadata_for_tm_t ig_tm_md) {
         bypass_egress.apply();
     }
 }
+#endif
 
+#if 0
 // Empty egress parser/control blocks
 parser EmptyEgressParser(
         packet_in pkt,
@@ -79,6 +84,7 @@ control EmptyEgress(
         inout egress_intrinsic_metadata_for_output_port_t eg_intr_oport_md) {
     apply {}
 }
+#endif
 
 #endif /* _UTIL */
 
