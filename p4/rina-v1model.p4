@@ -135,7 +135,7 @@ control IPToDMAC(inout ethernet_h ethernet,
     }
 
     // Prefix IP routing
-    table lpm {
+    table ip2mac {
         key = {
             ipv4.dst_addr: lpm;
         }
@@ -150,11 +150,11 @@ control IPToDMAC(inout ethernet_h ethernet,
 
     apply {
         if (ipv4.isValid()) {
-            //if (standard_metadata.checksum_error == 0) {
-                lpm.apply();
-            //} else {
-            //    drop();
-            //}
+            if (standard_metadata.checksum_error == 0) {
+                ip2mac.apply();
+            } else {
+                drop();
+            }
         } else {
             NoAction();
         }
@@ -197,11 +197,11 @@ control RINAToDMAC(inout ethernet_h ethernet,
 
     apply {
         if (efcp.isValid()) {
-            //if (ig_md.checksum_error == 0) {
+            if (standard_metadata.checksum_error == 0) {
                 map.apply();
-            //} else {
-            //    drop();
-            //}
+            } else {
+                drop();
+            }
         } else {
             NoAction();
         }
@@ -266,7 +266,6 @@ parser LocalParser(packet_in packet,
             EFCP_ETYPE: parse_efcp;
             VLAN_ETYPE: parse_vlan;
             ETHERTYPE_IPV4: parse_ipv4;
-            default : reject;
         }
     }
 
@@ -300,7 +299,6 @@ parser LocalParser(packet_in packet,
             SELECTIVE_NACK:        accept;
             SELECTIVE_ACK_AND_FLOW_CONTROL:  accept;
             SELECTIVE_NACK_AND_FLOW_CONTROL: accept;
-            default: reject;
         }
    }
 
@@ -311,7 +309,9 @@ parser LocalParser(packet_in packet,
 }
 
 control LocalVerifyChecksum(inout header_t hdr, inout metadata_t meta) {
-    apply {}
+    apply {
+    
+    }
 }
 
 control LocalIngress(inout header_t hdr,
@@ -353,14 +353,13 @@ control LocalIngress(inout header_t hdr,
             broadcast;
             NoAction;
         }
-        size = 2;
         const default_action = NoAction();
         const entries = {
             // This is for broadcasts!
-            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFFF: broadcast(1);
+            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFF: broadcast(1);
 
             // This is the multicast mask.
-            0x01005E000000 &&& 0x1FFFFFF000000: broadcast(1);
+            0x01005E000000 &&& 0x1FFFFFF00000: broadcast(1);
         }
     }
 
