@@ -18,13 +18,13 @@ BF_UNPACKED_OUT=$(BF_DIR)/pipe/tofino.bin
 BF_OUT=$(BF_DIR)/pipe/tofino-packed.bin
 BF_P4INFO_OUT=./out/$(P4_NAME).tofino/p4info.txt
 
-BF_P4_FILE=p4/$(P4_NAME).p4
+BF_P4_FILE=p4/$(P4_NAME)-bf.p4
 BF_P4_INCLUDE=$(SDE_INSTALL)/share/p4c/p4include/
 BF_P4C_ARGS=-D__TARGET_TOFINO__ \
 		    -I common/p4 \
 	        -I $(BF_P4_INCLUDE) \
             --p4runtime-force-std-externs\
-            --p4runtime-file $(BF_P4_INFO) \
+            --p4runtime-file $(BF_P4INFO_OUT) \
 		 	--p4runtime-format text \
 		 	--std p4-16 \
 		 	--target tofino \
@@ -48,31 +48,30 @@ V1MODEL_ADDR=localhost
 V1MODEL_PORT=9559
 V1MODEL_DEVICE_ID=0
 
-ACTIVE_TARGETS=
-
 ifeq ($(shell which bf-p4c),)
-$(warning "Barefoot compiler (bf-p4c) is not in the PATH, won't build TNA files")
+  $(warning "Barefoot compiler (bf-p4c) is not in the PATH, won't build TNA files")
 else
-ifeq ($(SDE_INSTALL),)
-$(error "SDE_INSTALL environment variable is NOT set, can't build TNA files")
-else
-ifeq ($(SDE),)
-$(error "SDE environment variable is NOT set, can't build TNA files")
-else
-ACTIVE_TARGETS:=$(ACTIVE_TARGETS) $(TOFINO_OUT) $(TOFINO_P4R_OUT)
-endif
-endif
+  ifeq ($(SDE_INSTALL),)
+    $(error "SDE_INSTALL environment variable is NOT set, can't build TNA files")
+  endif
+  ifeq ($(SDE),)
+    $(error "SDE environment variable is NOT set, can't build TNA files")
+  endif
+  BF_TARGETS:=$(BF_OUT) $(BF_P4INFO_OUT)
 endif
 
 ifeq ($(shell which p4c),)
-$(warning "P4 compiler (p4c) is not in the PATH, won't build V1Model files")
+  $(warning "P4 compiler (p4c) is not in the PATH, won't build V1Model files")
 else
-ACTIVE_TARGETS:=$(ACTIVE_TARGETS) $(V1MODEL_OUT) $(V1MODEL_P4R_OUT)
+  V1MODEL_TARGETS=$(V1MODEL_OUT) $(V1MODEL_P4INFO_OUT)
 endif
+
+$(info BF_TARGETS: $(BF_TARGETS))
+$(info V1MODEL_TARGETS: $(V1MODEL_TARGETS))
 
 .PHONY: clean shell
 
-all: $(ACTIVE_TARGETS)
+all: $(V1MODEL_TARGETS) $(BF_TARGETS)
 
 clean:
 	rm -r ./out
@@ -95,8 +94,8 @@ $(BF_UNPACKED_OUT): out $(BF_P4_FILE)
 
 $(BF_OUT): $(BF_UNPACKED_OUT)
 	p4r-tofino-pack --ctx-json $(BF_DIR)/pipe/context.json \
-				    --tofino-bin $(BF_OUT) \
-					--out $(BF_P4R_OUT) \
+				    --tofino-bin $(BF_UNPACKED_OUT) \
+					--out $(BF_OUT) \
 				    --name $(P4_NAME)
 
 # MAKEFILE COMMAND LINE TOOLS
