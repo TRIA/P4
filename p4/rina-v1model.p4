@@ -310,7 +310,33 @@ parser LocalParser(packet_in packet,
 
 control LocalVerifyChecksum(inout header_t hdr, inout metadata_t meta) {
     apply {
-    
+        verify_checksum(hdr.ipv4.isValid(),
+            { hdr.ipv4.version,
+              hdr.ipv4.ihl,
+              hdr.ipv4.diffserv,
+              hdr.ipv4.total_len,
+              hdr.ipv4.identification,
+              hdr.ipv4.flags,
+              hdr.ipv4.frag_offset,
+              hdr.ipv4.ttl,
+              hdr.ipv4.protocol,
+              hdr.ipv4.src_addr,
+              hdr.ipv4.dst_addr },
+            hdr.ipv4.hdr_checksum,
+            HashAlgorithm.csum16);
+        verify_checksum(hdr.efcp.isValid(),
+            { hdr.efcp.ver,
+              hdr.efcp.dst_addr,
+              hdr.efcp.src_addr,
+              hdr.efcp.qos_id,
+              hdr.efcp.dst_cep_id,
+              hdr.efcp.src_cep_id,
+              hdr.efcp.pdu_type,
+              hdr.efcp.flags,
+              hdr.efcp.len,
+              hdr.efcp.seqnum },
+            hdr.efcp.hdr_checksum,
+            HashAlgorithm.csum16);
     }
 }
 
@@ -332,8 +358,8 @@ control LocalIngress(inout header_t hdr,
     // reference implementation written in P4 but could not find a simple
     // implementation I could partially reuse. The default "switch.p4" is
     // fairly complex.
-    action broadcast(bit<16> mcast_gid) {
-        standard_metadata.mcast_grp = mcast_gid;
+    action broadcast() {
+        standard_metadata.mcast_grp = 1;
 
         hdr.bridged.is_broadcast = 1;
     }
@@ -356,10 +382,10 @@ control LocalIngress(inout header_t hdr,
         const default_action = NoAction();
         const entries = {
             // This is for broadcasts!
-            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFF: broadcast(1);
+            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFF: broadcast();
 
             // This is the multicast mask.
-            0x01005E000000 &&& 0x1FFFFFF00000: broadcast(1);
+            0x01005E000000 &&& 0x1FFFFFF00000: broadcast();
         }
     }
 
@@ -377,40 +403,41 @@ control LocalIngress(inout header_t hdr,
     }
 
     apply {
-        // Deal with L2 routing if its configured.
-        if (hdr.ethernet.isValid()) {
+        ingress_cnt.apply(hdr.ethernet.ether_type);
 
-            ingress_cnt.apply(hdr.ethernet.ether_type);
+        // VLAN routing.
+        if (hdr.dot1q.isValid()) {
+            vlan_map.apply();
+        }
+        // L3 routing otherwise.
+        else {
+            broadcast_map.apply();
 
-            // VLAN routing.
-            if (hdr.dot1q.isValid()) {
-                vlan_map.apply();
+            // The 2 following actions were NOT tested on a real
+            // network. They work with the Tofino model, but it is
+            // not clear they make sense on an actual network. In any
+            // case, they are an interesting learning exercise.
+
+            // RINA routing.
+            if (hdr.efcp.isValid()) {
+               rina_to_dmac.apply(hdr.ethernet, hdr.efcp, standard_metadata);
             }
-            // L3 routing otherwise.
-            else {
-                broadcast_map.apply();
 
-                // The 2 following actions were NOT tested on a real
-                // network. They work with the Tofino model, but it is
-                // not clear they make sense on an actual network. In any
-                // case, they are an interesting learning exercise.
-
-                // RINA routing.
-                rina_to_dmac.apply(hdr.ethernet, hdr.efcp, standard_metadata);
-
-                // IPv4 routing.
-                ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, standard_metadata);
-
-                // Back here we're back in the normal operation of a
-                // L2 switch.
-
-                // We should have an destination MAC address by this point...
-                dmac_to_port.apply(hdr.ethernet, standard_metadata);
+            // IPv4 routing.
+            if (hdr.ipv4.isValid()) {
+                if (standard_metadata.checksum_error == 0) {
+                    ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, standard_metadata);
+                } else {
+                    drop();
+                    return;
+                }
             }
-        } else {
-            // FIXME: Register an error here although it's really not
-            // clear how we'll get there. How will a bad Ethernet will
-            // reach this point, really?
+
+            // Back here we're back in the normal operation of a
+            // L2 switch.
+
+            // We should have an destination MAC address by this point...
+            dmac_to_port.apply(hdr.ethernet, standard_metadata);
         }
     }
 }
@@ -427,16 +454,19 @@ control LocalEgress(inout header_t hdr,
     }
 
     apply {
-        // This is specific to VLANs. This prevents a multicast packet
-        // from going back to its source port.
-        if (hdr.bridged.ingress_port == standard_metadata.egress_port) {
-            drop();
-        }
+        if (hdr.bridged.is_vlan == 1 || hdr.bridged.is_broadcast == 1) {
+           // This is specific to VLANs. This prevents a multicast packet
+           // from going back to its source port.
+           if (hdr.bridged.ingress_port == standard_metadata.egress_port) {
+              drop();
+              return;
+           }
 
-        // FIXME: This is for VLANs and I'm really not sure this is the right
-        // way to proceed.
-        if (hdr.bridged.is_vlan == 1) {
-            port_to_dmac.apply(standard_metadata.egress_port, hdr.ethernet, standard_metadata);
+           // FIXME: This is for VLANs and I'm really not sure this is the right
+           // way to proceed.
+           if (hdr.bridged.is_vlan == 1) {
+               port_to_dmac.apply(standard_metadata.egress_port, hdr.ethernet, standard_metadata);
+           }
         }
 
         // Change the source MAC if necessary
@@ -450,6 +480,33 @@ control LocalEgress(inout header_t hdr,
 control LocalComputeChecksum(inout header_t hdr,
                              inout metadata_t meta) {
     apply {
+        update_checksum(hdr.ipv4.isValid(),
+            { hdr.ipv4.version,
+              hdr.ipv4.ihl,
+              hdr.ipv4.diffserv,
+              hdr.ipv4.total_len,
+              hdr.ipv4.identification,
+              hdr.ipv4.flags,
+              hdr.ipv4.frag_offset,
+              hdr.ipv4.ttl,
+              hdr.ipv4.protocol,
+              hdr.ipv4.src_addr,
+              hdr.ipv4.dst_addr },
+            hdr.ipv4.hdr_checksum,
+            HashAlgorithm.csum16);
+        update_checksum(hdr.efcp.isValid(),
+            { hdr.efcp.ver,
+              hdr.efcp.dst_addr,
+              hdr.efcp.src_addr,
+              hdr.efcp.qos_id,
+              hdr.efcp.dst_cep_id,
+              hdr.efcp.src_cep_id,
+              hdr.efcp.pdu_type,
+              hdr.efcp.flags,
+              hdr.efcp.len,
+              hdr.efcp.seqnum },
+            hdr.efcp.hdr_checksum,
+            HashAlgorithm.csum16);
     }
 }
 

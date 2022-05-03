@@ -25,7 +25,7 @@ class L3IPControlPlane(L2ControlPlane):
 
         for i in mappings:
             te = self.p4helper.buildTableEntry(
-                table_name="LocalIngress.ip_to_dmac.lpm",
+                table_name="LocalIngress.ip_to_dmac.ip2mac",
                 match_fields={
                     "ipv4.dst_addr": i[0]
                 },

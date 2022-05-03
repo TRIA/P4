@@ -47,10 +47,10 @@ class TestL3ICMP(unittest.TestCase):
 
         # Look at the output of the single packet on port 133
         pkts = tB.results
-        self.assertIsNotNone(pkts)
-        self.assertTrue(len(pkts) > 0)
-        self.assertEqual(EDF10_REAL_MAC, pkts[0].dst)
-        self.assertEqual(SWITCH_MAC, pkts[0].src)
+        self.assertIsNotNone(pkts, "No packet data received")
+        self.assertTrue(len(pkts) > 0, ("Nb of received packets %d, expected more than one") % len(pkts))
+        self.assertEqual(EDF10_REAL_MAC, pkts[0].dst, ("Expected ethernet dst %s, received %s") % (EDF10_REAL_MAC, pkts[0].dst))
+        self.assertEqual(SWITCH_MAC, pkts[0].src, ("Expected ethernet src %s, received %s") % (SWITCH_MAC, pkts[0].src))
 
         # Make sure port 132 doesn't have an extra packet.
         pkts = tA.results
@@ -75,14 +75,29 @@ class TestL3ICMP(unittest.TestCase):
         # They should both end up in port B
         tB.join()
         pkts = tB.results
-        self.assertIsNotNone(pkts)
-        self.assertTrue(len(pkts) == 2)
-        self.assertEqual(EDF_DOT3X_IP_1, pkts[0][IP].dst)
-        self.assertEqual(EDF_DOT3X_IP_2, pkts[1][IP].dst)
-        self.assertEqual(EDF9_IP, pkts[0][IP].src)
-        self.assertEqual(EDF9_IP, pkts[1][IP].src)
-        self.assertEqual(SWITCH_MAC, pkts[0].src)
-        self.assertEqual(SWITCH_MAC, pkts[1].src)
+        self.assertIsNotNone(pkts, "No packet data received")
+        self.assertTrue(len(pkts) == 2, ("Nb of received packets %d, expected 2") % len(pkts))
+        self.assertEqual(EDF_DOT3X_IP_1, pkts[0][IP].dst, ("Expected dest %s, received %s") % (EDF_DOT3X_IP_1, pkts[0][IP].dst))
+        self.assertEqual(EDF_DOT3X_IP_2, pkts[1][IP].dst, ("Expected dest %s, received %s") % (EDF_DOT3X_IP_2, pkts[1][IP].dst))
+        self.assertEqual(EDF9_IP, pkts[0][IP].src, ("Expected src %s, received %s") % (EDF9_IP, pkts[0][IP].src))
+        self.assertEqual(EDF9_IP, pkts[1][IP].src, ("Expected src %s, received %s") % (EDF9_IP, pkts[1][IP].src))
+        self.assertEqual(SWITCH_MAC, pkts[0].src, ("Excepted ethernet src %s, received %s") % (SWITCH_MAC, pkts[0].src))
+        self.assertEqual(SWITCH_MAC, pkts[1].src, ("Excepted ethernet src %s, received %s") % (SWITCH_MAC, pkts[1].src))
+
+    def test_bad_icmp_checksum(self):
+        # Bad checksum means the packet should be discarded by the
+        # switch.
+        icmp_ping = Ether(dst=SWITCH_MAC, src=EDF9_REAL_MAC) \
+            / IP(dst=EDF10_IP, src=EDF9_IP, chksum=0xBAD) \
+            / ICMP(type=8)
+        t = AsyncSniffer(iface=PORT_B_VETH, count=1, timeout=2)
+        t.start()
+        time.sleep(1)
+        sendp(icmp_ping, count=1, iface=PORT_A_VETH, verbose=False)
+        t.join()
+        pkts = t.results
+        self.assertIsNotNone(pkts, "No packets packets data received")
+        self.assertTrue(len(pkts) == 0, ("Nb of received packets %d, expected 0") % len(pkts))
 
     def test_basic_icmp3(self):
         # Ping. The target MAC is the address of the switch.
@@ -103,8 +118,8 @@ class TestL3ICMP(unittest.TestCase):
         tA.join()
 
         pkts = tA.results
-        self.assertIsNotNone(pkts)
-        self.assertTrue(len(pkts) == 2)
+        self.assertIsNotNone(pkts, "No packets data received")
+        self.assertTrue(len(pkts) == 2, ("Nb of received packets %d, expected 2") % len(pkts))
 
 if __name__ == '__main__':
     unittest.main()

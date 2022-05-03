@@ -106,7 +106,7 @@ header ipv4_h {
     ipv4_addr_t dst_addr;
 }
 
-header ipv6_h {
+/*header ipv6_h {
     bit<4> version;
     bit<8> traffic_class;
     bit<20> flow_label;
@@ -115,7 +115,7 @@ header ipv6_h {
     bit<8> hop_limit;
     ipv6_addr_t src_addr;
     ipv6_addr_t dst_addr;
-}
+}*/
 
 header tcp_h {
     bit<16> src_port;

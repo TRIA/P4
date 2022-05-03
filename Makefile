@@ -141,4 +141,4 @@ run_switchd:
 	$(SDE)/run_switchd.sh -p $(P4_NAME) -c $(BF_DIR)/$(P4_NAME).conf -- --p4rt-server=$(BF_ADDR):$(BF_PORT) --skip-p4
 
 run_simple_switch:
-	simple_switch_grpc --log-console -L debug $(V1MODEL_OUT)
+	simple_switch_grpc --log-console -L trace -i 132@veth0 -i 148@veth2 $(V1MODEL_OUT)

@@ -31,9 +31,9 @@ class TestICMP(unittest.TestCase):
         sendp(icmp_ping, count=1, iface=PORT_A_VETH, verbose=False)
         t.join()
         pkts = t.results
-        self.assertIsNotNone(pkts)
-        self.assertEqual(EDF10_REAL_MAC, pkts[0].dst)
-        self.assertEqual(EDF9_FAKE_MAC, pkts[0].src)
+        self.assertIsNotNone(pkts, "No packet data received")
+        self.assertEqual(EDF10_REAL_MAC, pkts[0].dst, ("Expected dest %s, received %s") % (EDF10_REAL_MAC, pkts[0].dst))
+        self.assertEqual(EDF9_FAKE_MAC, pkts[0].src, ("Expected src %s, received %s") % (EDF9_FAKE_MAC, pkts[0].src))
 
         # Ping reply
         icmp_reply = Ether(dst=EDF9_FAKE_MAC, src=EDF10_REAL_MAC) \
@@ -45,20 +45,22 @@ class TestICMP(unittest.TestCase):
         sendp(icmp_reply, count=1, iface=PORT_B_VETH, verbose=False)
         t.join()
         pkts = t.results
-        self.assertIsNotNone(pkts)
-        self.assertEqual(EDF9_REAL_MAC, pkts[0].dst)
-        self.assertEqual(EDF10_FAKE_MAC, pkts[0].src)
+        self.assertIsNotNone(pkts, "No packet data received")
+        self.assertEqual(EDF9_REAL_MAC, pkts[0].dst, ("Expected dest %s, received %s") % (EDF9_REAL_MAC, pkts[0].dst))
+        self.assertEqual(EDF10_FAKE_MAC, pkts[0].src, ("Expected src %s, received %s") % (EDF10_FAKE_MAC, pkts[0].src))
 
     def test_broadcast(self):
-        icmp_bcast = Ether(dst="FF:FF:FF:FF:FF:FF", src=EDF9_REAL_MAC)
+        # This broadcasted packet should be available to all ports
+        # except the one where it comes from.
+        bcast = Ether(dst="FF:FF:FF:FF:FF:FF", src=EDF9_REAL_MAC)
         t = AsyncSniffer(iface=PORT_B_VETH, count=1, timeout=2)
         t.start()
         time.sleep(1)
-        sendp(icmp_bcast, count=1, iface=PORT_A_VETH, verbose=False)
+        sendp(bcast, count=1, iface=PORT_A_VETH, verbose=False)
         t.join()
         pkts = t.results
         self.assertIsNotNone(pkts)
-        self.assertTrue(len(pkts) == 1)
+        self.assertTrue(len(pkts) == 1, "Nb packets received %d, expected 1" % len(pkts))
         self.assertEqual("ff:ff:ff:ff:ff:ff", pkts[0].dst)
 
 # Test EFCP packets embedded in Ethernet packet... This is L2
