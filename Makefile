@@ -135,10 +135,10 @@ $(SDE_INSTALL)/$(BF_DIR):
 	ln -s $(PWD)/$(BF_DIR)
 
 run_tofino_model:
-	$(SDE)/run_tofino_model.sh --log-dir $(PWD)/logs -c $(BF_DIR)/$(P4_NAME).conf -p $(P4_NAME) -f $(PWD)/config/ports.json
+	$(SDE)/run_tofino_model.sh --log-dir $(PWD)/logs -c $(BF_DIR)/$(P4_NAME)-bf.conf -p $(P4_NAME) -f $(PWD)/config/ports.json
 
 run_switchd:
-	$(SDE)/run_switchd.sh -p $(P4_NAME) -c $(BF_DIR)/$(P4_NAME).conf -- --p4rt-server=$(BF_ADDR):$(BF_PORT) --skip-p4
+	$(SDE)/run_switchd.sh -p $(P4_NAME) -c $(BF_DIR)/$(P4_NAME)-bf.conf -- --p4rt-server=$(BF_ADDR):$(BF_PORT) --skip-p4
 
 run_simple_switch:
 	simple_switch_grpc --log-console -L trace -i 132@veth0 -i 148@veth2 $(V1MODEL_OUT)
