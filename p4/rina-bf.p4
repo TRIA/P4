@@ -33,7 +33,7 @@ error {
     wrong_pdu_type
 }
 
-parser SwitchIngressParser(
+parser LocalIngressParser(
          packet_in packet,
          out header_t hdr,
          out metadata_t ig_md,
@@ -224,7 +224,7 @@ control IPToDMAC(inout ethernet_h ethernet,
     }
 
     // Prefix IP routing
-    table lpm {
+    table ip2mac {
         key = {
             ipv4.dst_addr: lpm;
         }
@@ -240,7 +240,7 @@ control IPToDMAC(inout ethernet_h ethernet,
     apply {
         if (ipv4.isValid()) {
             if (ig_md.checksum_error == 0) {
-                lpm.apply();
+                ip2mac.apply();
             } else {
                 drop();
             }
@@ -333,7 +333,7 @@ control IngressCounter(in ether_type_t ether_type) {
     }
 }
 
-control SwitchIngress(
+control LocalIngress(
         inout header_t hdr,
         inout metadata_t ig_md,
         in ingress_intrinsic_metadata_t ig_intr_md,
@@ -380,10 +380,10 @@ control SwitchIngress(
         const default_action = NoAction();
         const entries = {
             // This is for broadcasts!
-            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFFF: broadcast(1);
+            0xFFFFFFFFFFFF &&& 0xFFFFFFFFFFFF: broadcast(1);
 
             // This is the multicast mask.
-            0x01005E000000 &&& 0x1FFFFFF000000: broadcast(1);
+            0x01005E000000 &&& 0x1FFFFFF00000: broadcast(1);
         }
     }
 
@@ -423,7 +423,14 @@ control SwitchIngress(
                 rina_to_dmac.apply(hdr.ethernet, hdr.efcp, ig_md, ig_intr_md, ig_intr_dprsr_md);
 
                 // IPv4 routing.
-                ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, ig_md, ig_intr_md, ig_intr_dprsr_md);
+                if (hdr.ipv4.isValid()) {
+                    if (ig_md.checksum_error == 0) {
+                        ip_to_dmac.apply(hdr.ethernet, hdr.ipv4, ig_md, ig_intr_md, ig_intr_dprsr_md);
+                    } else {
+                        drop();
+                        return;
+                    }
+                }
 
                 // Back here we're back in the normal operation of a
                 // L2 switch.
@@ -440,7 +447,7 @@ control SwitchIngress(
 }
 
 
-control SwitchIngressDeparser(
+control LocalIngressDeparser(
         packet_out packet,
         inout header_t hdr,
         in metadata_t ig_md,
@@ -454,7 +461,7 @@ control SwitchIngressDeparser(
     }
 }
 
-parser SwitchEgressParser(
+parser LocalEgressParser(
         packet_in packet,
         out header_t hdr,
         out egress_metadata_t eg_md,
@@ -513,7 +520,7 @@ parser SwitchEgressParser(
     }
 }
 
-control SwitchEgress(
+control LocalEgress(
         inout header_t hdr,
         inout egress_metadata_t eg_md,
         in egress_intrinsic_metadata_t eg_intr_md,
@@ -549,7 +556,7 @@ control SwitchEgress(
     }
 }
 
-control SwitchEgressDeparser(
+control LocalEgressDeparser(
         packet_out packet,
         inout header_t hdr,
         in egress_metadata_t eg_md,
@@ -597,12 +604,12 @@ control SwitchEgressDeparser(
 
 
 
-Pipeline(SwitchIngressParser(),
-         SwitchIngress(),
-         SwitchIngressDeparser(),
-         SwitchEgressParser(),
-         SwitchEgress(),
-         SwitchEgressDeparser()) pipe;
+Pipeline(LocalIngressParser(),
+         LocalIngress(),
+         LocalIngressDeparser(),
+         LocalEgressParser(),
+         LocalEgress(),
+         LocalEgressDeparser()) pipe;
 
 Switch(pipe) main;
 
